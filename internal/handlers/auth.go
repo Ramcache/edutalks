@@ -35,6 +35,7 @@ type registerRequest struct {
 
 type loginRequest struct {
 	Username string `json:"username"`
+	FullName string `json:"full_name"`
 	Password string `json:"password"`
 }
 
@@ -42,6 +43,7 @@ type loginResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	Username     string `json:"username"`
+	FullName     string `json:"full_name"`
 	Role         string `json:"role"`
 }
 
@@ -107,6 +109,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		accessTTL,
 		refreshTTL,
 	)
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -116,8 +119,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		AccessToken:  access,
 		RefreshToken: refresh,
 		Username:     user.Username,
+		FullName:     user.FullName,
 		Role:         user.Role,
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
@@ -240,4 +245,23 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 // @Router /api/admin/dashboard [get]
 func (h *AuthHandler) AdminOnly(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Доступно только администратору"))
+}
+
+// GetUsers godoc
+// @Summary Получить всех пользователей с ролью user
+// @Tags admin
+// @Security ApiKeyAuth
+// @Produce json
+// @Success 200 {array} models.User
+// @Failure 403 {string} string "Доступ запрещён"
+// @Router /api/admin/users [get]
+func (h *AuthHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := h.authService.GetUsers(r.Context())
+	if err != nil {
+		http.Error(w, "Ошибка получения пользователей", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(users)
 }
