@@ -1,0 +1,50 @@
+basePath: /
+definitions:
+  internal_handlers.registerRequest:
+    properties:
+      address:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Документация API Edutalks (регистрация, логин, токены и т.д.).
+  title: Edutalks API
+  version: "1.0"
+paths:
+  /register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Данные регистрации
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Пользователь успешно зарегистрирован
+          schema:
+            type: string
+        "400":
+          description: Ошибка валидации
+          schema:
+            type: string
+      summary: Регистрация нового пользователя
+      tags:
+      - auth
+swagger: "2.0"
