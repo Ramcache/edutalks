@@ -77,6 +77,15 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Пользователь успешно зарегистрирован"))
 }
 
+// Login godoc
+// @Summary Авторизация пользователя
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param input body loginRequest true "Данные для входа"
+// @Success 200 {object} loginResponse
+// @Failure 401 {string} string "Неверный логин или пароль"
+// @Router /login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -99,6 +108,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// Protected godoc
+// @Summary Защищённый маршрут (тест)
+// @Tags protected
+// @Security ApiKeyAuth
+// @Success 200 {string} string "Привет, пользователь с ролью"
+// @Failure 401 {string} string "Нет доступа"
+// @Router /api/profile [get]
 func (h *AuthHandler) Protected(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.ContextUserID)
 	role := r.Context().Value(middleware.ContextRole)
@@ -106,6 +122,14 @@ func (h *AuthHandler) Protected(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprintf("Привет, пользователь #%v с ролью %v", userID, role)))
 }
 
+// Refresh godoc
+// @Summary Обновление access-токена
+// @Tags auth
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {object} map[string]string
+// @Failure 401 {string} string "Недействительный refresh токен"
+// @Router /refresh [post]
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
@@ -151,6 +175,13 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// Logout godoc
+// @Summary Выход (удаление refresh токена)
+// @Tags auth
+// @Security ApiKeyAuth
+// @Success 200 {string} string "Выход выполнен"
+// @Failure 401 {string} string "Невалидный токен"
+// @Router /logout [post]
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
@@ -186,6 +217,13 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Выход выполнен"))
 }
 
+// AdminOnly godoc
+// @Summary Доступ только для администратора
+// @Tags admin
+// @Security ApiKeyAuth
+// @Success 200 {string} string "Доступно только администратору"
+// @Failure 403 {string} string "Доступ запрещён"
+// @Router /api/admin/dashboard [get]
 func (h *AuthHandler) AdminOnly(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Доступно только администратору"))
 }

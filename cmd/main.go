@@ -1,4 +1,7 @@
 // @title Edutalks API
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
 // @version 1.0
 // @description Документация API Edutalks (регистрация, логин, токены и т.д.).
 // @host localhost:8080
