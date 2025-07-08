@@ -43,6 +43,15 @@ type loginResponse struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+// Register godoc
+// @Summary Регистрация нового пользователя
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param input body registerRequest true "Данные регистрации"
+// @Success 201 {string} string "Пользователь успешно зарегистрирован"
+// @Failure 400 {string} string "Ошибка валидации"
+// @Router /register [post]
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
