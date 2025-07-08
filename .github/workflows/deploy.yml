@@ -21,8 +21,8 @@ jobs:
       - name: 🔨 Build the app
         run: |
           cd cmd
-          go build -o ../../main
-          cd ../../
+          go build -o ../main
+          cd ../
 
       - name: 📤 Upload binary and migrations
         uses: appleboy/scp-action@v0.1.7
