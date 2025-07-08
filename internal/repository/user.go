@@ -85,3 +85,38 @@ func (r *UserRepository) DeleteRefreshToken(ctx context.Context, userID int, tok
 	_, err := r.db.Exec(ctx, query, userID, token)
 	return err
 }
+
+func (r *UserRepository) GetAllUsers(ctx context.Context) ([]*models.User, error) {
+	query := `
+		SELECT id, username, full_name, phone, email, address, role, created_at, updated_at
+		FROM users
+		WHERE role = 'user'
+	`
+
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*models.User
+	for rows.Next() {
+		var u models.User
+		err := rows.Scan(
+			&u.ID,
+			&u.Username,
+			&u.FullName,
+			&u.Phone,
+			&u.Email,
+			&u.Address,
+			&u.Role,
+			&u.CreatedAt,
+			&u.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, &u)
+	}
+	return users, nil
+}

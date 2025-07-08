@@ -24,6 +24,7 @@ type UserRepo interface {
 	SaveRefreshToken(ctx context.Context, userID int, token string) error
 	IsRefreshTokenValid(ctx context.Context, userID int, token string) (bool, error)
 	DeleteRefreshToken(ctx context.Context, userID int, token string) error
+	GetAllUsers(ctx context.Context) ([]*models.User, error)
 }
 
 func (s *AuthService) RegisterUser(ctx context.Context, input *models.User, plainPassword string) error {
@@ -113,4 +114,8 @@ func (s *AuthService) LoginUserWithUser(
 	}
 
 	return accessToken, refreshToken, user, nil
+}
+
+func (s *AuthService) GetUsers(ctx context.Context) ([]*models.User, error) {
+	return s.repo.GetAllUsers(ctx)
 }

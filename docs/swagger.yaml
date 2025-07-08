@@ -1,6 +1,8 @@
 definitions:
   handlers.loginRequest:
     properties:
+      full_name:
+        type: string
       password:
         type: string
       username:
@@ -9,6 +11,8 @@ definitions:
   handlers.loginResponse:
     properties:
       access_token:
+        type: string
+      full_name:
         type: string
       refresh_token:
         type: string
@@ -32,6 +36,27 @@ definitions:
       username:
         type: string
     type: object
+  models.User:
+    properties:
+      address:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: integer
+      phone:
+        type: string
+      role:
+        type: string
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
 info:
   contact: {}
   title: Edutalks API
@@ -50,6 +75,26 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Доступ только для администратора
+      tags:
+      - admin
+  /api/admin/users:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.User'
+            type: array
+        "403":
+          description: Доступ запрещён
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Получить всех пользователей с ролью user
       tags:
       - admin
   /api/profile:
