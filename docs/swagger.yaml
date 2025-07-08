@@ -1,6 +1,6 @@
 basePath: /
 definitions:
-  internal_handlers.registerRequest:
+  handlers.registerRequest:
     properties:
       address:
         type: string
@@ -32,7 +32,7 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.registerRequest'
+          $ref: '#/definitions/handlers.registerRequest'
       produces:
       - application/json
       responses:

@@ -34,7 +34,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.registerRequest"
+                            "$ref": "#/definitions/handlers.registerRequest"
                         }
                     }
                 ],
@@ -56,7 +56,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "internal_handlers.registerRequest": {
+        "handlers.registerRequest": {
             "type": "object",
             "properties": {
                 "address": {
