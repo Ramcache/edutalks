@@ -23,6 +23,6 @@ jobs:
       - name: 🔨 Build the app
         run: |
           cd cmd
-          go build -o ../../main
-          cd ../../
+          go build -o ../main
+          cd ../
           echo "✅ Build complete"

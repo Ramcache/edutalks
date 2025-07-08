@@ -41,6 +41,8 @@ type loginRequest struct {
 type loginResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
+	Username     string `json:"username"`
+	Role         string `json:"role"`
 }
 
 // Register godoc
@@ -97,13 +99,25 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	accessTTL, _ := time.ParseDuration(cfg.AccessTokenTTL)
 	refreshTTL, _ := time.ParseDuration(cfg.RefreshTokenTTL)
 
-	access, refresh, err := h.authService.LoginUser(context.Background(), req.Username, req.Password, cfg.JWTSecret, accessTTL, refreshTTL)
+	access, refresh, user, err := h.authService.LoginUserWithUser(
+		context.Background(),
+		req.Username,
+		req.Password,
+		cfg.JWTSecret,
+		accessTTL,
+		refreshTTL,
+	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
-	resp := loginResponse{AccessToken: access, RefreshToken: refresh}
+	resp := loginResponse{
+		AccessToken:  access,
+		RefreshToken: refresh,
+		Username:     user.Username,
+		Role:         user.Role,
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
