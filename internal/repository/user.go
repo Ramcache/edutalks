@@ -1,0 +1,87 @@
+package repository
+
+import (
+	"context"
+	"edutalks/internal/models"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type UserRepository struct {
+	db *pgxpool.Pool
+}
+
+func NewUserRepository(db *pgxpool.Pool) *UserRepository {
+	return &UserRepository{db: db}
+}
+
+func (r *UserRepository) CreateUser(ctx context.Context, user *models.User) error {
+	query := `
+	INSERT INTO users (username, full_name, phone, email, address, password_hash, role)
+	VALUES ($1, $2, $3, $4, $5, $6, $7)`
+	_, err := r.db.Exec(ctx, query,
+		user.Username,
+		user.FullName,
+		user.Phone,
+		user.Email,
+		user.Address,
+		user.PasswordHash,
+		user.Role,
+	)
+	return err
+}
+
+func (r *UserRepository) IsUsernameTaken(ctx context.Context, username string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)`
+	var exists bool
+	err := r.db.QueryRow(ctx, query, username).Scan(&exists)
+	return exists, err
+}
+
+func (r *UserRepository) IsEmailTaken(ctx context.Context, email string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`
+	var exists bool
+	err := r.db.QueryRow(ctx, query, email).Scan(&exists)
+	return exists, err
+}
+
+func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*models.User, error) {
+	query := `SELECT id, username, full_name, phone, email, address, password_hash, role, created_at, updated_at FROM users WHERE username = $1`
+
+	var user models.User
+	err := r.db.QueryRow(ctx, query, username).Scan(
+		&user.ID,
+		&user.Username,
+		&user.FullName,
+		&user.Phone,
+		&user.Email,
+		&user.Address,
+		&user.PasswordHash,
+		&user.Role,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *UserRepository) SaveRefreshToken(ctx context.Context, userID int, token string) error {
+	query := `INSERT INTO refresh_tokens (user_id, token) VALUES ($1, $2)`
+	_, err := r.db.Exec(ctx, query, userID, token)
+	return err
+}
+
+func (r *UserRepository) IsRefreshTokenValid(ctx context.Context, userID int, token string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM refresh_tokens WHERE user_id = $1 AND token = $2)`
+	var exists bool
+	err := r.db.QueryRow(ctx, query, userID, token).Scan(&exists)
+	return exists, err
+}
+
+func (r *UserRepository) DeleteRefreshToken(ctx context.Context, userID int, token string) error {
+	query := `DELETE FROM refresh_tokens WHERE user_id = $1 AND token = $2`
+	_, err := r.db.Exec(ctx, query, userID, token)
+	return err
+}

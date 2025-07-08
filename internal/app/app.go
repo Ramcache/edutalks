@@ -1,0 +1,28 @@
+package app
+
+import (
+	"edutalks/internal/config"
+	"edutalks/internal/db"
+	"edutalks/internal/handlers"
+	"edutalks/internal/repository"
+	"edutalks/internal/routes"
+	"edutalks/internal/services"
+
+	"github.com/gorilla/mux"
+)
+
+func InitApp(cfg *config.Config) (*mux.Router, error) {
+	conn, err := db.NewPostgresConnection(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	userRepo := repository.NewUserRepository(conn)
+	authService := services.NewAuthService(userRepo)
+	authHandler := handlers.NewAuthHandler(authService)
+
+	router := mux.NewRouter()
+	routes.InitRoutes(router, authHandler)
+
+	return router, nil
+}
