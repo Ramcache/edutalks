@@ -83,3 +83,34 @@ func (s *AuthService) ValidateRefreshToken(ctx context.Context, userID int, toke
 func (s *AuthService) Logout(ctx context.Context, userID int, token string) error {
 	return s.repo.DeleteRefreshToken(ctx, userID, token)
 }
+
+func (s *AuthService) LoginUserWithUser(
+	ctx context.Context,
+	username, password, jwtSecret string,
+	accessTTL, refreshTTL time.Duration,
+) (string, string, *models.User, error) {
+	user, err := s.repo.GetByUsername(ctx, username)
+	if err != nil {
+		return "", "", nil, errors.New("пользователь не найден")
+	}
+
+	if !utils.CheckPasswordHash(password, user.PasswordHash) {
+		return "", "", nil, errors.New("неверный пароль")
+	}
+
+	accessToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, accessTTL)
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	refreshToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, refreshTTL)
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	if err := s.repo.SaveRefreshToken(ctx, user.ID, refreshToken); err != nil {
+		return "", "", nil, err
+	}
+
+	return accessToken, refreshToken, user, nil
+}

@@ -1,5 +1,22 @@
-basePath: /
 definitions:
+  handlers.loginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  handlers.loginResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+      role:
+        type: string
+      username:
+        type: string
+    type: object
   handlers.registerRequest:
     properties:
       address:
@@ -15,13 +32,103 @@ definitions:
       username:
         type: string
     type: object
-host: localhost:8080
 info:
   contact: {}
-  description: Документация API Edutalks (регистрация, логин, токены и т.д.).
   title: Edutalks API
-  version: "1.0"
 paths:
+  /api/admin/dashboard:
+    get:
+      responses:
+        "200":
+          description: Доступно только администратору
+          schema:
+            type: string
+        "403":
+          description: Доступ запрещён
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Доступ только для администратора
+      tags:
+      - admin
+  /api/profile:
+    get:
+      responses:
+        "200":
+          description: Привет, пользователь с ролью
+          schema:
+            type: string
+        "401":
+          description: Нет доступа
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Защищённый маршрут (тест)
+      tags:
+      - protected
+  /login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Данные для входа
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.loginResponse'
+        "401":
+          description: Неверный логин или пароль
+          schema:
+            type: string
+      summary: Авторизация пользователя
+      tags:
+      - auth
+  /logout:
+    post:
+      responses:
+        "200":
+          description: Выход выполнен
+          schema:
+            type: string
+        "401":
+          description: Невалидный токен
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Выход (удаление refresh токена)
+      tags:
+      - auth
+  /refresh:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Недействительный refresh токен
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Обновление access-токена
+      tags:
+      - auth
   /register:
     post:
       consumes:
@@ -47,4 +154,10 @@ paths:
       summary: Регистрация нового пользователя
       tags:
       - auth
+securityDefinitions:
+  ApiKeyAuth:
+    description: Документация API Edutalks (регистрация, логин, токены и т.д.).
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
