@@ -31,10 +31,10 @@ type UserRepo interface {
 
 func (s *AuthService) RegisterUser(ctx context.Context, input *models.User, plainPassword string) error {
 	if exists, _ := s.repo.IsUsernameTaken(ctx, input.Username); exists {
-		return errors.New("username already taken")
+		return errors.New("имя пользователя уже занято")
 	}
 	if exists, _ := s.repo.IsEmailTaken(ctx, input.Email); exists {
-		return errors.New("email already registered")
+		return errors.New("адрес электронной почты уже зарегистрирован")
 	}
 
 	hashed, err := utils.HashPassword(plainPassword)
