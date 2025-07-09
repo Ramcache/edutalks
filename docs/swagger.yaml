@@ -36,6 +36,19 @@ definitions:
       username:
         type: string
     type: object
+  models.UpdateUserRequest:
+    properties:
+      address:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      phone:
+        type: string
+      role:
+        type: string
+    type: object
   models.User:
     properties:
       address:
@@ -95,6 +108,69 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Получить всех пользователей с ролью user
+      tags:
+      - admin
+  /api/admin/users/{id}:
+    get:
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Невалидный ID
+          schema:
+            type: string
+        "404":
+          description: Пользователь не найден
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Получить пользователя по ID
+      tags:
+      - admin
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Что обновить
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Пользователь обновлён
+          schema:
+            type: string
+        "400":
+          description: Ошибка валидации
+          schema:
+            type: string
+        "404":
+          description: Пользователь не найден
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Частичное обновление пользователя
       tags:
       - admin
   /api/profile:
