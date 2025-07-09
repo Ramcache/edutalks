@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler) {
+func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentHandler *handlers.DocumentHandler) {
 	router.HandleFunc("/register", authHandler.Register).Methods("POST")
 	router.HandleFunc("/login", authHandler.Login).Methods("POST")
 	router.HandleFunc("/refresh", authHandler.Refresh).Methods("POST")
@@ -17,6 +17,9 @@ func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler) {
 	//jwt
 	protected := router.PathPrefix("/api").Subrouter()
 	protected.Use(middleware.JWTAuth)
+
+	fileRoutes := protected.PathPrefix("/files").Subrouter()
+	fileRoutes.HandleFunc("/upload", documentHandler.UploadDocument).Methods("POST")
 
 	//only
 	admin := protected.PathPrefix("/admin").Subrouter()

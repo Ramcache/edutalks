@@ -173,6 +173,32 @@ paths:
       summary: Частичное обновление пользователя
       tags:
       - admin
+  /api/files/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Документ
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Файл загружен
+          schema:
+            type: string
+        "400":
+          description: Ошибка загрузки
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Загрузка документа
+      tags:
+      - files
   /api/profile:
     get:
       responses:
