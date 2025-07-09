@@ -23,6 +23,8 @@ func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler) {
 	admin.Use(middleware.OnlyRole("admin"))
 	admin.HandleFunc("/dashboard", authHandler.AdminOnly).Methods("GET")
 	admin.HandleFunc("/users", authHandler.GetUsers).Methods("GET")
+	admin.HandleFunc("/users/{id}", authHandler.GetUserByID).Methods("GET")
+	admin.HandleFunc("/users/{id}", authHandler.UpdateUser).Methods("PATCH")
 
 	protected.HandleFunc("/profile", authHandler.Protected).Methods("GET")
 }
