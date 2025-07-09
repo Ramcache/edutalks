@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 	"edutalks/internal/models"
+	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -119,4 +121,71 @@ func (r *UserRepository) GetAllUsers(ctx context.Context) ([]*models.User, error
 		users = append(users, &u)
 	}
 	return users, nil
+}
+
+func (r *UserRepository) GetUserByID(ctx context.Context, id int) (*models.User, error) {
+	query := `
+		SELECT id, username, full_name, phone, email, address, role, created_at, updated_at
+		FROM users
+		WHERE id = $1
+	`
+
+	var u models.User
+	err := r.db.QueryRow(ctx, query, id).Scan(
+		&u.ID,
+		&u.Username,
+		&u.FullName,
+		&u.Phone,
+		&u.Email,
+		&u.Address,
+		&u.Role,
+		&u.CreatedAt,
+		&u.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (r *UserRepository) UpdateUserFields(ctx context.Context, id int, input *models.UpdateUserRequest) error {
+	query := `UPDATE users SET`
+	args := []interface{}{}
+	argNum := 1
+
+	if input.FullName != nil {
+		query += fmt.Sprintf(" full_name = $%d,", argNum)
+		args = append(args, *input.FullName)
+		argNum++
+	}
+	if input.Email != nil {
+		query += fmt.Sprintf(" email = $%d,", argNum)
+		args = append(args, *input.Email)
+		argNum++
+	}
+	if input.Phone != nil {
+		query += fmt.Sprintf(" phone = $%d,", argNum)
+		args = append(args, *input.Phone)
+		argNum++
+	}
+	if input.Address != nil {
+		query += fmt.Sprintf(" address = $%d,", argNum)
+		args = append(args, *input.Address)
+		argNum++
+	}
+	if input.Role != nil {
+		query += fmt.Sprintf(" role = $%d,", argNum)
+		args = append(args, *input.Role)
+		argNum++
+	}
+
+	if len(args) == 0 {
+		return nil // ничего не обновляем
+	}
+
+	query = strings.TrimSuffix(query, ",") + fmt.Sprintf(" WHERE id = $%d", argNum)
+	args = append(args, id)
+
+	_, err := r.db.Exec(ctx, query, args...)
+	return err
 }

@@ -10,10 +10,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/gorilla/mux"
 )
 
 type AuthHandler struct {
@@ -264,4 +266,68 @@ func (h *AuthHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(users)
+}
+
+// GetUserByID godoc
+// @Summary Получить пользователя по ID
+// @Tags admin
+// @Security ApiKeyAuth
+// @Produce json
+// @Param id path int true "ID пользователя"
+// @Success 200 {object} models.User
+// @Failure 400 {string} string "Невалидный ID"
+// @Failure 404 {string} string "Пользователь не найден"
+// @Router /api/admin/users/{id} [get]
+func (h *AuthHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Невалидный ID", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.authService.GetUserByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Пользователь не найден", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
+}
+
+// UpdateUser godoc
+// @Summary Частичное обновление пользователя
+// @Tags admin
+// @Security ApiKeyAuth
+// @Param id path int true "ID пользователя"
+// @Accept json
+// @Produce json
+// @Param input body updateUserRequest true "Что обновить"
+// @Success 200 {string} string "Пользователь обновлён"
+// @Failure 400 {string} string "Ошибка валидации"
+// @Failure 404 {string} string "Пользователь не найден"
+// @Router /api/admin/users/{id} [patch]
+func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, "Невалидный ID", http.StatusBadRequest)
+		return
+	}
+
+	var input models.UpdateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "Невалидный JSON", http.StatusBadRequest)
+		return
+	}
+
+	err = h.authService.UpdateUser(r.Context(), id, &input)
+	if err != nil {
+		http.Error(w, "Ошибка при обновлении", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte("Пользователь обновлён"))
 }
