@@ -304,7 +304,7 @@ func (h *AuthHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 // @Param id path int true "ID пользователя"
 // @Accept json
 // @Produce json
-// @Param input body updateUserRequest true "Что обновить"
+// @Param input body models.UpdateUserRequest true "Что обновить"
 // @Success 200 {string} string "Пользователь обновлён"
 // @Failure 400 {string} string "Ошибка валидации"
 // @Failure 404 {string} string "Пользователь не найден"
