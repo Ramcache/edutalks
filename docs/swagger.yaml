@@ -36,6 +36,23 @@ definitions:
       username:
         type: string
     type: object
+  models.Document:
+    properties:
+      description:
+        type: string
+      filename:
+        type: string
+      filepath:
+        type: string
+      id:
+        type: integer
+      is_public:
+        type: boolean
+      uploaded_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
   models.UpdateUserRequest:
     properties:
       address:
@@ -74,6 +91,62 @@ info:
   contact: {}
   title: Edutalks API
 paths:
+  /admin/files/{id}:
+    delete:
+      parameters:
+      - description: ID документа
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: Документ удалён
+          schema:
+            type: string
+        "404":
+          description: Документ не найден
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Удаление документа (только для админа)
+      tags:
+      - admin
+  /admin/files/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Файл документа
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Описание файла
+        in: formData
+        name: description
+        type: string
+      - description: Доступен по подписке?
+        in: formData
+        name: is_public
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Файл загружен
+          schema:
+            type: string
+        "400":
+          description: Ошибка загрузки
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Загрузка документа (только для админа)
+      tags:
+      - admin
   /api/admin/dashboard:
     get:
       responses:
@@ -173,30 +246,48 @@ paths:
       summary: Частичное обновление пользователя
       tags:
       - admin
-  /api/files/upload:
-    post:
-      consumes:
-      - multipart/form-data
-      parameters:
-      - description: Документ
-        in: formData
-        name: file
-        required: true
-        type: file
+  /api/files:
+    get:
       produces:
       - application/json
       responses:
         "200":
-          description: Файл загружен
+          description: OK
           schema:
-            type: string
-        "400":
-          description: Ошибка загрузки
+            items:
+              $ref: '#/definitions/models.Document'
+            type: array
+        "500":
+          description: Ошибка сервера
           schema:
             type: string
       security:
       - ApiKeyAuth: []
-      summary: Загрузка документа
+      summary: Список доступных документов (по подписке)
+      tags:
+      - files
+  /api/files/{id}:
+    get:
+      parameters:
+      - description: ID документа
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "404":
+          description: Документ не найден
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Скачать документ по ID
       tags:
       - files
   /api/profile:

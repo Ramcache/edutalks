@@ -40,5 +40,3 @@ func main() {
 	fmt.Println("Сервер запущен на порту", cfg.Port)
 	http.ListenAndServe(":"+cfg.Port, corsMiddleware.Handler(router))
 }
-
-//test
