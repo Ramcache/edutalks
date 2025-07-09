@@ -35,7 +35,7 @@ func NewDocumentHandler(s *services.DocumentService) *DocumentHandler {
 // @Param is_public formData bool false "Доступен по подписке?"
 // @Success 200 {string} string "Файл загружен"
 // @Failure 400 {string} string "Ошибка загрузки"
-// @Router /admin/files/upload [post]
+// @Router /api/admin/files/upload [post]
 func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.ContextUserID).(int)
 
@@ -124,7 +124,7 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 // @Param id path int true "ID документа"
 // @Success 200 {string} string "Документ удалён"
 // @Failure 404 {string} string "Документ не найден"
-// @Router /admin/files/{id} [delete]
+// @Router /api/admin/files/{id} [delete]
 func (h *DocumentHandler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"])

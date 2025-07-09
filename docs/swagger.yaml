@@ -91,7 +91,23 @@ info:
   contact: {}
   title: Edutalks API
 paths:
-  /admin/files/{id}:
+  /api/admin/dashboard:
+    get:
+      responses:
+        "200":
+          description: Доступно только администратору
+          schema:
+            type: string
+        "403":
+          description: Доступ запрещён
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Доступ только для администратора
+      tags:
+      - admin
+  /api/admin/files/{id}:
     delete:
       parameters:
       - description: ID документа
@@ -113,7 +129,7 @@ paths:
       summary: Удаление документа (только для админа)
       tags:
       - admin
-  /admin/files/upload:
+  /api/admin/files/upload:
     post:
       consumes:
       - multipart/form-data
@@ -145,22 +161,6 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Загрузка документа (только для админа)
-      tags:
-      - admin
-  /api/admin/dashboard:
-    get:
-      responses:
-        "200":
-          description: Доступно только администратору
-          schema:
-            type: string
-        "403":
-          description: Доступ запрещён
-          schema:
-            type: string
-      security:
-      - ApiKeyAuth: []
-      summary: Доступ только для администратора
       tags:
       - admin
   /api/admin/users:

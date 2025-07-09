@@ -15,7 +15,34 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/admin/files/upload": {
+        "/api/admin/dashboard": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Доступ только для администратора",
+                "responses": {
+                    "200": {
+                        "description": "Доступно только администратору",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Доступ запрещён",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/files/upload": {
             "post": {
                 "security": [
                     {
@@ -69,7 +96,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/files/{id}": {
+        "/api/admin/files/{id}": {
             "delete": {
                 "security": [
                     {
@@ -98,33 +125,6 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Документ не найден",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/admin/dashboard": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "tags": [
-                    "admin"
-                ],
-                "summary": "Доступ только для администратора",
-                "responses": {
-                    "200": {
-                        "description": "Доступно только администратору",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "403": {
-                        "description": "Доступ запрещён",
                         "schema": {
                             "type": "string"
                         }
