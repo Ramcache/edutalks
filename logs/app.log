@@ -42,3 +42,65 @@
 {"level":"INFO","time":"2025-07-13T18:48:30.953+0300","message":"Репозиторий: удаление документа","doc_id":4}
 {"level":"INFO","time":"2025-07-13T18:48:30.960+0300","message":"Документ успешно удалён","doc_id":4}
 {"level":"INFO","time":"2025-07-13T18:48:30.961+0300","message":"HTTP-запрос","method":"DELETE","path":"/api/admin/files/4","status":200,"duration":10712800}
+{"level":"INFO","time":"2025-07-13T19:14:18.636+0300","message":"Сервер запущен","port":"8080"}
+{"level":"INFO","time":"2025-07-13T19:14:33.639+0300","message":"Запрос на скачивание документа","user_id":11}
+{"level":"INFO","time":"2025-07-13T19:14:33.640+0300","message":"Получение пользователя по ID (service)","user_id":11}
+{"level":"DEBUG","time":"2025-07-13T19:14:33.641+0300","message":"Получение пользователя по ID (repo)","user_id":11}
+{"level":"ERROR","time":"2025-07-13T19:14:33.647+0300","message":"Ошибка получения пользователя по ID (repo)","user_id":11,"error":"no rows in result set"}
+{"level":"WARN","time":"2025-07-13T19:14:33.648+0300","message":"Пользователь не найден по ID (service)","user_id":11,"error":"no rows in result set"}
+{"level":"WARN","time":"2025-07-13T19:14:33.648+0300","message":"Пользователь не найден при скачивании документа","user_id":11}
+{"level":"INFO","time":"2025-07-13T19:14:33.649+0300","message":"HTTP-запрос","method":"GET","path":"/api/files/3","status":401,"duration":10200900}
+{"level":"INFO","time":"2025-07-13T19:14:42.632+0300","message":"Попытка входа","username":"admin"}
+{"level":"INFO","time":"2025-07-13T19:14:42.634+0300","message":"Попытка входа с возвратом user (service)","username":"admin"}
+{"level":"DEBUG","time":"2025-07-13T19:14:42.634+0300","message":"Получение пользователя по username (repo)","username":"admin"}
+{"level":"DEBUG","time":"2025-07-13T19:14:42.967+0300","message":"Сохранение refresh токена (repo)","user_id":1}
+{"level":"INFO","time":"2025-07-13T19:14:42.978+0300","message":"Вход выполнен (service)","username":"admin"}
+{"level":"INFO","time":"2025-07-13T19:14:42.979+0300","message":"Вход выполнен","username":"admin","role":"admin"}
+{"level":"INFO","time":"2025-07-13T19:14:42.980+0300","message":"HTTP-запрос","method":"POST","path":"/login","status":200,"duration":347342000}
+{"level":"INFO","time":"2025-07-13T19:14:54.658+0300","message":"Запрос на скачивание документа","user_id":1}
+{"level":"INFO","time":"2025-07-13T19:14:54.659+0300","message":"Получение пользователя по ID (service)","user_id":1}
+{"level":"DEBUG","time":"2025-07-13T19:14:54.659+0300","message":"Получение пользователя по ID (repo)","user_id":1}
+{"level":"INFO","time":"2025-07-13T19:14:54.660+0300","message":"Сервис: получение документа по ID","doc_id":3}
+{"level":"INFO","time":"2025-07-13T19:14:54.660+0300","message":"Репозиторий: получение документа по ID","doc_id":3}
+{"level":"ERROR","time":"2025-07-13T19:14:54.663+0300","message":"Ошибка получения документа по ID (repo)","doc_id":3,"error":"no rows in result set"}
+{"level":"ERROR","time":"2025-07-13T19:14:54.664+0300","message":"Ошибка получения документа по ID (service)","doc_id":3,"error":"no rows in result set"}
+{"level":"WARN","time":"2025-07-13T19:14:54.665+0300","message":"Документ не найден","doc_id":3}
+{"level":"INFO","time":"2025-07-13T19:14:54.665+0300","message":"HTTP-запрос","method":"GET","path":"/api/files/3","status":404,"duration":7620700}
+{"level":"INFO","time":"2025-07-13T19:15:02.290+0300","message":"Запрос на получение списка публичных документов"}
+{"level":"INFO","time":"2025-07-13T19:15:02.290+0300","message":"Сервис: получение публичных документов"}
+{"level":"INFO","time":"2025-07-13T19:15:02.291+0300","message":"Репозиторий: получение публичных документов"}
+{"level":"INFO","time":"2025-07-13T19:15:02.299+0300","message":"Документы получены","count":0}
+{"level":"INFO","time":"2025-07-13T19:15:02.300+0300","message":"HTTP-запрос","method":"GET","path":"/api/files","status":200,"duration":10069200}
+{"level":"INFO","time":"2025-07-13T19:15:11.161+0300","message":"Запрос на загрузку документа"}
+{"level":"INFO","time":"2025-07-13T19:15:11.163+0300","message":"Сохраняем информацию о документе","filename":"snickers.jpg","user_id":1}
+{"level":"INFO","time":"2025-07-13T19:15:11.163+0300","message":"Сервис: загрузка документа","filename":"snickers.jpg","user_id":1}
+{"level":"INFO","time":"2025-07-13T19:15:11.164+0300","message":"Репозиторий: сохранение документа","filename":"snickers.jpg","user_id":1}
+{"level":"INFO","time":"2025-07-13T19:15:11.167+0300","message":"Документ успешно загружен","filename":"snickers.jpg","user_id":1}
+{"level":"INFO","time":"2025-07-13T19:15:11.167+0300","message":"HTTP-запрос","method":"POST","path":"/api/admin/files/upload","status":201,"duration":6793600}
+{"level":"INFO","time":"2025-07-13T19:15:15.040+0300","message":"Запрос на получение списка публичных документов"}
+{"level":"INFO","time":"2025-07-13T19:15:15.041+0300","message":"Сервис: получение публичных документов"}
+{"level":"INFO","time":"2025-07-13T19:15:15.041+0300","message":"Репозиторий: получение публичных документов"}
+{"level":"INFO","time":"2025-07-13T19:15:15.042+0300","message":"Документы получены","count":1}
+{"level":"INFO","time":"2025-07-13T19:15:15.043+0300","message":"HTTP-запрос","method":"GET","path":"/api/files","status":200,"duration":3878700}
+{"level":"INFO","time":"2025-07-13T19:15:50.836+0300","message":"Запрос на скачивание документа","user_id":1}
+{"level":"INFO","time":"2025-07-13T19:15:50.837+0300","message":"Получение пользователя по ID (service)","user_id":1}
+{"level":"DEBUG","time":"2025-07-13T19:15:50.837+0300","message":"Получение пользователя по ID (repo)","user_id":1}
+{"level":"INFO","time":"2025-07-13T19:15:50.838+0300","message":"Сервис: получение документа по ID","doc_id":5}
+{"level":"INFO","time":"2025-07-13T19:15:50.838+0300","message":"Репозиторий: получение документа по ID","doc_id":5}
+{"level":"WARN","time":"2025-07-13T19:15:50.839+0300","message":"Попытка доступа к файлу без подписки","user_id":1,"doc_id":5}
+{"level":"INFO","time":"2025-07-13T19:15:50.839+0300","message":"HTTP-запрос","method":"GET","path":"/api/files/5","status":403,"duration":3345900}
+{"level":"INFO","time":"2025-07-13T19:20:35.691+0300","message":"Сервер запущен","port":"8080"}
+{"level":"INFO","time":"2025-07-13T19:20:36.394+0300","message":"Запрос на скачивание документа","user_id":1}
+{"level":"INFO","time":"2025-07-13T19:20:36.394+0300","message":"Получение пользователя по ID (service)","user_id":1}
+{"level":"DEBUG","time":"2025-07-13T19:20:36.395+0300","message":"Получение пользователя по ID (repo)","user_id":1}
+{"level":"INFO","time":"2025-07-13T19:20:36.404+0300","message":"Сервис: получение документа по ID","doc_id":5}
+{"level":"INFO","time":"2025-07-13T19:20:36.404+0300","message":"Репозиторий: получение документа по ID","doc_id":5}
+{"level":"INFO","time":"2025-07-13T19:20:36.410+0300","message":"Документ успешно скачан","filename":"snickers.jpg","user_id":1}
+{"level":"INFO","time":"2025-07-13T19:20:36.410+0300","message":"HTTP-запрос","method":"GET","path":"/api/files/5","status":200,"duration":18423400}
+{"level":"INFO","time":"2025-07-13T19:20:43.726+0300","message":"Запрос на скачивание документа","user_id":1}
+{"level":"INFO","time":"2025-07-13T19:20:43.726+0300","message":"Получение пользователя по ID (service)","user_id":1}
+{"level":"DEBUG","time":"2025-07-13T19:20:43.727+0300","message":"Получение пользователя по ID (repo)","user_id":1}
+{"level":"INFO","time":"2025-07-13T19:20:43.728+0300","message":"Сервис: получение документа по ID","doc_id":5}
+{"level":"INFO","time":"2025-07-13T19:20:43.728+0300","message":"Репозиторий: получение документа по ID","doc_id":5}
+{"level":"INFO","time":"2025-07-13T19:20:43.730+0300","message":"Документ успешно скачан","filename":"snickers.jpg","user_id":1}
+{"level":"INFO","time":"2025-07-13T19:20:43.730+0300","message":"HTTP-запрос","method":"GET","path":"/api/files/5","status":200,"duration":5178900}

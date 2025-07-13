@@ -156,7 +156,7 @@ func (r *UserRepository) GetAllUsers(ctx context.Context) ([]*models.User, error
 func (r *UserRepository) GetUserByID(ctx context.Context, id int) (*models.User, error) {
 	logger.Log.Debug("Получение пользователя по ID (repo)", zap.Int("user_id", id))
 	query := `
-		SELECT id, username, full_name, phone, email, address, role, created_at, updated_at
+		SELECT id, username, full_name, phone, email, address, role, created_at, updated_at, has_subscription
 		FROM users
 		WHERE id = $1
 	`
@@ -172,6 +172,7 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id int) (*models.User,
 		&u.Role,
 		&u.CreatedAt,
 		&u.UpdatedAt,
+		&u.HasSubscription, // добавь это!
 	)
 	if err != nil {
 		logger.Log.Error("Ошибка получения пользователя по ID (repo)", zap.Int("user_id", id), zap.Error(err))
