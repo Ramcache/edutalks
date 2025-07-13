@@ -5,6 +5,7 @@ import (
 	"edutalks/internal/logger"
 	"edutalks/internal/models"
 	"edutalks/internal/services"
+	helpers "edutalks/internal/utils/helpres"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -47,7 +48,7 @@ func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
 	var req createNewsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logger.Log.Warn("Невалидный JSON при создании новости", zap.Error(err))
-		http.Error(w, "Невалидный JSON", http.StatusBadRequest)
+		helpers.Error(w, http.StatusBadRequest, "Невалидный JSON")
 		return
 	}
 
@@ -59,13 +60,12 @@ func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.newsService.Create(context.Background(), news); err != nil {
 		logger.Log.Error("Ошибка создания новости", zap.Error(err))
-		http.Error(w, "Ошибка создания", http.StatusInternalServerError)
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка создания")
 		return
 	}
 
 	logger.Log.Info("Новость успешно создана", zap.String("title", news.Title))
-	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("Новость создана"))
+	helpers.JSON(w, http.StatusCreated, "Новость создана")
 }
 
 // ListNews godoc
@@ -80,13 +80,12 @@ func (h *NewsHandler) ListNews(w http.ResponseWriter, r *http.Request) {
 	newsList, err := h.newsService.List(r.Context())
 	if err != nil {
 		logger.Log.Error("Ошибка получения новостей", zap.Error(err))
-		http.Error(w, "Ошибка получения новостей", http.StatusInternalServerError)
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка получения новостей")
 		return
 	}
 
 	logger.Log.Info("Новости получены", zap.Int("count", len(newsList)))
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(newsList)
+	helpers.JSON(w, http.StatusOK, newsList)
 }
 
 // GetNews godoc
@@ -103,13 +102,12 @@ func (h *NewsHandler) GetNews(w http.ResponseWriter, r *http.Request) {
 	news, err := h.newsService.GetByID(r.Context(), id)
 	if err != nil {
 		logger.Log.Warn("Новость не найдена", zap.Int("news_id", id))
-		http.Error(w, "Новость не найдена", http.StatusNotFound)
+		helpers.Error(w, http.StatusNotFound, "Новость не найдена")
 		return
 	}
 
 	logger.Log.Info("Новость получена", zap.Int("news_id", id))
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(news)
+	helpers.JSON(w, http.StatusOK, news)
 }
 
 // UpdateNews godoc
@@ -126,18 +124,18 @@ func (h *NewsHandler) UpdateNews(w http.ResponseWriter, r *http.Request) {
 	var req updateNewsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logger.Log.Warn("Невалидный JSON при обновлении новости", zap.Error(err))
-		http.Error(w, "Невалидный JSON", http.StatusBadRequest)
+		helpers.Error(w, http.StatusBadRequest, "Невалидный JSON")
 		return
 	}
 
 	if err := h.newsService.Update(r.Context(), id, req.Title, req.Content); err != nil {
 		logger.Log.Error("Ошибка обновления новости", zap.Error(err), zap.Int("news_id", id))
-		http.Error(w, "Ошибка обновления", http.StatusInternalServerError)
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка обновления")
 		return
 	}
 
 	logger.Log.Info("Новость успешно обновлена", zap.Int("news_id", id))
-	w.Write([]byte("Обновлено"))
+	helpers.JSON(w, http.StatusOK, "Обновлено")
 }
 
 // DeleteNews godoc
@@ -152,10 +150,10 @@ func (h *NewsHandler) DeleteNews(w http.ResponseWriter, r *http.Request) {
 	logger.Log.Info("Запрос на удаление новости", zap.Int("news_id", id))
 	if err := h.newsService.Delete(r.Context(), id); err != nil {
 		logger.Log.Error("Ошибка удаления новости", zap.Error(err), zap.Int("news_id", id))
-		http.Error(w, "Ошибка удаления", http.StatusInternalServerError)
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка удаления")
 		return
 	}
 
 	logger.Log.Info("Новость успешно удалена", zap.Int("news_id", id))
-	w.Write([]byte("Удалено"))
+	helpers.JSON(w, http.StatusOK, "Удалено")
 }

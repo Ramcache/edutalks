@@ -46,7 +46,6 @@ definitions:
   handlers.subscriptionRequest:
     properties:
       active:
-        description: true = вкл, false = выкл
         type: boolean
     type: object
   handlers.updateNewsRequest:

@@ -739,7 +739,6 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "active": {
-                    "description": "true = вкл, false = выкл",
                     "type": "boolean"
                 }
             }

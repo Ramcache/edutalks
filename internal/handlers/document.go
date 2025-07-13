@@ -5,9 +5,10 @@ import (
 	"edutalks/internal/middleware"
 	"edutalks/internal/models"
 	"edutalks/internal/services"
-	"encoding/json"
+	helpers "edutalks/internal/utils/helpres"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -48,24 +49,32 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 	err := r.ParseMultipartForm(10 << 20) // 10MB
 	if err != nil {
 		logger.Log.Warn("Ошибка разбора формы при загрузке документа", zap.Error(err))
-		http.Error(w, "Ошибка разбора формы", http.StatusBadRequest)
+		helpers.Error(w, http.StatusBadRequest, "Ошибка разбора формы")
 		return
 	}
 
 	file, handler, err := r.FormFile("file")
 	if err != nil {
 		logger.Log.Warn("Файл не найден при загрузке", zap.Error(err))
-		http.Error(w, "Файл не найден", http.StatusBadRequest)
+		helpers.Error(w, http.StatusBadRequest, "Файл не найден")
 		return
 	}
-	defer file.Close()
+	defer func(file multipart.File) {
+		err := file.Close()
+		if err != nil {
+			logger.Log.Error("ошибка при закрытии файла: %v", zap.Error(err))
+		}
+	}(file)
 
 	description := r.FormValue("description")
 	isPublic := strings.ToLower(r.FormValue("is_public")) == "true"
 
 	userID := r.Context().Value(middleware.ContextUserID).(int)
 	uploadDir := "uploaded"
-	os.MkdirAll(uploadDir, os.ModePerm)
+	err = os.MkdirAll(uploadDir, os.ModePerm)
+	if err != nil {
+		return
+	}
 
 	filename := fmt.Sprintf("%d_%s", time.Now().Unix(), handler.Filename)
 	fullPath := filepath.Join(uploadDir, filename)
@@ -73,11 +82,19 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 	dst, err := os.Create(fullPath)
 	if err != nil {
 		logger.Log.Error("Ошибка при сохранении файла", zap.Error(err))
-		http.Error(w, "Ошибка при сохранении файла", http.StatusInternalServerError)
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка при сохранении файла")
 		return
 	}
-	defer dst.Close()
-	io.Copy(dst, file)
+	defer func(dst *os.File) {
+		err := dst.Close()
+		if err != nil {
+			logger.Log.Error("ошибка при закрытии файла: %v", zap.Error(err))
+		}
+	}(dst)
+	_, err = io.Copy(dst, file)
+	if err != nil {
+		return
+	}
 
 	doc := &models.Document{
 		UserID:      userID,
@@ -92,13 +109,12 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 	err = h.service.Upload(r.Context(), doc)
 	if err != nil {
 		logger.Log.Error("Ошибка при сохранении документа в базе", zap.Error(err))
-		http.Error(w, "Ошибка при сохранении документа", http.StatusInternalServerError)
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка при сохранении документа")
 		return
 	}
 
 	logger.Log.Info("Документ успешно загружен", zap.String("filename", handler.Filename), zap.Int("user_id", userID))
-	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("Файл загружен"))
+	helpers.JSON(w, http.StatusCreated, "Файл загружен")
 }
 
 // ListPublicDocuments godoc
@@ -114,12 +130,11 @@ func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Req
 	docs, err := h.service.GetPublicDocuments(r.Context())
 	if err != nil {
 		logger.Log.Error("Ошибка при получении документов", zap.Error(err))
-		http.Error(w, "Ошибка при получении документов", http.StatusInternalServerError)
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка при получении документов")
 		return
 	}
 	logger.Log.Info("Документы получены", zap.Int("count", len(docs)))
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(docs)
+	helpers.JSON(w, http.StatusOK, docs)
 }
 
 // DownloadDocument godoc
@@ -138,7 +153,7 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 	user, err := h.userService.GetUserByID(r.Context(), userID)
 	if err != nil {
 		logger.Log.Warn("Пользователь не найден при скачивании документа", zap.Int("user_id", userID))
-		http.Error(w, "Пользователь не найден", http.StatusUnauthorized)
+		helpers.Error(w, http.StatusUnauthorized, "Пользователь не найден")
 		return
 	}
 
@@ -148,33 +163,36 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 	doc, err := h.service.GetDocumentByID(r.Context(), id)
 	if err != nil {
 		logger.Log.Warn("Документ не найден", zap.Int("doc_id", id))
-		http.Error(w, "Документ не найден", http.StatusNotFound)
+		helpers.Error(w, http.StatusNotFound, "Документ не найден")
 		return
 	}
 
 	if !user.HasSubscription {
 		logger.Log.Warn("Попытка доступа к файлу без подписки", zap.Int("user_id", userID), zap.Int("doc_id", id))
-		http.Error(w, "Нет доступа — купите подписку", http.StatusForbidden)
+		helpers.Error(w, http.StatusForbidden, "Нет доступа — купите подписку")
 		return
 	}
 
 	if !doc.IsPublic {
 		logger.Log.Warn("Попытка доступа к закрытому документу", zap.Int("user_id", userID), zap.Int("doc_id", id))
-		http.Error(w, "Этот документ закрыт", http.StatusForbidden)
+		helpers.Error(w, http.StatusForbidden, "Этот документ закрыт")
 		return
 	}
 
 	fileBytes, err := os.ReadFile(doc.Filepath)
 	if err != nil {
 		logger.Log.Error("Файл не найден на диске", zap.String("filepath", doc.Filepath), zap.Error(err))
-		http.Error(w, "Файл не найден", http.StatusInternalServerError)
+		helpers.Error(w, http.StatusInternalServerError, "Файл не найден")
 		return
 	}
 
 	logger.Log.Info("Документ успешно скачан", zap.String("filename", doc.Filename), zap.Int("user_id", userID))
 	w.Header().Set("Content-Disposition", "attachment; filename="+doc.Filename)
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Write(fileBytes)
+	_, err = w.Write(fileBytes)
+	if err != nil {
+		return
+	}
 }
 
 // DeleteDocument godoc
@@ -193,23 +211,23 @@ func (h *DocumentHandler) DeleteDocument(w http.ResponseWriter, r *http.Request)
 	doc, err := h.service.GetDocumentByID(r.Context(), id)
 	if err != nil {
 		logger.Log.Warn("Документ не найден для удаления", zap.Int("doc_id", id))
-		http.Error(w, "Документ не найден", http.StatusNotFound)
+		helpers.Error(w, http.StatusNotFound, "Документ не найден")
 		return
 	}
 
 	err = h.service.Delete(r.Context(), id)
 	if err != nil {
 		logger.Log.Error("Ошибка при удалении документа из базы", zap.Error(err), zap.Int("doc_id", id))
-		http.Error(w, "Ошибка при удалении", http.StatusInternalServerError)
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка при удалении")
 		return
 	}
 
 	if err := os.Remove(doc.Filepath); err != nil && !os.IsNotExist(err) {
 		logger.Log.Error("Ошибка при удалении файла с диска", zap.String("filepath", doc.Filepath), zap.Error(err))
-		http.Error(w, "Файл не удалось удалить", http.StatusInternalServerError)
+		helpers.Error(w, http.StatusInternalServerError, "Файл не удалось удалить")
 		return
 	}
 
 	logger.Log.Info("Документ успешно удалён", zap.Int("doc_id", id))
-	w.Write([]byte("Документ удалён"))
+	helpers.JSON(w, http.StatusOK, "Документ удалён")
 }

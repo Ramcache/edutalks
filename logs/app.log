@@ -3,3 +3,42 @@
 {"level":"INFO","time":"2025-07-13T17:43:01.376+0300","message":"Получение всех пользователей (repo)"}
 {"level":"INFO","time":"2025-07-13T17:43:01.386+0300","message":"Получены пользователи","count":1}
 {"level":"INFO","time":"2025-07-13T17:43:01.387+0300","message":"HTTP-запрос","method":"GET","path":"/api/admin/users","status":200,"duration":13712100}
+{"level":"INFO","time":"2025-07-13T18:46:54.446+0300","message":"Сервер запущен","port":"8080"}
+{"level":"DEBUG","time":"2025-07-13T18:47:10.322+0300","message":"Попытка обновления токена","token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTI0MTYwMjAsInJvbGUiOiJhZG1pbiIsInVzZXJfaWQiOjF9.A_4XW5tIr7MYAkpq7zb0vCj1_sDblhNhy9feSa9bTGw"}
+{"level":"WARN","time":"2025-07-13T18:47:10.327+0300","message":"Неверный или просроченный refresh token","error":"token has invalid claims: token is expired"}
+{"level":"INFO","time":"2025-07-13T18:47:10.327+0300","message":"HTTP-запрос","method":"POST","path":"/refresh","status":401,"duration":4890500}
+{"level":"INFO","time":"2025-07-13T18:47:20.697+0300","message":"Попытка входа","username":"admin"}
+{"level":"INFO","time":"2025-07-13T18:47:20.702+0300","message":"Попытка входа с возвратом user (service)","username":"admin"}
+{"level":"DEBUG","time":"2025-07-13T18:47:20.703+0300","message":"Получение пользователя по username (repo)","username":"admin"}
+{"level":"DEBUG","time":"2025-07-13T18:47:21.172+0300","message":"Сохранение refresh токена (repo)","user_id":1}
+{"level":"INFO","time":"2025-07-13T18:47:21.190+0300","message":"Вход выполнен (service)","username":"admin"}
+{"level":"INFO","time":"2025-07-13T18:47:21.191+0300","message":"Вход выполнен","username":"admin","role":"admin"}
+{"level":"INFO","time":"2025-07-13T18:47:21.192+0300","message":"HTTP-запрос","method":"POST","path":"/login","status":200,"duration":494240600}
+{"level":"DEBUG","time":"2025-07-13T18:47:47.463+0300","message":"Попытка обновления токена","token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTMwMjY0NDEsInJvbGUiOiJhZG1pbiIsInVzZXJfaWQiOjF9.bKjf3vCpXhRU0G0SWOEaDZ_DeN3E-6LCSwQxsAQAwds"}
+{"level":"DEBUG","time":"2025-07-13T18:47:47.465+0300","message":"Проверка refresh токена (service)","user_id":1}
+{"level":"DEBUG","time":"2025-07-13T18:47:47.465+0300","message":"Проверка refresh токена (repo)","user_id":1}
+{"level":"INFO","time":"2025-07-13T18:47:47.474+0300","message":"Токен обновлён","user_id":1}
+{"level":"INFO","time":"2025-07-13T18:47:47.475+0300","message":"HTTP-запрос","method":"POST","path":"/refresh","status":200,"duration":11520800}
+{"level":"INFO","time":"2025-07-13T18:47:58.245+0300","message":"Получение всех пользователей (service)"}
+{"level":"INFO","time":"2025-07-13T18:47:58.245+0300","message":"Получение всех пользователей (repo)"}
+{"level":"INFO","time":"2025-07-13T18:47:58.247+0300","message":"Получены пользователи","count":1}
+{"level":"INFO","time":"2025-07-13T18:47:58.248+0300","message":"HTTP-запрос","method":"GET","path":"/api/admin/users","status":200,"duration":3549400}
+{"level":"INFO","time":"2025-07-13T18:48:10.878+0300","message":"Запрос на получение списка публичных документов"}
+{"level":"INFO","time":"2025-07-13T18:48:10.879+0300","message":"Сервис: получение публичных документов"}
+{"level":"INFO","time":"2025-07-13T18:48:10.879+0300","message":"Репозиторий: получение публичных документов"}
+{"level":"INFO","time":"2025-07-13T18:48:10.893+0300","message":"Документы получены","count":1}
+{"level":"INFO","time":"2025-07-13T18:48:10.893+0300","message":"HTTP-запрос","method":"GET","path":"/api/files","status":200,"duration":15700600}
+{"level":"INFO","time":"2025-07-13T18:48:19.487+0300","message":"Запрос на удаление документа","doc_id":3}
+{"level":"INFO","time":"2025-07-13T18:48:19.487+0300","message":"Сервис: получение документа по ID","doc_id":3}
+{"level":"INFO","time":"2025-07-13T18:48:19.487+0300","message":"Репозиторий: получение документа по ID","doc_id":3}
+{"level":"ERROR","time":"2025-07-13T18:48:19.489+0300","message":"Ошибка получения документа по ID (repo)","doc_id":3,"error":"no rows in result set"}
+{"level":"ERROR","time":"2025-07-13T18:48:19.490+0300","message":"Ошибка получения документа по ID (service)","doc_id":3,"error":"no rows in result set"}
+{"level":"WARN","time":"2025-07-13T18:48:19.490+0300","message":"Документ не найден для удаления","doc_id":3}
+{"level":"INFO","time":"2025-07-13T18:48:19.490+0300","message":"HTTP-запрос","method":"DELETE","path":"/api/admin/files/3","status":404,"duration":4108400}
+{"level":"INFO","time":"2025-07-13T18:48:30.951+0300","message":"Запрос на удаление документа","doc_id":4}
+{"level":"INFO","time":"2025-07-13T18:48:30.951+0300","message":"Сервис: получение документа по ID","doc_id":4}
+{"level":"INFO","time":"2025-07-13T18:48:30.951+0300","message":"Репозиторий: получение документа по ID","doc_id":4}
+{"level":"INFO","time":"2025-07-13T18:48:30.953+0300","message":"Сервис: удаление документа","doc_id":4}
+{"level":"INFO","time":"2025-07-13T18:48:30.953+0300","message":"Репозиторий: удаление документа","doc_id":4}
+{"level":"INFO","time":"2025-07-13T18:48:30.960+0300","message":"Документ успешно удалён","doc_id":4}
+{"level":"INFO","time":"2025-07-13T18:48:30.961+0300","message":"HTTP-запрос","method":"DELETE","path":"/api/admin/files/4","status":200,"duration":10712800}
