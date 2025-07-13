@@ -8,12 +8,14 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentHandler *handlers.DocumentHandler) {
+func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentHandler *handlers.DocumentHandler, newsHandler *handlers.NewsHandler) {
 	// Public auth
 	router.HandleFunc("/register", authHandler.Register).Methods("POST")
 	router.HandleFunc("/login", authHandler.Login).Methods("POST")
 	router.HandleFunc("/refresh", authHandler.Refresh).Methods("POST")
 	router.HandleFunc("/logout", authHandler.Logout).Methods("POST")
+	router.HandleFunc("/news", newsHandler.ListNews).Methods("GET")
+	router.HandleFunc("/news/{id:[0-9]+}", newsHandler.GetNews).Methods("GET")
 
 	// JWT protected
 	protected := router.PathPrefix("/api").Subrouter()
@@ -37,5 +39,8 @@ func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentH
 		admin.HandleFunc("/users/{id}", authHandler.GetUserByID).Methods("GET")
 		admin.HandleFunc("/users/{id}", authHandler.UpdateUser).Methods("PATCH")
 		admin.HandleFunc("/users/{id}/subscription", authHandler.SetSubscription).Methods("PATCH")
+		admin.HandleFunc("/news", newsHandler.CreateNews).Methods("POST")
+		admin.HandleFunc("/news/{id:[0-9]+}", newsHandler.UpdateNews).Methods("PATCH")
+		admin.HandleFunc("/news/{id:[0-9]+}", newsHandler.DeleteNews).Methods("DELETE")
 	}
 }

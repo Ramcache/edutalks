@@ -25,8 +25,12 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	docService := services.NewDocumentService(docRepo)
 	docHandler := handlers.NewDocumentHandler(docService, authService)
 
+	newsRepo := repository.NewNewsRepository(conn)
+	newsService := services.NewNewsService(newsRepo)
+	newsHandler := handlers.NewNewsHandler(newsService)
+
 	router := mux.NewRouter()
-	routes.InitRoutes(router, authHandler, docHandler)
+	routes.InitRoutes(router, authHandler, docHandler, newsHandler)
 
 	return router, nil
 }

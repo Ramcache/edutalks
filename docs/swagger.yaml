@@ -1,4 +1,11 @@
 definitions:
+  handlers.createNewsRequest:
+    properties:
+      content:
+        type: string
+      title:
+        type: string
+    type: object
   handlers.loginRequest:
     properties:
       full_name:
@@ -42,6 +49,13 @@ definitions:
         description: true = вкл, false = выкл
         type: boolean
     type: object
+  handlers.updateNewsRequest:
+    properties:
+      content:
+        type: string
+      title:
+        type: string
+    type: object
   models.Document:
     properties:
       description:
@@ -58,6 +72,17 @@ definitions:
         type: string
       user_id:
         type: integer
+    type: object
+  models.News:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
     type: object
   models.UpdateUserRequest:
     properties:
@@ -99,6 +124,74 @@ info:
   contact: {}
   title: Edutalks API
 paths:
+  /admin/news:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Данные новости
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createNewsRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Новость создана
+          schema:
+            type: string
+        "400":
+          description: Ошибка запроса
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Создать новость (только admin)
+      tags:
+      - news
+  /admin/news/{id}:
+    delete:
+      parameters:
+      - description: ID новости
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: Удалено
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Удалить новость (только admin)
+      tags:
+      - admin
+    patch:
+      parameters:
+      - description: ID новости
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Новое содержимое
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateNewsRequest'
+      responses:
+        "200":
+          description: Обновлено
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Обновить новость (только admin)
+      tags:
+      - admin
   /admin/users/{id}/subscription:
     patch:
       parameters:
@@ -383,6 +476,42 @@ paths:
       summary: Выход (удаление refresh токена)
       tags:
       - auth
+  /news:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.News'
+            type: array
+      summary: Получить список новостей
+      tags:
+      - news
+  /news/{id}:
+    get:
+      parameters:
+      - description: ID новости
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.News'
+        "404":
+          description: Не найдено
+          schema:
+            type: string
+      summary: Получить новость по ID
+      tags:
+      - news
   /refresh:
     post:
       produces:
