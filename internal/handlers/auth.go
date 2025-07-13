@@ -49,6 +49,10 @@ type loginResponse struct {
 	Role         string `json:"role"`
 }
 
+type subscriptionRequest struct {
+	Active bool `json:"active"` // true = вкл, false = выкл
+}
+
 // Register godoc
 // @Summary Регистрация нового пользователя
 // @Tags auth
@@ -330,4 +334,35 @@ func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte("Пользователь обновлён"))
+}
+
+// SetSubscription godoc
+// @Summary Включение или отключение подписки у пользователя (только admin)
+// @Tags admin
+// @Security ApiKeyAuth
+// @Param id path int true "ID пользователя"
+// @Param input body subscriptionRequest true "Статус подписки"
+// @Success 200 {string} string "Статус обновлён"
+// @Failure 400 {string} string "Ошибка запроса"
+// @Router /admin/users/{id}/subscription [patch]
+func (h *AuthHandler) SetSubscription(w http.ResponseWriter, r *http.Request) {
+	idStr := mux.Vars(r)["id"]
+	userID, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Неверный ID", http.StatusBadRequest)
+		return
+	}
+
+	var req subscriptionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Невалидный JSON", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.authService.SetSubscription(r.Context(), userID, req.Active); err != nil {
+		http.Error(w, "Ошибка обновления подписки", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte("Статус подписки обновлён"))
 }

@@ -36,5 +36,6 @@ func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentH
 		admin.HandleFunc("/users", authHandler.GetUsers).Methods("GET")
 		admin.HandleFunc("/users/{id}", authHandler.GetUserByID).Methods("GET")
 		admin.HandleFunc("/users/{id}", authHandler.UpdateUser).Methods("PATCH")
+		admin.HandleFunc("/users/{id}/subscription", authHandler.SetSubscription).Methods("PATCH")
 	}
 }

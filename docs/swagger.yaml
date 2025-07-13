@@ -36,6 +36,12 @@ definitions:
       username:
         type: string
     type: object
+  handlers.subscriptionRequest:
+    properties:
+      active:
+        description: true = вкл, false = выкл
+        type: boolean
+    type: object
   models.Document:
     properties:
       description:
@@ -93,6 +99,34 @@ info:
   contact: {}
   title: Edutalks API
 paths:
+  /admin/users/{id}/subscription:
+    patch:
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Статус подписки
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.subscriptionRequest'
+      responses:
+        "200":
+          description: Статус обновлён
+          schema:
+            type: string
+        "400":
+          description: Ошибка запроса
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Включение или отключение подписки у пользователя (только admin)
+      tags:
+      - admin
   /api/admin/dashboard:
     get:
       responses:

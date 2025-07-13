@@ -189,3 +189,9 @@ func (r *UserRepository) UpdateUserFields(ctx context.Context, id int, input *mo
 	_, err := r.db.Exec(ctx, query, args...)
 	return err
 }
+
+func (r *UserRepository) UpdateSubscriptionStatus(ctx context.Context, userID int, status bool) error {
+	query := `UPDATE users SET has_subscription = $1 WHERE id = $2`
+	_, err := r.db.Exec(ctx, query, status, userID)
+	return err
+}

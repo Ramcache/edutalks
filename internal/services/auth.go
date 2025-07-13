@@ -27,6 +27,7 @@ type UserRepo interface {
 	GetAllUsers(ctx context.Context) ([]*models.User, error)
 	GetUserByID(ctx context.Context, id int) (*models.User, error)
 	UpdateUserFields(ctx context.Context, id int, input *models.UpdateUserRequest) error
+	UpdateSubscriptionStatus(ctx context.Context, userID int, status bool) error
 }
 
 func (s *AuthService) RegisterUser(ctx context.Context, input *models.User, plainPassword string) error {
@@ -128,4 +129,8 @@ func (s *AuthService) GetUserByID(ctx context.Context, id int) (*models.User, er
 
 func (s *AuthService) UpdateUser(ctx context.Context, id int, input *models.UpdateUserRequest) error {
 	return s.repo.UpdateUserFields(ctx, id, input)
+}
+
+func (s *AuthService) SetSubscription(ctx context.Context, userID int, status bool) error {
+	return s.repo.UpdateSubscriptionStatus(ctx, userID, status)
 }

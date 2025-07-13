@@ -15,6 +15,51 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/users/{id}/subscription": {
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Включение или отключение подписки у пользователя (только admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID пользователя",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Статус подписки",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.subscriptionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Статус обновлён",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Ошибка запроса",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/dashboard": {
             "get": {
                 "security": [
@@ -558,6 +603,15 @@ const docTemplate = `{
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.subscriptionRequest": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "description": "true = вкл, false = выкл",
+                    "type": "boolean"
                 }
             }
         },
