@@ -18,11 +18,15 @@ import (
 )
 
 type DocumentHandler struct {
-	service *services.DocumentService
+	service     *services.DocumentService
+	userService *services.AuthService
 }
 
-func NewDocumentHandler(s *services.DocumentService) *DocumentHandler {
-	return &DocumentHandler{service: s}
+func NewDocumentHandler(docService *services.DocumentService, userService *services.AuthService) *DocumentHandler {
+	return &DocumentHandler{
+		service:     docService,
+		userService: userService,
+	}
 }
 
 // UploadDocument godoc
@@ -116,16 +120,42 @@ func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Req
 // @Failure 404 {string} string "Документ не найден"
 // @Router /api/files/{id} [get]
 func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id, _ := strconv.Atoi(vars["id"])
+	userID := r.Context().Value(middleware.ContextUserID).(int)
 
-	doc, err := h.service.GetDocumentByID(r.Context(), id)
-	if err != nil || !doc.IsPublic {
-		http.Error(w, "Документ не найден или недоступен", http.StatusNotFound)
+	user, err := h.userService.GetUserByID(r.Context(), userID)
+	if err != nil {
+		http.Error(w, "Пользователь не найден", http.StatusUnauthorized)
 		return
 	}
 
-	http.ServeFile(w, r, doc.Filepath)
+	idStr := mux.Vars(r)["id"]
+	id, _ := strconv.Atoi(idStr)
+
+	doc, err := h.service.GetDocumentByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Документ не найден", http.StatusNotFound)
+		return
+	}
+
+	if !user.HasSubscription {
+		http.Error(w, "Нет доступа — купите подписку", http.StatusForbidden)
+		return
+	}
+
+	if !doc.IsPublic {
+		http.Error(w, "Этот документ закрыт", http.StatusForbidden)
+		return
+	}
+
+	fileBytes, err := os.ReadFile(doc.Filepath)
+	if err != nil {
+		http.Error(w, "Файл не найден", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Disposition", "attachment; filename="+doc.Filename)
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Write(fileBytes)
 }
 
 // DeleteDocument godoc

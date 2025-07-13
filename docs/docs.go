@@ -622,6 +622,9 @@ const docTemplate = `{
                 "full_name": {
                     "type": "string"
                 },
+                "hasSubscription": {
+                    "type": "boolean"
+                },
                 "id": {
                     "type": "integer"
                 },
