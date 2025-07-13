@@ -16,8 +16,17 @@ func NewDocumentRepository(db *pgxpool.Pool) *DocumentRepository {
 }
 
 func (r *DocumentRepository) SaveDocument(ctx context.Context, doc *models.Document) error {
-	query := `INSERT INTO documents (user_id, filename, filepath) VALUES ($1, $2, $3)`
-	_, err := r.db.Exec(ctx, query, doc.UserID, doc.Filename, doc.Filepath)
+	query := `
+		INSERT INTO documents (user_id, filename, filepath, description, is_public, uploaded_at)
+		VALUES ($1, $2, $3, $4, $5, $6)`
+	_, err := r.db.Exec(ctx, query,
+		doc.UserID,
+		doc.Filename,
+		doc.Filepath,
+		doc.Description,
+		doc.IsPublic,
+		doc.UploadedAt,
+	)
 	return err
 }
 

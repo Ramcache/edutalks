@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -37,43 +38,53 @@ func NewDocumentHandler(s *services.DocumentService) *DocumentHandler {
 // @Failure 400 {string} string "Ошибка загрузки"
 // @Router /api/admin/files/upload [post]
 func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value(middleware.ContextUserID).(int)
-
-	// файл
-	file, header, err := r.FormFile("file")
+	err := r.ParseMultipartForm(10 << 20) // 10MB
 	if err != nil {
-		http.Error(w, "Не удалось прочитать файл", http.StatusBadRequest)
+		http.Error(w, "Ошибка разбора формы", http.StatusBadRequest)
+		return
+	}
+
+	file, handler, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Файл не найден", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
 
-	// описание
 	description := r.FormValue("description")
-	isPublic := r.FormValue("is_public") == "true"
+	isPublic := strings.ToLower(r.FormValue("is_public")) == "true"
 
-	// сохраняем файл на диск
-	dstPath := filepath.Join("uploaded", fmt.Sprintf("%d_%s", time.Now().Unix(), header.Filename))
-	dstFile, err := os.Create(dstPath)
+	userID := r.Context().Value(middleware.ContextUserID).(int)
+	uploadDir := "uploaded"
+	os.MkdirAll(uploadDir, os.ModePerm)
+
+	filename := fmt.Sprintf("%d_%s", time.Now().Unix(), handler.Filename)
+	fullPath := filepath.Join(uploadDir, filename)
+
+	dst, err := os.Create(fullPath)
 	if err != nil {
-		http.Error(w, "Не удалось сохранить файл", http.StatusInternalServerError)
+		http.Error(w, "Ошибка при сохранении файла", http.StatusInternalServerError)
 		return
 	}
-	defer dstFile.Close()
-	io.Copy(dstFile, file)
+	defer dst.Close()
+	io.Copy(dst, file)
 
-	// в БД
 	doc := &models.Document{
 		UserID:      userID,
-		Filename:    header.Filename,
-		Filepath:    dstPath,
+		Filename:    handler.Filename,
+		Filepath:    fullPath,
 		Description: description,
 		IsPublic:    isPublic,
+		UploadedAt:  time.Now(),
 	}
-	if err := h.service.Upload(r.Context(), doc); err != nil {
-		http.Error(w, "Ошибка записи в БД", http.StatusInternalServerError)
+
+	err = h.service.Upload(r.Context(), doc)
+	if err != nil {
+		http.Error(w, "Ошибка при сохранении документа", http.StatusInternalServerError)
 		return
 	}
 
+	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Файл загружен"))
 }
 
