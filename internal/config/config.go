@@ -14,11 +14,14 @@ type Config struct {
 	DbUser    string
 	DbPass    string
 	DbName    string
-	DbSSLMode string // 👈 добавили sslmode
+	DbSSLMode string
 
 	JWTSecret       string
 	AccessTokenTTL  string
 	RefreshTokenTTL string
+
+	Log      string
+	LogLevel string
 }
 
 // LoadConfig загружает переменные из .env
@@ -36,6 +39,8 @@ func LoadConfig() (*Config, error) {
 		JWTSecret:       os.Getenv("JWT_SECRET"),
 		AccessTokenTTL:  os.Getenv("ACCESS_TOKEN_EXPIRY"),
 		RefreshTokenTTL: os.Getenv("REFRESH_TOKEN_EXPIRY"),
+		Log:             os.Getenv("Log"),
+		LogLevel:        os.Getenv("LogLevel"),
 	}
 	return cfg, nil
 }

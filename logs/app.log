@@ -1,0 +1,5 @@
+{"level":"INFO","time":"2025-07-13T17:42:46.234+0300","message":"Сервер запущен","port":"8080"}
+{"level":"INFO","time":"2025-07-13T17:43:01.375+0300","message":"Получение всех пользователей (service)"}
+{"level":"INFO","time":"2025-07-13T17:43:01.376+0300","message":"Получение всех пользователей (repo)"}
+{"level":"INFO","time":"2025-07-13T17:43:01.386+0300","message":"Получены пользователи","count":1}
+{"level":"INFO","time":"2025-07-13T17:43:01.387+0300","message":"HTTP-запрос","method":"GET","path":"/api/admin/users","status":200,"duration":13712100}

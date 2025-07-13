@@ -2,9 +2,11 @@ package repository
 
 import (
 	"context"
+	"edutalks/internal/logger"
 	"edutalks/internal/models"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.uber.org/zap"
 )
 
 type DocumentRepository struct {
@@ -15,7 +17,15 @@ func NewDocumentRepository(db *pgxpool.Pool) *DocumentRepository {
 	return &DocumentRepository{db: db}
 }
 
+type DocumentRepo interface {
+	SaveDocument(ctx context.Context, doc *models.Document) error
+	GetPublicDocuments(ctx context.Context) ([]*models.Document, error)
+	GetDocumentByID(ctx context.Context, id int) (*models.Document, error)
+	DeleteDocument(ctx context.Context, id int) error
+}
+
 func (r *DocumentRepository) SaveDocument(ctx context.Context, doc *models.Document) error {
+	logger.Log.Info("Репозиторий: сохранение документа", zap.String("filename", doc.Filename), zap.Int("user_id", doc.UserID))
 	query := `
 		INSERT INTO documents (user_id, filename, filepath, description, is_public, uploaded_at)
 		VALUES ($1, $2, $3, $4, $5, $6)`
@@ -27,10 +37,14 @@ func (r *DocumentRepository) SaveDocument(ctx context.Context, doc *models.Docum
 		doc.IsPublic,
 		doc.UploadedAt,
 	)
+	if err != nil {
+		logger.Log.Error("Ошибка сохранения документа (repo)", zap.Error(err))
+	}
 	return err
 }
 
 func (r *DocumentRepository) GetPublicDocuments(ctx context.Context) ([]*models.Document, error) {
+	logger.Log.Info("Репозиторий: получение публичных документов")
 	query := `
 		SELECT id, user_id, filename, filepath, description, is_public, uploaded_at
 		FROM documents
@@ -40,6 +54,7 @@ func (r *DocumentRepository) GetPublicDocuments(ctx context.Context) ([]*models.
 
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
+		logger.Log.Error("Ошибка получения публичных документов (repo)", zap.Error(err))
 		return nil, err
 	}
 	defer rows.Close()
@@ -57,6 +72,7 @@ func (r *DocumentRepository) GetPublicDocuments(ctx context.Context) ([]*models.
 			&d.UploadedAt,
 		)
 		if err != nil {
+			logger.Log.Error("Ошибка сканирования документа (repo)", zap.Error(err))
 			return nil, err
 		}
 		docs = append(docs, &d)
@@ -66,6 +82,7 @@ func (r *DocumentRepository) GetPublicDocuments(ctx context.Context) ([]*models.
 }
 
 func (r *DocumentRepository) GetDocumentByID(ctx context.Context, id int) (*models.Document, error) {
+	logger.Log.Info("Репозиторий: получение документа по ID", zap.Int("doc_id", id))
 	query := `
 		SELECT id, user_id, filename, filepath, description, is_public, uploaded_at
 		FROM documents WHERE id = $1
@@ -81,13 +98,18 @@ func (r *DocumentRepository) GetDocumentByID(ctx context.Context, id int) (*mode
 		&d.UploadedAt,
 	)
 	if err != nil {
+		logger.Log.Error("Ошибка получения документа по ID (repo)", zap.Int("doc_id", id), zap.Error(err))
 		return nil, err
 	}
 	return &d, nil
 }
 
 func (r *DocumentRepository) DeleteDocument(ctx context.Context, id int) error {
+	logger.Log.Info("Репозиторий: удаление документа", zap.Int("doc_id", id))
 	query := `DELETE FROM documents WHERE id = $1`
 	_, err := r.db.Exec(ctx, query, id)
+	if err != nil {
+		logger.Log.Error("Ошибка удаления документа (repo)", zap.Int("doc_id", id), zap.Error(err))
+	}
 	return err
 }

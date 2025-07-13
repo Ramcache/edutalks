@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"edutalks/internal/logger"
 	"edutalks/internal/models"
 	"edutalks/internal/services"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
 )
 
 type NewsHandler struct {
@@ -25,6 +27,11 @@ type createNewsRequest struct {
 	Content string `json:"content"`
 }
 
+type updateNewsRequest struct {
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
 // CreateNews godoc
 // @Summary Создать новость (только admin)
 // @Tags news
@@ -36,8 +43,10 @@ type createNewsRequest struct {
 // @Failure 400 {string} string "Ошибка запроса"
 // @Router /admin/news [post]
 func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
+	logger.Log.Info("Запрос на создание новости")
 	var req createNewsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Log.Warn("Невалидный JSON при создании новости", zap.Error(err))
 		http.Error(w, "Невалидный JSON", http.StatusBadRequest)
 		return
 	}
@@ -49,10 +58,12 @@ func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.newsService.Create(context.Background(), news); err != nil {
+		logger.Log.Error("Ошибка создания новости", zap.Error(err))
 		http.Error(w, "Ошибка создания", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Log.Info("Новость успешно создана", zap.String("title", news.Title))
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Новость создана"))
 }
@@ -63,13 +74,17 @@ func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Success 200 {array} models.News
 // @Router /news [get]
+
 func (h *NewsHandler) ListNews(w http.ResponseWriter, r *http.Request) {
+	logger.Log.Info("Запрос на получение списка новостей")
 	newsList, err := h.newsService.List(r.Context())
 	if err != nil {
+		logger.Log.Error("Ошибка получения новостей", zap.Error(err))
 		http.Error(w, "Ошибка получения новостей", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Log.Info("Новости получены", zap.Int("count", len(newsList)))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(newsList)
 }
@@ -84,19 +99,17 @@ func (h *NewsHandler) ListNews(w http.ResponseWriter, r *http.Request) {
 // @Router /news/{id} [get]
 func (h *NewsHandler) GetNews(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(mux.Vars(r)["id"])
+	logger.Log.Info("Запрос на получение новости по ID", zap.Int("news_id", id))
 	news, err := h.newsService.GetByID(r.Context(), id)
 	if err != nil {
+		logger.Log.Warn("Новость не найдена", zap.Int("news_id", id))
 		http.Error(w, "Новость не найдена", http.StatusNotFound)
 		return
 	}
 
+	logger.Log.Info("Новость получена", zap.Int("news_id", id))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(news)
-}
-
-type updateNewsRequest struct {
-	Title   string `json:"title"`
-	Content string `json:"content"`
 }
 
 // UpdateNews godoc
@@ -109,17 +122,21 @@ type updateNewsRequest struct {
 // @Router /admin/news/{id} [patch]
 func (h *NewsHandler) UpdateNews(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(mux.Vars(r)["id"])
+	logger.Log.Info("Запрос на обновление новости", zap.Int("news_id", id))
 	var req updateNewsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Log.Warn("Невалидный JSON при обновлении новости", zap.Error(err))
 		http.Error(w, "Невалидный JSON", http.StatusBadRequest)
 		return
 	}
 
 	if err := h.newsService.Update(r.Context(), id, req.Title, req.Content); err != nil {
+		logger.Log.Error("Ошибка обновления новости", zap.Error(err), zap.Int("news_id", id))
 		http.Error(w, "Ошибка обновления", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Log.Info("Новость успешно обновлена", zap.Int("news_id", id))
 	w.Write([]byte("Обновлено"))
 }
 
@@ -132,10 +149,13 @@ func (h *NewsHandler) UpdateNews(w http.ResponseWriter, r *http.Request) {
 // @Router /admin/news/{id} [delete]
 func (h *NewsHandler) DeleteNews(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(mux.Vars(r)["id"])
+	logger.Log.Info("Запрос на удаление новости", zap.Int("news_id", id))
 	if err := h.newsService.Delete(r.Context(), id); err != nil {
+		logger.Log.Error("Ошибка удаления новости", zap.Error(err), zap.Int("news_id", id))
 		http.Error(w, "Ошибка удаления", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Log.Info("Новость успешно удалена", zap.Int("news_id", id))
 	w.Write([]byte("Удалено"))
 }

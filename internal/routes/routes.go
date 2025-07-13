@@ -9,6 +9,8 @@ import (
 )
 
 func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentHandler *handlers.DocumentHandler, newsHandler *handlers.NewsHandler) {
+	router.Use(middleware.Logging)
+
 	// Public auth
 	router.HandleFunc("/register", authHandler.Register).Methods("POST")
 	router.HandleFunc("/login", authHandler.Login).Methods("POST")

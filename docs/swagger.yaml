@@ -460,36 +460,6 @@ paths:
       summary: Авторизация пользователя
       tags:
       - auth
-  /logout:
-    post:
-      responses:
-        "200":
-          description: Выход выполнен
-          schema:
-            type: string
-        "401":
-          description: Невалидный токен
-          schema:
-            type: string
-      security:
-      - ApiKeyAuth: []
-      summary: Выход (удаление refresh токена)
-      tags:
-      - auth
-  /news:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/models.News'
-            type: array
-      summary: Получить список новостей
-      tags:
-      - news
   /news/{id}:
     get:
       parameters:

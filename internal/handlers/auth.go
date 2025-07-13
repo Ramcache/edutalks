@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"edutalks/internal/config"
+	"edutalks/internal/logger"
 	"edutalks/internal/middleware"
 	"edutalks/internal/models"
 	"edutalks/internal/services"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
 )
 
 type AuthHandler struct {
@@ -65,9 +67,11 @@ type subscriptionRequest struct {
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Log.Warn("Ошибка декодирования JSON в Register", zap.Error(err))
 		http.Error(w, "Невалидный JSON", http.StatusBadRequest)
 		return
 	}
+	logger.Log.Info("Регистрация пользователя", zap.String("username", req.Username), zap.String("email", req.Email))
 
 	user := &models.User{
 		Username: req.Username,
@@ -79,10 +83,12 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	err := h.authService.RegisterUser(context.Background(), user, req.Password)
 	if err != nil {
+		logger.Log.Error("Ошибка регистрации пользователя", zap.Error(err))
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	logger.Log.Info("Пользователь успешно зарегистрирован", zap.String("username", req.Username))
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Пользователь успешно зарегистрирован"))
 }
@@ -99,9 +105,11 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Log.Warn("Ошибка декодирования JSON в Login", zap.Error(err))
 		http.Error(w, "Невалидный JSON", http.StatusBadRequest)
 		return
 	}
+	logger.Log.Info("Попытка входа", zap.String("username", req.Username))
 
 	cfg, _ := config.LoadConfig()
 	accessTTL, _ := time.ParseDuration(cfg.AccessTokenTTL)
@@ -115,12 +123,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		accessTTL,
 		refreshTTL,
 	)
-
 	if err != nil {
+		logger.Log.Warn("Ошибка входа пользователя", zap.String("username", req.Username), zap.Error(err))
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
+	logger.Log.Info("Вход выполнен", zap.String("username", req.Username), zap.String("role", user.Role))
 	resp := loginResponse{
 		AccessToken:  access,
 		RefreshToken: refresh,
@@ -143,7 +152,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Protected(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.ContextUserID)
 	role := r.Context().Value(middleware.ContextRole)
-
+	logger.Log.Debug("Доступ к защищённому маршруту", zap.Any("userID", userID), zap.Any("role", role))
 	w.Write([]byte(fmt.Sprintf("Привет, пользователь #%v с ролью %v", userID, role)))
 }
 
@@ -158,19 +167,21 @@ func (h *AuthHandler) Protected(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+		logger.Log.Warn("Отсутствует refresh token в Refresh")
 		http.Error(w, "Отсутствует refresh token", http.StatusUnauthorized)
 		return
 	}
 
 	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	logger.Log.Debug("Попытка обновления токена", zap.String("token", tokenString))
 
 	cfg, _ := config.LoadConfig()
 	claims := jwt.MapClaims{}
-
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(cfg.JWTSecret), nil
 	})
 	if err != nil || !token.Valid {
+		logger.Log.Warn("Неверный или просроченный refresh token", zap.Error(err))
 		http.Error(w, "Неверный или просроченный refresh token", http.StatusUnauthorized)
 		return
 	}
@@ -178,12 +189,14 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	userID, ok1 := claims["user_id"].(float64)
 	role, ok2 := claims["role"].(string)
 	if !ok1 || !ok2 {
+		logger.Log.Error("Неверный payload токена", zap.Any("claims", claims))
 		http.Error(w, "Неверный payload токена", http.StatusUnauthorized)
 		return
 	}
 
 	isValid, err := h.authService.ValidateRefreshToken(r.Context(), int(userID), tokenString)
 	if err != nil || !isValid {
+		logger.Log.Warn("Недействительный refresh token", zap.Error(err))
 		http.Error(w, "Недействительный refresh token", http.StatusUnauthorized)
 		return
 	}
@@ -191,10 +204,12 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	accessTTL, _ := time.ParseDuration(cfg.AccessTokenTTL)
 	accessToken, err := utils.GenerateToken(cfg.JWTSecret, int(userID), role, accessTTL)
 	if err != nil {
+		logger.Log.Error("Ошибка генерации токена", zap.Error(err))
 		http.Error(w, "Ошибка генерации токена", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Log.Info("Токен обновлён", zap.Float64("user_id", userID))
 	resp := map[string]string{"access_token": accessToken}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
@@ -207,9 +222,11 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {string} string "Выход выполнен"
 // @Failure 401 {string} string "Невалидный токен"
 // @Router /logout [post]
+
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+		logger.Log.Warn("Отсутствует refresh token в Logout")
 		http.Error(w, "Отсутствует refresh token", http.StatusUnauthorized)
 		return
 	}
@@ -218,27 +235,30 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	cfg, _ := config.LoadConfig()
 	claims := jwt.MapClaims{}
-
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(cfg.JWTSecret), nil
 	})
 	if err != nil || !token.Valid {
+		logger.Log.Warn("Невалидный refresh token при выходе", zap.Error(err))
 		http.Error(w, "Невалидный refresh token", http.StatusUnauthorized)
 		return
 	}
 
 	userID, ok := claims["user_id"].(float64)
 	if !ok {
+		logger.Log.Error("Неверный payload при выходе", zap.Any("claims", claims))
 		http.Error(w, "Неверный payload", http.StatusUnauthorized)
 		return
 	}
 
 	err = h.authService.Logout(r.Context(), int(userID), tokenString)
 	if err != nil {
+		logger.Log.Error("Ошибка при удалении токена", zap.Error(err))
 		http.Error(w, "Ошибка при удалении токена", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Log.Info("Пользователь вышел", zap.Float64("user_id", userID))
 	w.Write([]byte("Выход выполнен"))
 }
 
@@ -264,10 +284,11 @@ func (h *AuthHandler) AdminOnly(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := h.authService.GetUsers(r.Context())
 	if err != nil {
+		logger.Log.Error("Ошибка получения пользователей", zap.Error(err))
 		http.Error(w, "Ошибка получения пользователей", http.StatusInternalServerError)
 		return
 	}
-
+	logger.Log.Info("Получены пользователи", zap.Int("count", len(users)))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(users)
 }
@@ -287,16 +308,18 @@ func (h *AuthHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
+		logger.Log.Warn("Невалидный ID при получении пользователя", zap.String("id", idStr))
 		http.Error(w, "Невалидный ID", http.StatusBadRequest)
 		return
 	}
 
 	user, err := h.authService.GetUserByID(r.Context(), id)
 	if err != nil {
+		logger.Log.Warn("Пользователь не найден", zap.Int("user_id", id))
 		http.Error(w, "Пользователь не найден", http.StatusNotFound)
 		return
 	}
-
+	logger.Log.Info("Получен пользователь по ID", zap.Int("user_id", id))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user)
 }
@@ -317,22 +340,26 @@ func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
+		logger.Log.Warn("Невалидный ID при обновлении пользователя", zap.Any("vars", vars))
 		http.Error(w, "Невалидный ID", http.StatusBadRequest)
 		return
 	}
 
 	var input models.UpdateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		logger.Log.Warn("Невалидный JSON при обновлении пользователя", zap.Error(err))
 		http.Error(w, "Невалидный JSON", http.StatusBadRequest)
 		return
 	}
 
 	err = h.authService.UpdateUser(r.Context(), id, &input)
 	if err != nil {
+		logger.Log.Error("Ошибка при обновлении пользователя", zap.Error(err), zap.Int("user_id", id))
 		http.Error(w, "Ошибка при обновлении", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Log.Info("Пользователь обновлён", zap.Int("user_id", id))
 	w.Write([]byte("Пользователь обновлён"))
 }
 
@@ -349,20 +376,24 @@ func (h *AuthHandler) SetSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := mux.Vars(r)["id"]
 	userID, err := strconv.Atoi(idStr)
 	if err != nil {
+		logger.Log.Warn("Неверный ID при обновлении подписки", zap.String("id", idStr))
 		http.Error(w, "Неверный ID", http.StatusBadRequest)
 		return
 	}
 
 	var req subscriptionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Log.Warn("Невалидный JSON при обновлении подписки", zap.Error(err))
 		http.Error(w, "Невалидный JSON", http.StatusBadRequest)
 		return
 	}
 
 	if err := h.authService.SetSubscription(r.Context(), userID, req.Active); err != nil {
+		logger.Log.Error("Ошибка обновления подписки", zap.Error(err), zap.Int("user_id", userID))
 		http.Error(w, "Ошибка обновления подписки", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Log.Info("Подписка пользователя изменена", zap.Int("user_id", userID), zap.Bool("active", req.Active))
 	w.Write([]byte("Статус подписки обновлён"))
 }

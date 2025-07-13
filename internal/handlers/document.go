@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"edutalks/internal/logger"
 	"edutalks/internal/middleware"
 	"edutalks/internal/models"
 	"edutalks/internal/services"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
 )
 
 type DocumentHandler struct {
@@ -42,14 +44,17 @@ func NewDocumentHandler(docService *services.DocumentService, userService *servi
 // @Failure 400 {string} string "Ошибка загрузки"
 // @Router /api/admin/files/upload [post]
 func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request) {
+	logger.Log.Info("Запрос на загрузку документа")
 	err := r.ParseMultipartForm(10 << 20) // 10MB
 	if err != nil {
+		logger.Log.Warn("Ошибка разбора формы при загрузке документа", zap.Error(err))
 		http.Error(w, "Ошибка разбора формы", http.StatusBadRequest)
 		return
 	}
 
 	file, handler, err := r.FormFile("file")
 	if err != nil {
+		logger.Log.Warn("Файл не найден при загрузке", zap.Error(err))
 		http.Error(w, "Файл не найден", http.StatusBadRequest)
 		return
 	}
@@ -67,6 +72,7 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 
 	dst, err := os.Create(fullPath)
 	if err != nil {
+		logger.Log.Error("Ошибка при сохранении файла", zap.Error(err))
 		http.Error(w, "Ошибка при сохранении файла", http.StatusInternalServerError)
 		return
 	}
@@ -82,12 +88,15 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 		UploadedAt:  time.Now(),
 	}
 
+	logger.Log.Info("Сохраняем информацию о документе", zap.String("filename", handler.Filename), zap.Int("user_id", userID))
 	err = h.service.Upload(r.Context(), doc)
 	if err != nil {
+		logger.Log.Error("Ошибка при сохранении документа в базе", zap.Error(err))
 		http.Error(w, "Ошибка при сохранении документа", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Log.Info("Документ успешно загружен", zap.String("filename", handler.Filename), zap.Int("user_id", userID))
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Файл загружен"))
 }
@@ -101,11 +110,14 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 // @Failure 500 {string} string "Ошибка сервера"
 // @Router /api/files [get]
 func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Request) {
+	logger.Log.Info("Запрос на получение списка публичных документов")
 	docs, err := h.service.GetPublicDocuments(r.Context())
 	if err != nil {
+		logger.Log.Error("Ошибка при получении документов", zap.Error(err))
 		http.Error(w, "Ошибка при получении документов", http.StatusInternalServerError)
 		return
 	}
+	logger.Log.Info("Документы получены", zap.Int("count", len(docs)))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(docs)
 }
@@ -121,9 +133,11 @@ func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Req
 // @Router /api/files/{id} [get]
 func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.ContextUserID).(int)
+	logger.Log.Info("Запрос на скачивание документа", zap.Int("user_id", userID))
 
 	user, err := h.userService.GetUserByID(r.Context(), userID)
 	if err != nil {
+		logger.Log.Warn("Пользователь не найден при скачивании документа", zap.Int("user_id", userID))
 		http.Error(w, "Пользователь не найден", http.StatusUnauthorized)
 		return
 	}
@@ -133,26 +147,31 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 
 	doc, err := h.service.GetDocumentByID(r.Context(), id)
 	if err != nil {
+		logger.Log.Warn("Документ не найден", zap.Int("doc_id", id))
 		http.Error(w, "Документ не найден", http.StatusNotFound)
 		return
 	}
 
 	if !user.HasSubscription {
+		logger.Log.Warn("Попытка доступа к файлу без подписки", zap.Int("user_id", userID), zap.Int("doc_id", id))
 		http.Error(w, "Нет доступа — купите подписку", http.StatusForbidden)
 		return
 	}
 
 	if !doc.IsPublic {
+		logger.Log.Warn("Попытка доступа к закрытому документу", zap.Int("user_id", userID), zap.Int("doc_id", id))
 		http.Error(w, "Этот документ закрыт", http.StatusForbidden)
 		return
 	}
 
 	fileBytes, err := os.ReadFile(doc.Filepath)
 	if err != nil {
+		logger.Log.Error("Файл не найден на диске", zap.String("filepath", doc.Filepath), zap.Error(err))
 		http.Error(w, "Файл не найден", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Log.Info("Документ успешно скачан", zap.String("filename", doc.Filename), zap.Int("user_id", userID))
 	w.Header().Set("Content-Disposition", "attachment; filename="+doc.Filename)
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Write(fileBytes)
@@ -169,26 +188,28 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 func (h *DocumentHandler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"])
+	logger.Log.Info("Запрос на удаление документа", zap.Int("doc_id", id))
 
-	// Загружаем документ для проверки и удаления файла с диска
 	doc, err := h.service.GetDocumentByID(r.Context(), id)
 	if err != nil {
+		logger.Log.Warn("Документ не найден для удаления", zap.Int("doc_id", id))
 		http.Error(w, "Документ не найден", http.StatusNotFound)
 		return
 	}
 
-	// Удаляем из базы
 	err = h.service.Delete(r.Context(), id)
 	if err != nil {
+		logger.Log.Error("Ошибка при удалении документа из базы", zap.Error(err), zap.Int("doc_id", id))
 		http.Error(w, "Ошибка при удалении", http.StatusInternalServerError)
 		return
 	}
 
-	// Удаляем файл с диска
 	if err := os.Remove(doc.Filepath); err != nil && !os.IsNotExist(err) {
+		logger.Log.Error("Ошибка при удалении файла с диска", zap.String("filepath", doc.Filepath), zap.Error(err))
 		http.Error(w, "Файл не удалось удалить", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Log.Info("Документ успешно удалён", zap.Int("doc_id", id))
 	w.Write([]byte("Документ удалён"))
 }

@@ -559,55 +559,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/logout": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Выход (удаление refresh токена)",
-                "responses": {
-                    "200": {
-                        "description": "Выход выполнен",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "401": {
-                        "description": "Невалидный токен",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/news": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "news"
-                ],
-                "summary": "Получить список новостей",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.News"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/news/{id}": {
             "get": {
                 "produces": [
