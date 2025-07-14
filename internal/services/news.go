@@ -5,16 +5,27 @@ import (
 	"edutalks/internal/logger"
 	"edutalks/internal/models"
 	"edutalks/internal/repository"
+	"fmt"
 
 	"go.uber.org/zap"
 )
 
 type NewsService struct {
-	repo *repository.NewsRepository
+	repo         *repository.NewsRepository
+	userRepo     *repository.UserRepository
+	emailService *EmailService
 }
 
-func NewNewsService(repo *repository.NewsRepository) *NewsService {
-	return &NewsService{repo: repo}
+func NewNewsService(
+	repo *repository.NewsRepository,
+	userRepo *repository.UserRepository,
+	emailService *EmailService,
+) *NewsService {
+	return &NewsService{
+		repo:         repo,
+		userRepo:     userRepo,
+		emailService: emailService,
+	}
 }
 
 func (s *NewsService) Create(ctx context.Context, news *models.News) error {
@@ -23,6 +34,14 @@ func (s *NewsService) Create(ctx context.Context, news *models.News) error {
 	if err != nil {
 		logger.Log.Error("Ошибка создания новости (service)", zap.Error(err))
 	}
+	subscribers, _ := s.userRepo.GetSubscribedEmails(ctx)
+	subject := "Новая новость: " + news.Title
+	body := fmt.Sprintf("Прочитайте новость: %s\n\n%s", news.Title, news.Content)
+
+	if err := s.emailService.Send(subscribers, subject, body); err != nil {
+		logger.Log.Warn("Ошибка при отправке писем", zap.Error(err))
+	}
+
 	return err
 }
 

@@ -21,7 +21,7 @@ type NewsRepo interface {
 	Create(ctx context.Context, news *models.News) error
 	List(ctx context.Context) ([]*models.News, error)
 	GetByID(ctx context.Context, id int) (*models.News, error)
-	Update(ctx context.Context, id int, title, content string) error
+	Update(ctx context.Context, id int, title, content, imageURL string) error
 	Delete(ctx context.Context, id int) error
 }
 

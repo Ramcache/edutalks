@@ -31,6 +31,7 @@ type UserRepo interface {
 	GetUserByID(ctx context.Context, id int) (*models.User, error)
 	UpdateUserFields(ctx context.Context, id int, input *models.UpdateUserRequest) error
 	UpdateSubscriptionStatus(ctx context.Context, userID int, status bool) error
+	GetSubscribedEmails(ctx context.Context) ([]string, error)
 }
 
 func (s *AuthService) RegisterUser(ctx context.Context, input *models.User, plainPassword string) error {
@@ -187,4 +188,8 @@ func (s *AuthService) SetSubscription(ctx context.Context, userID int, status bo
 	}
 	logger.Log.Info("Статус подписки обновлён (service)", zap.Int("user_id", userID), zap.Bool("status", status))
 	return nil
+}
+
+func (s *AuthService) GetSubscribedEmails(ctx context.Context) ([]string, error) {
+	return s.repo.GetSubscribedEmails(ctx)
 }
