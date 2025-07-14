@@ -1,4 +1,4 @@
 .env
 .idea
-uploaded
+uploaded/*
 logs/app.log
