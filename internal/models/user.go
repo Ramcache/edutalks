@@ -15,7 +15,7 @@ type User struct {
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 	HasSubscription   bool
-	Email_verified    string
+	Email_verified    bool
 }
 
 type UpdateUserRequest struct {

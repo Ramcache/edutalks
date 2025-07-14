@@ -77,8 +77,6 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*m
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.HasSubscription,
-		&user.EmailSubscription,
-		&user.Email_verified,
 	)
 
 	if err != nil {

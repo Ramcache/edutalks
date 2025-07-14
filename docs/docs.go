@@ -1079,7 +1079,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "email_verified": {
-                    "type": "string"
+                    "type": "boolean"
                 },
                 "full_name": {
                     "type": "string"
