@@ -22,6 +22,7 @@ type DocumentRepo interface {
 	GetPublicDocuments(ctx context.Context) ([]*models.Document, error)
 	GetDocumentByID(ctx context.Context, id int) (*models.Document, error)
 	DeleteDocument(ctx context.Context, id int) error
+	GetAllDocuments(ctx context.Context) ([]*models.Document, error)
 }
 
 func (r *DocumentRepository) SaveDocument(ctx context.Context, doc *models.Document) error {
@@ -112,4 +113,25 @@ func (r *DocumentRepository) DeleteDocument(ctx context.Context, id int) error {
 		logger.Log.Error("Ошибка удаления документа (repo)", zap.Int("doc_id", id), zap.Error(err))
 	}
 	return err
+}
+
+func (r *DocumentRepository) GetAllDocuments(ctx context.Context) ([]*models.Document, error) {
+	query := `SELECT id, user_id, filename, filepath, is_public, description, uploaded_at FROM documents ORDER BY uploaded_at DESC`
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		logger.Log.Error("Ошибка получения всех документов (repo)", zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
+
+	var docs []*models.Document
+	for rows.Next() {
+		var d models.Document
+		if err := rows.Scan(&d.ID, &d.UserID, &d.Filename, &d.Filepath, &d.IsPublic, &d.Description, &d.UploadedAt); err != nil {
+			logger.Log.Error("Ошибка сканирования документа (repo)", zap.Error(err))
+			return nil, err
+		}
+		docs = append(docs, &d)
+	}
+	return docs, nil
 }

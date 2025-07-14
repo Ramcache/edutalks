@@ -34,6 +34,7 @@ func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentH
 		// Админка
 		admin := protected.PathPrefix("/admin").Subrouter()
 		admin.Use(middleware.OnlyRole("admin"))
+		admin.HandleFunc("/files", documentHandler.GetAllDocuments).Methods("GET")
 		admin.HandleFunc("/files/upload", documentHandler.UploadDocument).Methods("POST")
 		admin.HandleFunc("/files/{id:[0-9]+}", documentHandler.DeleteDocument).Methods("DELETE")
 		admin.HandleFunc("/dashboard", authHandler.AdminOnly).Methods("GET")

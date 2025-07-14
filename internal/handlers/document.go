@@ -6,6 +6,7 @@ import (
 	"edutalks/internal/models"
 	"edutalks/internal/services"
 	helpers "edutalks/internal/utils/helpres"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -230,4 +231,23 @@ func (h *DocumentHandler) DeleteDocument(w http.ResponseWriter, r *http.Request)
 
 	logger.Log.Info("Документ успешно удалён", zap.Int("doc_id", id))
 	helpers.JSON(w, http.StatusOK, "Документ удалён")
+}
+
+// GetAllDocuments godoc
+// @Summary Получить все документы (только для админа)
+// @Tags admin-files
+// @Security ApiKeyAuth
+// @Produce json
+// @Success 200 {array} models.Document
+// @Failure 500 {string} string "Ошибка сервера"
+// @Router /api/admin/files [get]
+func (h *DocumentHandler) GetAllDocuments(w http.ResponseWriter, r *http.Request) {
+	docs, err := h.service.GetAllDocuments(r.Context())
+	if err != nil {
+		http.Error(w, "Ошибка получения документов", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(docs)
 }

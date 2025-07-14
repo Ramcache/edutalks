@@ -145,6 +145,26 @@ paths:
       summary: Доступ только для администратора
       tags:
       - admin-users
+  /api/admin/files:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Document'
+            type: array
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Получить все документы (только для админа)
+      tags:
+      - admin-files
   /api/admin/files/{id}:
     delete:
       parameters:

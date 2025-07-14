@@ -22,6 +22,7 @@ type DocumentServiceInterface interface {
 	GetPublicDocuments(ctx context.Context) ([]*models.Document, error)
 	GetDocumentByID(ctx context.Context, id int) (*models.Document, error)
 	Delete(ctx context.Context, id int) error
+	GetAllDocuments(ctx context.Context) ([]*models.Document, error)
 }
 
 func (s *DocumentService) Upload(ctx context.Context, doc *models.Document) error {
@@ -58,4 +59,9 @@ func (s *DocumentService) Delete(ctx context.Context, id int) error {
 		logger.Log.Error("Ошибка удаления документа (service)", zap.Int("doc_id", id), zap.Error(err))
 	}
 	return err
+}
+
+func (s *DocumentService) GetAllDocuments(ctx context.Context) ([]*models.Document, error) {
+	logger.Log.Info("Сервис: получение всех документов")
+	return s.repo.GetAllDocuments(ctx)
 }
