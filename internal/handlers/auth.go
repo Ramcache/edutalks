@@ -142,10 +142,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 // Protected godoc
-// @Summary Защищённый маршрут (тест)
-// @Tags protected
+// @Summary Получить данные профиля
+// @Tags profile
 // @Security ApiKeyAuth
-// @Success 200 {string} string "Привет, пользователь с ролью"
+// @Success 200 {object} map[string]interface{} "Профиль пользователя"
 // @Failure 401 {string} string "Нет доступа"
 // @Router /api/profile [get]
 func (h *AuthHandler) Protected(w http.ResponseWriter, r *http.Request) {
@@ -221,7 +221,6 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {string} string "Выход выполнен"
 // @Failure 401 {string} string "Невалидный токен"
 // @Router /logout [post]
-
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
@@ -263,7 +262,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 // AdminOnly godoc
 // @Summary Доступ только для администратора
-// @Tags admin
+// @Tags admin-users
 // @Security ApiKeyAuth
 // @Success 200 {string} string "Доступно только администратору"
 // @Failure 403 {string} string "Доступ запрещён"
@@ -273,8 +272,8 @@ func (h *AuthHandler) AdminOnly(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetUsers godoc
-// @Summary Получить всех пользователей с ролью user
-// @Tags admin
+// @Summary Получить всех пользователей
+// @Tags admin-users
 // @Security ApiKeyAuth
 // @Produce json
 // @Success 200 {array} models.User
@@ -293,7 +292,7 @@ func (h *AuthHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 
 // GetUserByID godoc
 // @Summary Получить пользователя по ID
-// @Tags admin
+// @Tags admin-users
 // @Security ApiKeyAuth
 // @Produce json
 // @Param id path int true "ID пользователя"
@@ -323,7 +322,7 @@ func (h *AuthHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 
 // UpdateUser godoc
 // @Summary Частичное обновление пользователя
-// @Tags admin
+// @Tags admin-users
 // @Security ApiKeyAuth
 // @Param id path int true "ID пользователя"
 // @Accept json
@@ -361,14 +360,14 @@ func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 // SetSubscription godoc
-// @Summary Включение или отключение подписки у пользователя (только admin)
-// @Tags admin
+// @Summary Включение или отключение подписки у пользователя
+// @Tags admin-users
 // @Security ApiKeyAuth
 // @Param id path int true "ID пользователя"
 // @Param input body subscriptionRequest true "Статус подписки"
 // @Success 200 {string} string "Статус обновлён"
 // @Failure 400 {string} string "Ошибка запроса"
-// @Router /admin/users/{id}/subscription [patch]
+// @Router /api/admin/users/{id}/subscription [patch]
 func (h *AuthHandler) SetSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := mux.Vars(r)["id"]
 	userID, err := strconv.Atoi(idStr)

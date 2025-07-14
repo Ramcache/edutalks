@@ -27,8 +27,8 @@ type NewsRepo interface {
 
 func (r *NewsRepository) Create(ctx context.Context, news *models.News) error {
 	logger.Log.Info("Репозиторий: создание новости", zap.String("title", news.Title))
-	query := `INSERT INTO news (title, content) VALUES ($1, $2)`
-	_, err := r.db.Exec(ctx, query, news.Title, news.Content)
+	query := `INSERT INTO news (title, content, image_url) VALUES ($1, $2, $3)`
+	_, err := r.db.Exec(ctx, query, news.Title, news.Content, news.ImageURL)
 	if err != nil {
 		logger.Log.Error("Ошибка создания новости (repo)", zap.Error(err))
 	}
@@ -37,7 +37,8 @@ func (r *NewsRepository) Create(ctx context.Context, news *models.News) error {
 
 func (r *NewsRepository) List(ctx context.Context) ([]*models.News, error) {
 	logger.Log.Info("Репозиторий: получение списка новостей")
-	rows, err := r.db.Query(ctx, `SELECT id, title, content, created_at FROM news ORDER BY created_at DESC`)
+	rows, err := r.db.Query(ctx, `SELECT id, title, content, image_url, created_at FROM news ORDER BY created_at DESC
+`)
 	if err != nil {
 		logger.Log.Error("Ошибка получения списка новостей (repo)", zap.Error(err))
 		return nil, err
@@ -47,7 +48,7 @@ func (r *NewsRepository) List(ctx context.Context) ([]*models.News, error) {
 	var newsList []*models.News
 	for rows.Next() {
 		var n models.News
-		if err := rows.Scan(&n.ID, &n.Title, &n.Content, &n.CreatedAt); err != nil {
+		if err := rows.Scan(&n.ID, &n.Title, &n.Content, &n.ImageURL, &n.CreatedAt); err != nil {
 			logger.Log.Error("Ошибка сканирования новости (repo)", zap.Error(err))
 			return nil, err
 		}
@@ -59,21 +60,22 @@ func (r *NewsRepository) List(ctx context.Context) ([]*models.News, error) {
 
 func (r *NewsRepository) GetByID(ctx context.Context, id int) (*models.News, error) {
 	logger.Log.Info("Репозиторий: получение новости по ID", zap.Int("news_id", id))
-	query := `SELECT id, title, content, created_at FROM news WHERE id = $1`
+	query := `SELECT id, title, content, image_url, created_at FROM news WHERE id = $1`
 	row := r.db.QueryRow(ctx, query, id)
 
 	var n models.News
-	if err := row.Scan(&n.ID, &n.Title, &n.Content, &n.CreatedAt); err != nil {
+	if err := row.Scan(&n.ID, &n.Title, &n.Content, &n.ImageURL, &n.CreatedAt); err != nil {
 		logger.Log.Error("Ошибка получения новости по ID (repo)", zap.Int("news_id", id), zap.Error(err))
 		return nil, err
 	}
+
 	return &n, nil
 }
 
-func (r *NewsRepository) Update(ctx context.Context, id int, title, content string) error {
+func (r *NewsRepository) Update(ctx context.Context, id int, title, content, imageURL string) error {
 	logger.Log.Info("Репозиторий: обновление новости", zap.Int("news_id", id))
-	query := `UPDATE news SET title = $1, content = $2 WHERE id = $3`
-	_, err := r.db.Exec(ctx, query, title, content, id)
+	query := `UPDATE news SET title = $1, content = $2, image_url = $3 WHERE id = $4`
+	_, err := r.db.Exec(ctx, query, title, content, imageURL, id)
 	if err != nil {
 		logger.Log.Error("Ошибка обновления новости (repo)", zap.Int("news_id", id), zap.Error(err))
 	}

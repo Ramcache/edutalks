@@ -24,25 +24,27 @@ func NewNewsHandler(newsService *services.NewsService) *NewsHandler {
 }
 
 type createNewsRequest struct {
-	Title   string `json:"title"`
-	Content string `json:"content"`
+	Title    string `json:"title"`
+	Content  string `json:"content"`
+	ImageURL string `json:"image_url"`
 }
 
 type updateNewsRequest struct {
-	Title   string `json:"title"`
-	Content string `json:"content"`
+	Title    string `json:"title"`
+	Content  string `json:"content"`
+	ImageURL string `json:"image_url"`
 }
 
 // CreateNews godoc
 // @Summary Создать новость (только admin)
-// @Tags news
+// @Tags admin-news
 // @Security ApiKeyAuth
 // @Accept json
 // @Produce json
 // @Param input body createNewsRequest true "Данные новости"
 // @Success 201 {string} string "Новость создана"
 // @Failure 400 {string} string "Ошибка запроса"
-// @Router /admin/news [post]
+// @Router /api/admin/news [post]
 func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
 	logger.Log.Info("Запрос на создание новости")
 	var req createNewsRequest
@@ -74,7 +76,6 @@ func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Success 200 {array} models.News
 // @Router /news [get]
-
 func (h *NewsHandler) ListNews(w http.ResponseWriter, r *http.Request) {
 	logger.Log.Info("Запрос на получение списка новостей")
 	newsList, err := h.newsService.List(r.Context())
@@ -112,12 +113,12 @@ func (h *NewsHandler) GetNews(w http.ResponseWriter, r *http.Request) {
 
 // UpdateNews godoc
 // @Summary Обновить новость (только admin)
-// @Tags admin
+// @Tags admin-news
 // @Security ApiKeyAuth
 // @Param id path int true "ID новости"
 // @Param input body updateNewsRequest true "Новое содержимое"
 // @Success 200 {string} string "Обновлено"
-// @Router /admin/news/{id} [patch]
+// @Router /api/admin/news/{id} [patch]
 func (h *NewsHandler) UpdateNews(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(mux.Vars(r)["id"])
 	logger.Log.Info("Запрос на обновление новости", zap.Int("news_id", id))
@@ -128,7 +129,7 @@ func (h *NewsHandler) UpdateNews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.newsService.Update(r.Context(), id, req.Title, req.Content); err != nil {
+	if err := h.newsService.Update(r.Context(), id, req.Title, req.Content, req.ImageURL); err != nil {
 		logger.Log.Error("Ошибка обновления новости", zap.Error(err), zap.Int("news_id", id))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка обновления")
 		return
@@ -140,11 +141,11 @@ func (h *NewsHandler) UpdateNews(w http.ResponseWriter, r *http.Request) {
 
 // DeleteNews godoc
 // @Summary Удалить новость (только admin)
-// @Tags admin
+// @Tags admin-news
 // @Security ApiKeyAuth
 // @Param id path int true "ID новости"
 // @Success 200 {string} string "Удалено"
-// @Router /admin/news/{id} [delete]
+// @Router /api/admin/news/{id} [delete]
 func (h *NewsHandler) DeleteNews(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(mux.Vars(r)["id"])
 	logger.Log.Info("Запрос на удаление новости", zap.Int("news_id", id))

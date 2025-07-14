@@ -3,6 +3,8 @@ definitions:
     properties:
       content:
         type: string
+      image_url:
+        type: string
       title:
         type: string
     type: object
@@ -52,6 +54,8 @@ definitions:
     properties:
       content:
         type: string
+      image_url:
+        type: string
       title:
         type: string
     type: object
@@ -80,6 +84,8 @@ definitions:
         type: string
       id:
         type: integer
+      image_url:
+        type: string
       title:
         type: string
     type: object
@@ -123,7 +129,79 @@ info:
   contact: {}
   title: Edutalks API
 paths:
-  /admin/news:
+  /api/admin/dashboard:
+    get:
+      responses:
+        "200":
+          description: Доступно только администратору
+          schema:
+            type: string
+        "403":
+          description: Доступ запрещён
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Доступ только для администратора
+      tags:
+      - admin-users
+  /api/admin/files/{id}:
+    delete:
+      parameters:
+      - description: ID документа
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: Документ удалён
+          schema:
+            type: string
+        "404":
+          description: Документ не найден
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Удаление документа (только для админа)
+      tags:
+      - admin-files
+  /api/admin/files/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Файл документа
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Описание файла
+        in: formData
+        name: description
+        type: string
+      - description: Доступен по подписке?
+        in: formData
+        name: is_public
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Файл загружен
+          schema:
+            type: string
+        "400":
+          description: Ошибка загрузки
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Загрузка документа (только для админа)
+      tags:
+      - admin-files
+  /api/admin/news:
     post:
       consumes:
       - application/json
@@ -149,8 +227,8 @@ paths:
       - ApiKeyAuth: []
       summary: Создать новость (только admin)
       tags:
-      - news
-  /admin/news/{id}:
+      - admin-news
+  /api/admin/news/{id}:
     delete:
       parameters:
       - description: ID новости
@@ -167,7 +245,7 @@ paths:
       - ApiKeyAuth: []
       summary: Удалить новость (только admin)
       tags:
-      - admin
+      - admin-news
     patch:
       parameters:
       - description: ID новости
@@ -190,107 +268,7 @@ paths:
       - ApiKeyAuth: []
       summary: Обновить новость (только admin)
       tags:
-      - admin
-  /admin/users/{id}/subscription:
-    patch:
-      parameters:
-      - description: ID пользователя
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: Статус подписки
-        in: body
-        name: input
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.subscriptionRequest'
-      responses:
-        "200":
-          description: Статус обновлён
-          schema:
-            type: string
-        "400":
-          description: Ошибка запроса
-          schema:
-            type: string
-      security:
-      - ApiKeyAuth: []
-      summary: Включение или отключение подписки у пользователя (только admin)
-      tags:
-      - admin
-  /api/admin/dashboard:
-    get:
-      responses:
-        "200":
-          description: Доступно только администратору
-          schema:
-            type: string
-        "403":
-          description: Доступ запрещён
-          schema:
-            type: string
-      security:
-      - ApiKeyAuth: []
-      summary: Доступ только для администратора
-      tags:
-      - admin
-  /api/admin/files/{id}:
-    delete:
-      parameters:
-      - description: ID документа
-        in: path
-        name: id
-        required: true
-        type: integer
-      responses:
-        "200":
-          description: Документ удалён
-          schema:
-            type: string
-        "404":
-          description: Документ не найден
-          schema:
-            type: string
-      security:
-      - ApiKeyAuth: []
-      summary: Удаление документа (только для админа)
-      tags:
-      - admin
-  /api/admin/files/upload:
-    post:
-      consumes:
-      - multipart/form-data
-      parameters:
-      - description: Файл документа
-        in: formData
-        name: file
-        required: true
-        type: file
-      - description: Описание файла
-        in: formData
-        name: description
-        type: string
-      - description: Доступен по подписке?
-        in: formData
-        name: is_public
-        type: boolean
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Файл загружен
-          schema:
-            type: string
-        "400":
-          description: Ошибка загрузки
-          schema:
-            type: string
-      security:
-      - ApiKeyAuth: []
-      summary: Загрузка документа (только для админа)
-      tags:
-      - admin
+      - admin-news
   /api/admin/users:
     get:
       produces:
@@ -308,9 +286,9 @@ paths:
             type: string
       security:
       - ApiKeyAuth: []
-      summary: Получить всех пользователей с ролью user
+      summary: Получить всех пользователей
       tags:
-      - admin
+      - admin-users
   /api/admin/users/{id}:
     get:
       parameters:
@@ -338,7 +316,7 @@ paths:
       - ApiKeyAuth: []
       summary: Получить пользователя по ID
       tags:
-      - admin
+      - admin-users
     patch:
       consumes:
       - application/json
@@ -373,7 +351,35 @@ paths:
       - ApiKeyAuth: []
       summary: Частичное обновление пользователя
       tags:
-      - admin
+      - admin-users
+  /api/admin/users/{id}/subscription:
+    patch:
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Статус подписки
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.subscriptionRequest'
+      responses:
+        "200":
+          description: Статус обновлён
+          schema:
+            type: string
+        "400":
+          description: Ошибка запроса
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Включение или отключение подписки у пользователя
+      tags:
+      - admin-users
   /api/files:
     get:
       produces:
@@ -422,18 +428,19 @@ paths:
     get:
       responses:
         "200":
-          description: Привет, пользователь с ролью
+          description: Профиль пользователя
           schema:
-            type: string
+            additionalProperties: true
+            type: object
         "401":
           description: Нет доступа
           schema:
             type: string
       security:
       - ApiKeyAuth: []
-      summary: Защищённый маршрут (тест)
+      summary: Получить данные профиля
       tags:
-      - protected
+      - profile
   /login:
     post:
       consumes:
@@ -459,6 +466,36 @@ paths:
       summary: Авторизация пользователя
       tags:
       - auth
+  /logout:
+    post:
+      responses:
+        "200":
+          description: Выход выполнен
+          schema:
+            type: string
+        "401":
+          description: Невалидный токен
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Выход (удаление refresh токена)
+      tags:
+      - auth
+  /news:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.News'
+            type: array
+      summary: Получить список новостей
+      tags:
+      - news
   /news/{id}:
     get:
       parameters:

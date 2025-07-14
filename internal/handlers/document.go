@@ -34,14 +34,14 @@ func NewDocumentHandler(docService *services.DocumentService, userService *servi
 
 // UploadDocument godoc
 // @Summary Загрузка документа (только для админа)
-// @Tags admin
+// @Tags admin-files
 // @Security ApiKeyAuth
 // @Accept multipart/form-data
 // @Produce json
 // @Param file formData file true "Файл документа"
 // @Param description formData string false "Описание файла"
 // @Param is_public formData bool false "Доступен по подписке?"
-// @Success 200 {string} string "Файл загружен"
+// @Success 201 {string} string "Файл загружен"
 // @Failure 400 {string} string "Ошибка загрузки"
 // @Router /api/admin/files/upload [post]
 func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request) {
@@ -197,7 +197,7 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 
 // DeleteDocument godoc
 // @Summary Удаление документа (только для админа)
-// @Tags admin
+// @Tags admin-files
 // @Security ApiKeyAuth
 // @Param id path int true "ID документа"
 // @Success 200 {string} string "Документ удалён"

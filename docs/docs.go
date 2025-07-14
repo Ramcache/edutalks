@@ -15,162 +15,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/admin/news": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "news"
-                ],
-                "summary": "Создать новость (только admin)",
-                "parameters": [
-                    {
-                        "description": "Данные новости",
-                        "name": "input",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.createNewsRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Новость создана",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "400": {
-                        "description": "Ошибка запроса",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/admin/news/{id}": {
-            "delete": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "tags": [
-                    "admin"
-                ],
-                "summary": "Удалить новость (только admin)",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "ID новости",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Удалено",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            },
-            "patch": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "tags": [
-                    "admin"
-                ],
-                "summary": "Обновить новость (только admin)",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "ID новости",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Новое содержимое",
-                        "name": "input",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.updateNewsRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Обновлено",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/admin/users/{id}/subscription": {
-            "patch": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "tags": [
-                    "admin"
-                ],
-                "summary": "Включение или отключение подписки у пользователя (только admin)",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "ID пользователя",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Статус подписки",
-                        "name": "input",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.subscriptionRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Статус обновлён",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "400": {
-                        "description": "Ошибка запроса",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
         "/api/admin/dashboard": {
             "get": {
                 "security": [
@@ -179,7 +23,7 @@ const docTemplate = `{
                     }
                 ],
                 "tags": [
-                    "admin"
+                    "admin-users"
                 ],
                 "summary": "Доступ только для администратора",
                 "responses": {
@@ -212,7 +56,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "admin"
+                    "admin-files"
                 ],
                 "summary": "Загрузка документа (только для админа)",
                 "parameters": [
@@ -237,7 +81,7 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "201": {
                         "description": "Файл загружен",
                         "schema": {
                             "type": "string"
@@ -260,7 +104,7 @@ const docTemplate = `{
                     }
                 ],
                 "tags": [
-                    "admin"
+                    "admin-files"
                 ],
                 "summary": "Удаление документа (только для админа)",
                 "parameters": [
@@ -288,6 +132,117 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/admin/news": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-news"
+                ],
+                "summary": "Создать новость (только admin)",
+                "parameters": [
+                    {
+                        "description": "Данные новости",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.createNewsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Новость создана",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Ошибка запроса",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/news/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "tags": [
+                    "admin-news"
+                ],
+                "summary": "Удалить новость (только admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID новости",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Удалено",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "tags": [
+                    "admin-news"
+                ],
+                "summary": "Обновить новость (только admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID новости",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Новое содержимое",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.updateNewsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Обновлено",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/users": {
             "get": {
                 "security": [
@@ -299,9 +254,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "admin"
+                    "admin-users"
                 ],
-                "summary": "Получить всех пользователей с ролью user",
+                "summary": "Получить всех пользователей",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -332,7 +287,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "admin"
+                    "admin-users"
                 ],
                 "summary": "Получить пользователя по ID",
                 "parameters": [
@@ -378,7 +333,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "admin"
+                    "admin-users"
                 ],
                 "summary": "Частичное обновление пользователя",
                 "parameters": [
@@ -414,6 +369,51 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Пользователь не найден",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{id}/subscription": {
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "tags": [
+                    "admin-users"
+                ],
+                "summary": "Включение или отключение подписки у пользователя",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID пользователя",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Статус подписки",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.subscriptionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Статус обновлён",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Ошибка запроса",
                         "schema": {
                             "type": "string"
                         }
@@ -501,14 +501,15 @@ const docTemplate = `{
                     }
                 ],
                 "tags": [
-                    "protected"
+                    "profile"
                 ],
-                "summary": "Защищённый маршрут (тест)",
+                "summary": "Получить данные профиля",
                 "responses": {
                     "200": {
-                        "description": "Привет, пользователь с ролью",
+                        "description": "Профиль пользователя",
                         "schema": {
-                            "type": "string"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "401": {
@@ -554,6 +555,55 @@ const docTemplate = `{
                         "description": "Неверный логин или пароль",
                         "schema": {
                             "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/logout": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Выход (удаление refresh токена)",
+                "responses": {
+                    "200": {
+                        "description": "Выход выполнен",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Невалидный токен",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/news": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "news"
+                ],
+                "summary": "Получить список новостей",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.News"
+                            }
                         }
                     }
                 }
@@ -673,6 +723,9 @@ const docTemplate = `{
                 "content": {
                     "type": "string"
                 },
+                "image_url": {
+                    "type": "string"
+                },
                 "title": {
                     "type": "string"
                 }
@@ -749,6 +802,9 @@ const docTemplate = `{
                 "content": {
                     "type": "string"
                 },
+                "image_url": {
+                    "type": "string"
+                },
                 "title": {
                     "type": "string"
                 }
@@ -791,6 +847,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                },
+                "image_url": {
+                    "type": "string"
                 },
                 "title": {
                     "type": "string"

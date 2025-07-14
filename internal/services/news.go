@@ -44,9 +44,9 @@ func (s *NewsService) GetByID(ctx context.Context, id int) (*models.News, error)
 	return n, err
 }
 
-func (s *NewsService) Update(ctx context.Context, id int, title, content string) error {
+func (s *NewsService) Update(ctx context.Context, id int, title, content, imageURL string) error {
 	logger.Log.Info("Сервис: обновление новости", zap.Int("news_id", id))
-	err := s.repo.Update(ctx, id, title, content)
+	err := s.repo.Update(ctx, id, title, content, imageURL)
 	if err != nil {
 		logger.Log.Error("Ошибка обновления новости (service)", zap.Error(err), zap.Int("news_id", id))
 	}

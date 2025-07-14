@@ -104,3 +104,4 @@
 {"level":"INFO","time":"2025-07-13T19:20:43.728+0300","message":"Репозиторий: получение документа по ID","doc_id":5}
 {"level":"INFO","time":"2025-07-13T19:20:43.730+0300","message":"Документ успешно скачан","filename":"snickers.jpg","user_id":1}
 {"level":"INFO","time":"2025-07-13T19:20:43.730+0300","message":"HTTP-запрос","method":"GET","path":"/api/files/5","status":200,"duration":5178900}
+{"level":"INFO","time":"2025-07-14T14:38:07.455+0300","message":"Сервер запущен","port":"8080"}
