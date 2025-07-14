@@ -17,18 +17,23 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 		return nil, err
 	}
 
+	// Репозитории
 	userRepo := repository.NewUserRepository(conn)
-	authService := services.NewAuthService(userRepo)
-	authHandler := handlers.NewAuthHandler(authService)
-
 	docRepo := repository.NewDocumentRepository(conn)
-	docService := services.NewDocumentService(docRepo)
-	docHandler := handlers.NewDocumentHandler(docService, authService)
-
 	newsRepo := repository.NewNewsRepository(conn)
-	newsService := services.NewNewsService(newsRepo)
+
+	// Сервисы
+	authService := services.NewAuthService(userRepo)
+	docService := services.NewDocumentService(docRepo)
+	emailService := services.NewEmailService(cfg)
+	newsService := services.NewNewsService(newsRepo, userRepo, emailService)
+
+	// Хендлеры
+	authHandler := handlers.NewAuthHandler(authService)
+	docHandler := handlers.NewDocumentHandler(docService, authService)
 	newsHandler := handlers.NewNewsHandler(newsService)
 
+	// Маршруты
 	router := mux.NewRouter()
 	routes.InitRoutes(router, authHandler, docHandler, newsHandler)
 

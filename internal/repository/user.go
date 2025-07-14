@@ -237,3 +237,20 @@ func (r *UserRepository) UpdateSubscriptionStatus(ctx context.Context, userID in
 	}
 	return err
 }
+
+func (r *UserRepository) GetSubscribedEmails(ctx context.Context) ([]string, error) {
+	rows, err := r.db.Query(ctx, `SELECT email FROM users WHERE email_subscription = true`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var emails []string
+	for rows.Next() {
+		var email string
+		if err := rows.Scan(&email); err == nil {
+			emails = append(emails, email)
+		}
+	}
+	return emails, nil
+}

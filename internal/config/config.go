@@ -22,6 +22,11 @@ type Config struct {
 
 	Log      string
 	LogLevel string
+
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUser     string
+	SMTPPassword string
 }
 
 // LoadConfig загружает переменные из .env
@@ -41,6 +46,10 @@ func LoadConfig() (*Config, error) {
 		RefreshTokenTTL: os.Getenv("REFRESH_TOKEN_EXPIRY"),
 		Log:             os.Getenv("Log"),
 		LogLevel:        os.Getenv("LogLevel"),
+		SMTPHost:        os.Getenv("SMTP_HOST"),
+		SMTPPort:        os.Getenv("SMTP_PORT"),
+		SMTPUser:        os.Getenv("SMTP_USER"),
+		SMTPPassword:    os.Getenv("SMTP_PASSWORD"),
 	}
 	return cfg, nil
 }

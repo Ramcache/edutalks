@@ -56,6 +56,11 @@ type subscriptionRequest struct {
 	Active bool `json:"active"`
 }
 
+type notifyRequest struct {
+	Subject string `json:"subject"`
+	Message string `json:"message"`
+}
+
 // Register godoc
 // @Summary Регистрация нового пользователя
 // @Tags auth
@@ -392,4 +397,37 @@ func (h *AuthHandler) SetSubscription(w http.ResponseWriter, r *http.Request) {
 
 	logger.Log.Info("Подписка пользователя изменена", zap.Int("user_id", userID), zap.Bool("active", req.Active))
 	helpers.JSON(w, http.StatusOK, "Статус подписки обновлён")
+}
+
+// NotifySubscribers godoc
+// @Summary Отправить письмо всем подписанным
+// @Tags admin
+// @Security ApiKeyAuth
+// @Accept json
+// @Param input body notifyRequest true "Сообщение"
+// @Success 200 {string} string "Письма отправлены"
+// @Failure 400 {string} string "Ошибка запроса"
+// @Failure 500 {string} string "Ошибка отправки"
+// @Router /api/admin/notify [post]
+func (h *AuthHandler) NotifySubscribers(w http.ResponseWriter, r *http.Request) {
+	var req notifyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Невалидный JSON", http.StatusBadRequest)
+		return
+	}
+
+	emails, err := h.authService.GetSubscribedEmails(r.Context())
+	if err != nil {
+		http.Error(w, "Не удалось получить список подписчиков", http.StatusInternalServerError)
+		return
+	}
+
+	for _, email := range emails {
+		err := utils.SendEmail(email, req.Subject, req.Message)
+		if err != nil {
+			logger.Log.Warn("Ошибка отправки письма", zap.String("email", email), zap.Error(err))
+		}
+	}
+
+	w.Write([]byte("Письма отправлены"))
 }

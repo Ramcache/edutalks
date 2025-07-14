@@ -276,6 +276,53 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/admin/notify": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Отправить письмо всем подписанным",
+                "parameters": [
+                    {
+                        "description": "Сообщение",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.notifyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Письма отправлены",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Ошибка запроса",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Ошибка отправки",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/users": {
             "get": {
                 "security": [
@@ -798,6 +845,17 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.notifyRequest": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.registerRequest": {
             "type": "object",
             "properties": {
@@ -920,6 +978,9 @@ const docTemplate = `{
                 },
                 "email": {
                     "type": "string"
+                },
+                "email_subscription": {
+                    "type": "boolean"
                 },
                 "full_name": {
                     "type": "string"
