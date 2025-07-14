@@ -1078,6 +1078,9 @@ const docTemplate = `{
                 "email_subscription": {
                     "type": "boolean"
                 },
+                "email_verified": {
+                    "type": "string"
+                },
                 "full_name": {
                     "type": "string"
                 },

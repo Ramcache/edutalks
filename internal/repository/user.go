@@ -60,7 +60,9 @@ func (r *UserRepository) IsEmailTaken(ctx context.Context, email string) (bool, 
 
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*models.User, error) {
 	logger.Log.Debug("Получение пользователя по username (repo)", zap.String("username", username))
-	query := `SELECT id, username, full_name, phone, email, address, password_hash, role, created_at, updated_at, has_subscription FROM users WHERE username = $1`
+	query := `SELECT id, username, full_name, phone, email, address, password_hash, role, created_at, updated_at, has_subscription, email_subscription, email_verified
+	FROM users 
+	WHERE username = $1`
 
 	var user models.User
 	err := r.db.QueryRow(ctx, query, username).Scan(
@@ -75,6 +77,8 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*m
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.HasSubscription,
+		&user.EmailSubscription,
+		&user.Email_verified,
 	)
 
 	if err != nil {
@@ -117,7 +121,7 @@ func (r *UserRepository) DeleteRefreshToken(ctx context.Context, userID int, tok
 
 func (r *UserRepository) GetAllUsers(ctx context.Context) ([]*models.User, error) {
 	logger.Log.Info("Получение всех пользователей (repo)")
-	query := `SELECT id, username, full_name, phone, email, address, role, created_at, updated_at, has_subscription FROM users`
+	query := `SELECT id, username, full_name, phone, email, address, role, created_at, updated_at, has_subscription, email_subscription, email_verified FROM users`
 
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
@@ -140,6 +144,8 @@ func (r *UserRepository) GetAllUsers(ctx context.Context) ([]*models.User, error
 			&u.CreatedAt,
 			&u.UpdatedAt,
 			&u.HasSubscription,
+			&u.EmailSubscription,
+			&u.Email_verified,
 		)
 		if err != nil {
 			logger.Log.Error("Ошибка сканирования пользователя (repo)", zap.Error(err))
@@ -153,7 +159,7 @@ func (r *UserRepository) GetAllUsers(ctx context.Context) ([]*models.User, error
 func (r *UserRepository) GetUserByID(ctx context.Context, id int) (*models.User, error) {
 	logger.Log.Debug("Получение пользователя по ID (repo)", zap.Int("user_id", id))
 	query := `
-		SELECT id, username, full_name, phone, email, address, role, created_at, updated_at, has_subscription
+		SELECT id, username, full_name, phone, email, address, role, created_at, updated_at, has_subscription, email_subscription, email_verified
 		FROM users
 		WHERE id = $1
 	`
@@ -170,6 +176,8 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id int) (*models.User,
 		&u.CreatedAt,
 		&u.UpdatedAt,
 		&u.HasSubscription,
+		&u.EmailSubscription,
+		&u.Email_verified,
 	)
 	if err != nil {
 		logger.Log.Error("Ошибка получения пользователя по ID (repo)", zap.Int("user_id", id), zap.Error(err))

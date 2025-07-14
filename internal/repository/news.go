@@ -37,7 +37,7 @@ func (r *NewsRepository) Create(ctx context.Context, news *models.News) error {
 
 func (r *NewsRepository) List(ctx context.Context) ([]*models.News, error) {
 	logger.Log.Info("Репозиторий: получение списка новостей")
-	rows, err := r.db.Query(ctx, `SELECT id, title, content, image_url, created_at FROM news ORDER BY created_at DESC
+	rows, err := r.db.Query(ctx, `SELECT id, title, content,  created_at, image_url FROM news ORDER BY created_at DESC
 `)
 	if err != nil {
 		logger.Log.Error("Ошибка получения списка новостей (repo)", zap.Error(err))
@@ -48,7 +48,7 @@ func (r *NewsRepository) List(ctx context.Context) ([]*models.News, error) {
 	var newsList []*models.News
 	for rows.Next() {
 		var n models.News
-		if err := rows.Scan(&n.ID, &n.Title, &n.Content, &n.ImageURL, &n.CreatedAt); err != nil {
+		if err := rows.Scan(&n.ID, &n.Title, &n.Content, &n.CreatedAt, &n.ImageURL); err != nil {
 			logger.Log.Error("Ошибка сканирования новости (repo)", zap.Error(err))
 			return nil, err
 		}
@@ -60,11 +60,11 @@ func (r *NewsRepository) List(ctx context.Context) ([]*models.News, error) {
 
 func (r *NewsRepository) GetByID(ctx context.Context, id int) (*models.News, error) {
 	logger.Log.Info("Репозиторий: получение новости по ID", zap.Int("news_id", id))
-	query := `SELECT id, title, content, image_url, created_at FROM news WHERE id = $1`
+	query := `SELECT id, title, content, created_at, image_url FROM news WHERE id = $1`
 	row := r.db.QueryRow(ctx, query, id)
 
 	var n models.News
-	if err := row.Scan(&n.ID, &n.Title, &n.Content, &n.ImageURL, &n.CreatedAt); err != nil {
+	if err := row.Scan(&n.ID, &n.Title, &n.Content, &n.CreatedAt, &n.ImageURL); err != nil {
 		logger.Log.Error("Ошибка получения новости по ID (repo)", zap.Int("news_id", id), zap.Error(err))
 		return nil, err
 	}
