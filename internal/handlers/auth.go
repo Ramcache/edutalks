@@ -61,6 +61,10 @@ type notifyRequest struct {
 	Message string `json:"message"`
 }
 
+type emailSubscriptionRequest struct {
+	Subscribe bool `json:"subscribe"`
+}
+
 // Register godoc
 // @Summary Регистрация нового пользователя
 // @Tags auth
@@ -401,7 +405,7 @@ func (h *AuthHandler) SetSubscription(w http.ResponseWriter, r *http.Request) {
 
 // NotifySubscribers godoc
 // @Summary Отправить письмо всем подписанным
-// @Tags admin
+// @Tags admin-notify
 // @Security ApiKeyAuth
 // @Accept json
 // @Param input body notifyRequest true "Сообщение"
@@ -430,4 +434,32 @@ func (h *AuthHandler) NotifySubscribers(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Write([]byte("Письма отправлены"))
+}
+
+// EmailSubscribe godoc
+// @Summary Подписка или отписка от email-уведомлений
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param input body emailSubscriptionRequest true "Подписка на email"
+// @Success 200 {string} string "Статус подписки обновлён"
+// @Failure 400 {string} string "Невалидный запрос"
+// @Router /api/email-subscription [patch]
+func (h *AuthHandler) EmailSubscribe(w http.ResponseWriter, r *http.Request) {
+	var req emailSubscriptionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Невалидный JSON", http.StatusBadRequest)
+		return
+	}
+
+	userID := r.Context().Value(middleware.ContextUserID).(int)
+
+	err := h.authService.UpdateEmailSubscription(r.Context(), userID, req.Subscribe)
+	if err != nil {
+		http.Error(w, "Не удалось обновить статус подписки", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte("Статус подписки обновлён"))
 }

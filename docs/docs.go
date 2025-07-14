@@ -287,7 +287,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "admin"
+                    "admin-notify"
                 ],
                 "summary": "Отправить письмо всем подписанным",
                 "parameters": [
@@ -494,6 +494,50 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Ошибка запроса",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/email-subscription": {
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Подписка или отписка от email-уведомлений",
+                "parameters": [
+                    {
+                        "description": "Подписка на email",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.emailSubscriptionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Статус подписки обновлён",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Невалидный запрос",
                         "schema": {
                             "type": "string"
                         }
@@ -808,6 +852,14 @@ const docTemplate = `{
                 },
                 "title": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.emailSubscriptionRequest": {
+            "type": "object",
+            "properties": {
+                "subscribe": {
+                    "type": "boolean"
                 }
             }
         },
