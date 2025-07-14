@@ -57,7 +57,7 @@ func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
 	news := &models.News{
 		Title:     req.Title,
 		Content:   req.Content,
-		ImageURL:  req.ImageURL,
+		ImageURL:  req.ImageURL, // test
 		CreatedAt: time.Now(),
 	}
 
