@@ -18,7 +18,7 @@ import (
 // @name Authorization
 // @version 1.0
 // @description Документация API Edutalks (регистрация, логин, токены и т.д.).
-// @host localhost:8080
+// @host http://85.143.175.100:8080
 // @BasePath /
 func main() {
 	cfg, err := config.LoadConfig()
