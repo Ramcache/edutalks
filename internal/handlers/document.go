@@ -6,7 +6,6 @@ import (
 	"edutalks/internal/models"
 	"edutalks/internal/services"
 	helpers "edutalks/internal/utils/helpres"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -244,10 +243,8 @@ func (h *DocumentHandler) DeleteDocument(w http.ResponseWriter, r *http.Request)
 func (h *DocumentHandler) GetAllDocuments(w http.ResponseWriter, r *http.Request) {
 	docs, err := h.service.GetAllDocuments(r.Context())
 	if err != nil {
-		http.Error(w, "Ошибка получения документов", http.StatusInternalServerError)
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка получения документов")
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(docs)
+	helpers.JSON(w, http.StatusOK, docs)
 }

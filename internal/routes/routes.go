@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentHandler *handlers.DocumentHandler, newsHandler *handlers.NewsHandler) {
+func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentHandler *handlers.DocumentHandler, newsHandler *handlers.NewsHandler, emailHandler *handlers.EmailHandler) {
 	router.Use(middleware.Logging)
 
 	// Public auth
@@ -18,6 +18,7 @@ func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentH
 	router.HandleFunc("/logout", authHandler.Logout).Methods("POST")
 	router.HandleFunc("/news", newsHandler.ListNews).Methods("GET")
 	router.HandleFunc("/news/{id:[0-9]+}", newsHandler.GetNews).Methods("GET")
+	router.HandleFunc("/verify-email", emailHandler.VerifyEmail).Methods("GET")
 
 	// JWT protected
 	protected := router.PathPrefix("/api").Subrouter()
