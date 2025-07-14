@@ -254,3 +254,11 @@ func (r *UserRepository) GetSubscribedEmails(ctx context.Context) ([]string, err
 	}
 	return emails, nil
 }
+
+// internal/repository/user.go
+
+func (r *UserRepository) UpdateEmailSubscription(ctx context.Context, userID int, subscribe bool) error {
+	query := `UPDATE users SET email_subscription = $1 WHERE id = $2`
+	_, err := r.db.Exec(ctx, query, subscribe, userID)
+	return err
+}

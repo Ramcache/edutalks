@@ -25,6 +25,7 @@ func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentH
 	{
 		// Личный кабинет
 		protected.HandleFunc("/profile", authHandler.Protected).Methods("GET")
+		protected.HandleFunc("/email-subscription", authHandler.EmailSubscribe).Methods("PATCH")
 
 		// Файлы (по подписке)
 		fileRoutes := protected.PathPrefix("/files").Subrouter()

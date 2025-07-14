@@ -8,6 +8,11 @@ definitions:
       title:
         type: string
     type: object
+  handlers.emailSubscriptionRequest:
+    properties:
+      subscribe:
+        type: boolean
+    type: object
   handlers.loginRequest:
     properties:
       full_name:
@@ -326,7 +331,7 @@ paths:
       - ApiKeyAuth: []
       summary: Отправить письмо всем подписанным
       tags:
-      - admin
+      - admin-notify
   /api/admin/users:
     get:
       produces:
@@ -438,6 +443,33 @@ paths:
       summary: Включение или отключение подписки у пользователя
       tags:
       - admin-users
+  /api/email-subscription:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Подписка на email
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.emailSubscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Статус подписки обновлён
+          schema:
+            type: string
+        "400":
+          description: Невалидный запрос
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Подписка или отписка от email-уведомлений
+      tags:
+      - auth
   /api/files:
     get:
       produces:
