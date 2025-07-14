@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"edutalks/internal/logger"
 	"edutalks/internal/models"
 	"edutalks/internal/services"
@@ -57,11 +56,11 @@ func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
 	news := &models.News{
 		Title:     req.Title,
 		Content:   req.Content,
-		ImageURL:  req.ImageURL, // test
+		ImageURL:  req.ImageURL,
 		CreatedAt: time.Now(),
 	}
 
-	if err := h.newsService.Create(context.Background(), news); err != nil {
+	if err := h.newsService.Create(r.Context(), news); err != nil {
 		logger.Log.Error("Ошибка создания новости", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка создания")
 		return
