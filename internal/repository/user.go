@@ -23,8 +23,9 @@ func (r *UserRepository) CreateUser(ctx context.Context, user *models.User) erro
 	logger.Log.Info("Создание пользователя (repo)", zap.String("username", user.Username), zap.String("email", user.Email))
 	query := `
 	INSERT INTO users (username, full_name, phone, email, address, password_hash, role)
-	VALUES ($1, $2, $3, $4, $5, $6, $7)`
-	_, err := r.db.Exec(ctx, query,
+	VALUES ($1, $2, $3, $4, $5, $6, $7)
+	RETURNING id`
+	return r.db.QueryRow(ctx, query,
 		user.Username,
 		user.FullName,
 		user.Phone,
@@ -32,11 +33,7 @@ func (r *UserRepository) CreateUser(ctx context.Context, user *models.User) erro
 		user.Address,
 		user.PasswordHash,
 		user.Role,
-	)
-	if err != nil {
-		logger.Log.Error("Ошибка создания пользователя (repo)", zap.Error(err))
-	}
-	return err
+	).Scan(&user.ID)
 }
 
 func (r *UserRepository) IsUsernameTaken(ctx context.Context, username string) (bool, error) {
