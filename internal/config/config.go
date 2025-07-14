@@ -27,6 +27,8 @@ type Config struct {
 	SMTPPort     string
 	SMTPUser     string
 	SMTPPassword string
+
+	SiteURL string
 }
 
 // LoadConfig загружает переменные из .env
@@ -50,6 +52,7 @@ func LoadConfig() (*Config, error) {
 		SMTPPort:        os.Getenv("SMTP_PORT"),
 		SMTPUser:        os.Getenv("SMTP_USER"),
 		SMTPPassword:    os.Getenv("SMTP_PASSWORD"),
+		SiteURL:         os.Getenv("SITEURL"),
 	}
 	return cfg, nil
 }

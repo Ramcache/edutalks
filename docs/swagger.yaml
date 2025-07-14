@@ -653,6 +653,35 @@ paths:
       summary: Регистрация нового пользователя
       tags:
       - auth
+  /verify-email:
+    get:
+      consumes:
+      - application/json
+      description: Подтверждает email по токену из письма
+      parameters:
+      - description: Токен подтверждения
+        in: query
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Подтвердить email
+      tags:
+      - email
 securityDefinitions:
   ApiKeyAuth:
     description: Документация API Edutalks (регистрация, логин, токены и т.д.).

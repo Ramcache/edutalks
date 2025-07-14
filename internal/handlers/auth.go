@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -22,11 +23,17 @@ import (
 )
 
 type AuthHandler struct {
-	authService *services.AuthService
+	authService       *services.AuthService
+	emailService      *services.EmailService
+	emailTokenService *services.EmailTokenService
 }
 
-func NewAuthHandler(authService *services.AuthService) *AuthHandler {
-	return &AuthHandler{authService: authService}
+func NewAuthHandler(authService *services.AuthService, emailService *services.EmailService, emailTokenService *services.EmailTokenService) *AuthHandler {
+	return &AuthHandler{
+		authService:       authService,
+		emailService:      emailService,
+		emailTokenService: emailTokenService,
+	}
 }
 
 type registerRequest struct {
@@ -98,8 +105,11 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Log.Info("Пользователь успешно зарегистрирован", zap.String("username", req.Username))
-	helpers.JSON(w, http.StatusCreated, "Пользователь успешно зарегистрирован")
+	if err := h.SendVerificationEmail(r.Context(), user); err != nil {
+		logger.Log.Error("Не удалось отправить письмо верификации", zap.Error(err))
+	}
+
+	helpers.JSON(w, http.StatusCreated, "Пользователь успешно зарегистрирован. Проверьте вашу почту для подтверждения.")
 }
 
 // Login godoc
@@ -416,24 +426,58 @@ func (h *AuthHandler) SetSubscription(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) NotifySubscribers(w http.ResponseWriter, r *http.Request) {
 	var req notifyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Невалидный JSON", http.StatusBadRequest)
+		helpers.Error(w, http.StatusBadRequest, "Невалидный JSON")
 		return
 	}
 
 	emails, err := h.authService.GetSubscribedEmails(r.Context())
 	if err != nil {
-		http.Error(w, "Не удалось получить список подписчиков", http.StatusInternalServerError)
+		helpers.Error(w, http.StatusInternalServerError, "Не удалось получить список подписчиков")
 		return
 	}
 
-	for _, email := range emails {
-		err := utils.SendEmail(email, req.Subject, req.Message)
-		if err != nil {
-			logger.Log.Warn("Ошибка отправки письма", zap.String("email", email), zap.Error(err))
+	if len(emails) == 0 {
+		helpers.JSON(w, http.StatusOK, map[string]string{"message": "Нет подписчиков"})
+		return
+	}
+
+	type result struct {
+		Email string `json:"email"`
+		Error string `json:"error,omitempty"`
+	}
+	results := make([]result, len(emails))
+	var wg sync.WaitGroup
+
+	for i, email := range emails {
+		wg.Add(1)
+		go func(i int, email string) {
+			defer wg.Done()
+			err := h.emailService.Send([]string{email}, req.Subject, req.Message)
+			if err != nil {
+				logger.Log.Warn("Ошибка отправки письма", zap.String("email", email), zap.Error(err))
+				results[i] = result{Email: email, Error: err.Error()}
+			} else {
+				results[i] = result{Email: email}
+			}
+		}(i, email)
+	}
+	wg.Wait()
+
+	// Подсчёт успешных/неуспешных отправок
+	success, failed := 0, 0
+	for _, res := range results {
+		if res.Error == "" {
+			success++
+		} else {
+			failed++
 		}
 	}
 
-	w.Write([]byte("Письма отправлены"))
+	helpers.JSON(w, http.StatusOK, map[string]interface{}{
+		"sent":    success,
+		"failed":  failed,
+		"results": results,
+	})
 }
 
 // EmailSubscribe godoc
@@ -449,7 +493,7 @@ func (h *AuthHandler) NotifySubscribers(w http.ResponseWriter, r *http.Request) 
 func (h *AuthHandler) EmailSubscribe(w http.ResponseWriter, r *http.Request) {
 	var req emailSubscriptionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Невалидный JSON", http.StatusBadRequest)
+		helpers.Error(w, http.StatusBadRequest, "Невалидный JSON")
 		return
 	}
 
@@ -457,9 +501,31 @@ func (h *AuthHandler) EmailSubscribe(w http.ResponseWriter, r *http.Request) {
 
 	err := h.authService.UpdateEmailSubscription(r.Context(), userID, req.Subscribe)
 	if err != nil {
-		http.Error(w, "Не удалось обновить статус подписки", http.StatusInternalServerError)
+		helpers.Error(w, http.StatusInternalServerError, "Не удалось обновить статус подписки")
 		return
 	}
 
-	w.Write([]byte("Статус подписки обновлён"))
+	helpers.JSON(w, http.StatusOK, map[string]string{"message": "Статус подписки обновлён"})
+}
+
+func (h *AuthHandler) SendVerificationEmail(ctx context.Context, user *models.User) error {
+	emailToken, err := h.emailTokenService.GenerateToken(ctx, user.ID)
+	if err != nil {
+		logger.Log.Error("Ошибка генерации email токена", zap.Error(err))
+		return err
+	}
+
+	cfg, _ := config.LoadConfig()
+	verifyLink := fmt.Sprintf("%s/verify-email?token=%s", cfg.SiteURL, emailToken.Token)
+	emailBody := fmt.Sprintf(
+		"Здравствуйте, %s!\n\nДля подтверждения вашей почты перейдите по ссылке:\n%s\n\nЕсли вы не регистрировались, просто проигнорируйте это письмо.",
+		user.FullName, verifyLink,
+	)
+
+	if err := h.emailService.Send([]string{user.Email}, "Подтверждение регистрации", emailBody); err != nil {
+		logger.Log.Error("Ошибка отправки письма для верификации", zap.Error(err))
+		return err
+	}
+
+	return nil
 }
