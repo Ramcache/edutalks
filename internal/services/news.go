@@ -30,19 +30,33 @@ func NewNewsService(
 
 func (s *NewsService) Create(ctx context.Context, news *models.News) error {
 	logger.Log.Info("Сервис: создание новости", zap.String("title", news.Title))
+
 	err := s.repo.Create(ctx, news)
 	if err != nil {
 		logger.Log.Error("Ошибка создания новости (service)", zap.Error(err))
-	}
-	subscribers, _ := s.userRepo.GetSubscribedEmails(ctx)
-	subject := "Новая новость: " + news.Title
-	body := fmt.Sprintf("Прочитайте новость: %s\n\n%s", news.Title, news.Content)
-
-	if err := s.emailService.Send(subscribers, subject, body); err != nil {
-		logger.Log.Warn("Ошибка при отправке писем", zap.Error(err))
+		return err
 	}
 
-	return err
+	// Получаем подписчиков для рассылки
+	subscribers, err := s.userRepo.GetSubscribedEmails(ctx)
+	if err != nil {
+		logger.Log.Warn("Ошибка получения подписчиков", zap.Error(err))
+		return nil
+	}
+
+	// Асинхронная отправка почты (в фоне)
+	go func() {
+		subject := "Новая новость: " + news.Title
+		body := fmt.Sprintf("Прочитайте новость: %s\n\n%s", news.Title, news.Content)
+
+		if err := s.emailService.Send(subscribers, subject, body); err != nil {
+			logger.Log.Warn("Ошибка отправки писем подписчикам", zap.Error(err))
+		} else {
+			logger.Log.Info("Письма успешно отправлены подписчикам")
+		}
+	}()
+
+	return nil
 }
 
 func (s *NewsService) List(ctx context.Context) ([]*models.News, error) {
