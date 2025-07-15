@@ -34,13 +34,8 @@ func (s *DocumentService) Upload(ctx context.Context, doc *models.Document) erro
 	return err
 }
 
-func (s *DocumentService) GetPublicDocuments(ctx context.Context) ([]*models.Document, error) {
-	logger.Log.Info("Сервис: получение публичных документов")
-	docs, err := s.repo.GetPublicDocuments(ctx)
-	if err != nil {
-		logger.Log.Error("Ошибка получения публичных документов (service)", zap.Error(err))
-	}
-	return docs, err
+func (s *DocumentService) GetPublicDocumentsPaginated(ctx context.Context, limit, offset int) ([]*models.Document, int, error) {
+	return s.repo.GetPublicDocumentsPaginated(ctx, limit, offset)
 }
 
 func (s *DocumentService) GetDocumentByID(ctx context.Context, id int) (*models.Document, error) {

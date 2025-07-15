@@ -65,13 +65,8 @@ func (s *NewsService) Create(ctx context.Context, news *models.News) ([]string, 
 	return sentEmails, nil
 }
 
-func (s *NewsService) List(ctx context.Context) ([]*models.News, error) {
-	logger.Log.Info("Сервис: получение списка новостей")
-	news, err := s.repo.List(ctx)
-	if err != nil {
-		logger.Log.Error("Ошибка получения списка новостей (service)", zap.Error(err))
-	}
-	return news, err
+func (s *NewsService) ListPaginated(ctx context.Context, limit, offset int) ([]*models.News, int, error) {
+	return s.repo.ListPaginated(ctx, limit, offset)
 }
 
 func (s *NewsService) GetByID(ctx context.Context, id int) (*models.News, error) {

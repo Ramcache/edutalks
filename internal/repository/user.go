@@ -119,14 +119,15 @@ func (r *UserRepository) DeleteRefreshToken(ctx context.Context, userID int, tok
 	return err
 }
 
-func (r *UserRepository) GetAllUsers(ctx context.Context) ([]*models.User, error) {
-	logger.Log.Info("Получение всех пользователей (repo)")
-	query := `SELECT id, username, full_name, phone, email, address, role, created_at, updated_at, has_subscription, email_subscription, email_verified FROM users`
-
-	rows, err := r.db.Query(ctx, query)
+func (r *UserRepository) GetAllUsersPaginated(ctx context.Context, limit, offset int) ([]*models.User, int, error) {
+	query := `SELECT id, username, full_name, phone, email, address, role, created_at, updated_at, has_subscription, email_subscription, email_verified
+	          FROM users
+	          ORDER BY created_at DESC
+	          LIMIT $1 OFFSET $2`
+	rows, err := r.db.Query(ctx, query, limit, offset)
 	if err != nil {
 		logger.Log.Error("Ошибка получения пользователей (repo)", zap.Error(err))
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -149,11 +150,19 @@ func (r *UserRepository) GetAllUsers(ctx context.Context) ([]*models.User, error
 		)
 		if err != nil {
 			logger.Log.Error("Ошибка сканирования пользователя (repo)", zap.Error(err))
-			return nil, err
+			return nil, 0, err
 		}
 		users = append(users, &u)
 	}
-	return users, nil
+
+	// total — всего пользователей
+	var total int
+	err = r.db.QueryRow(ctx, "SELECT COUNT(*) FROM users").Scan(&total)
+	if err != nil {
+		logger.Log.Error("Ошибка подсчёта пользователей (repo)", zap.Error(err))
+		return nil, 0, err
+	}
+	return users, total, nil
 }
 
 func (r *UserRepository) GetUserByID(ctx context.Context, id int) (*models.User, error) {

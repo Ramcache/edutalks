@@ -336,6 +336,15 @@ paths:
       - admin-notify
   /api/admin/users:
     get:
+      parameters:
+      - description: Номер страницы (начиная с 1)
+        in: query
+        name: page
+        type: integer
+      - description: Размер страницы
+        in: query
+        name: page_size
+        type: integer
       produces:
       - application/json
       responses:
@@ -474,6 +483,15 @@ paths:
       - auth
   /api/files:
     get:
+      parameters:
+      - description: Номер страницы (начиная с 1)
+        in: query
+        name: page
+        type: integer
+      - description: Размер страницы
+        in: query
+        name: page_size
+        type: integer
       produces:
       - application/json
       responses:
@@ -576,6 +594,15 @@ paths:
       - auth
   /news:
     get:
+      parameters:
+      - description: Номер страницы (начиная с 1)
+        in: query
+        name: page
+        type: integer
+      - description: Размер страницы
+        in: query
+        name: page_size
+        type: integer
       produces:
       - application/json
       responses:

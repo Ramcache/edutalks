@@ -292,18 +292,34 @@ func (h *AuthHandler) AdminOnly(w http.ResponseWriter, r *http.Request) {
 // @Tags admin-users
 // @Security ApiKeyAuth
 // @Produce json
+// @Param page query int false "Номер страницы (начиная с 1)"
+// @Param page_size query int false "Размер страницы"
 // @Success 200 {array} models.User
 // @Failure 403 {string} string "Доступ запрещён"
 // @Router /api/admin/users [get]
 func (h *AuthHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := h.authService.GetUsers(r.Context())
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
+
+	users, total, err := h.authService.GetUsersPaginated(r.Context(), pageSize, offset)
 	if err != nil {
 		logger.Log.Error("Ошибка получения пользователей", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка получения пользователей")
 		return
 	}
-	logger.Log.Info("Получены пользователи", zap.Int("count", len(users)))
-	helpers.JSON(w, http.StatusOK, users)
+	helpers.JSON(w, http.StatusOK, map[string]interface{}{
+		"data":      users,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	})
 }
 
 // GetUserByID godoc
