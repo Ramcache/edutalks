@@ -60,14 +60,16 @@ func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: time.Now(),
 	}
 
-	if err := h.newsService.Create(r.Context(), news); err != nil {
-		logger.Log.Error("Ошибка создания новости", zap.Error(err))
-		helpers.Error(w, http.StatusInternalServerError, "Ошибка создания")
+	sentEmails, err := h.newsService.Create(r.Context(), news)
+	if err != nil {
+		helpers.Error(w, http.StatusInternalServerError, "Не удалось создать новость")
 		return
 	}
 
-	logger.Log.Info("Новость успешно создана", zap.String("title", news.Title))
-	helpers.JSON(w, http.StatusCreated, "Новость создана")
+	helpers.JSON(w, http.StatusOK, map[string]interface{}{
+		"message": "Новость создана и отправлена подписчикам",
+		"sent_to": sentEmails,
+	})
 }
 
 // ListNews godoc
