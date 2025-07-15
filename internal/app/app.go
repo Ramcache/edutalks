@@ -27,14 +27,18 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	authService := services.NewAuthService(userRepo)
 	docService := services.NewDocumentService(docRepo)
 	emailService := services.NewEmailService(cfg)
-	newsService := services.NewNewsService(newsRepo, userRepo, emailService)
-	emailTokenService := services.NewEmailTokenService(emailTokenRepo)
-
+	newsService := services.NewNewsService(newsRepo, userRepo, emailService, cfg)
+	emailTokenService := services.NewEmailTokenService(emailTokenRepo, userRepo)
+	emaService := services.NewEmailService(cfg)
 	// Хендлеры
 	authHandler := handlers.NewAuthHandler(authService, emailService, emailTokenService)
 	docHandler := handlers.NewDocumentHandler(docService, authService)
 	newsHandler := handlers.NewNewsHandler(newsService)
 	emailHandler := handlers.NewEmailHandler(emailTokenService)
+
+	for i := 0; i < 3; i++ {
+		services.StartEmailWorker(emaService)
+	}
 
 	// Маршруты
 	router := mux.NewRouter()

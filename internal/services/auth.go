@@ -33,6 +33,7 @@ type UserRepo interface {
 	UpdateSubscriptionStatus(ctx context.Context, userID int, status bool) error
 	GetSubscribedEmails(ctx context.Context) ([]string, error)
 	UpdateEmailSubscription(ctx context.Context, userID int, subscribe bool) error
+	SetEmailVerified(ctx context.Context, userID int, verified bool) error
 }
 
 func (s *AuthService) RegisterUser(ctx context.Context, input *models.User, plainPassword string) error {
