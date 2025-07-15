@@ -19,7 +19,7 @@ func NewNewsRepository(db *pgxpool.Pool) *NewsRepository {
 
 type NewsRepo interface {
 	Create(ctx context.Context, news *models.News) error
-	List(ctx context.Context) ([]*models.News, error)
+	ListPaginated(ctx context.Context, limit, offset int) ([]*models.News, int, error)
 	GetByID(ctx context.Context, id int) (*models.News, error)
 	Update(ctx context.Context, id int, title, content, imageURL string) error
 	Delete(ctx context.Context, id int) error
@@ -35,13 +35,17 @@ func (r *NewsRepository) Create(ctx context.Context, news *models.News) error {
 	return err
 }
 
-func (r *NewsRepository) List(ctx context.Context) ([]*models.News, error) {
-	logger.Log.Info("Репозиторий: получение списка новостей")
-	rows, err := r.db.Query(ctx, `SELECT id, title, content,  created_at, image_url FROM news ORDER BY created_at DESC
-`)
+func (r *NewsRepository) ListPaginated(ctx context.Context, limit, offset int) ([]*models.News, int, error) {
+	// Получаем сами новости
+	rows, err := r.db.Query(ctx, `
+		SELECT id, title, content, created_at, image_url
+		FROM news
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`, limit, offset)
 	if err != nil {
 		logger.Log.Error("Ошибка получения списка новостей (repo)", zap.Error(err))
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -50,12 +54,20 @@ func (r *NewsRepository) List(ctx context.Context) ([]*models.News, error) {
 		var n models.News
 		if err := rows.Scan(&n.ID, &n.Title, &n.Content, &n.CreatedAt, &n.ImageURL); err != nil {
 			logger.Log.Error("Ошибка сканирования новости (repo)", zap.Error(err))
-			return nil, err
+			return nil, 0, err
 		}
 		newsList = append(newsList, &n)
 	}
 
-	return newsList, nil
+	// Получаем общее количество новостей (для total)
+	var total int
+	err = r.db.QueryRow(ctx, "SELECT COUNT(*) FROM news").Scan(&total)
+	if err != nil {
+		logger.Log.Error("Ошибка подсчёта новостей (repo)", zap.Error(err))
+		return nil, 0, err
+	}
+
+	return newsList, total, nil
 }
 
 func (r *NewsRepository) GetByID(ctx context.Context, id int) (*models.News, error) {

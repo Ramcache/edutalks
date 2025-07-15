@@ -122,19 +122,34 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 // @Tags files
 // @Security ApiKeyAuth
 // @Produce json
+// @Param page query int false "Номер страницы (начиная с 1)"
+// @Param page_size query int false "Размер страницы"
 // @Success 200 {array} models.Document
 // @Failure 500 {string} string "Ошибка сервера"
 // @Router /api/files [get]
 func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Request) {
-	logger.Log.Info("Запрос на получение списка публичных документов")
-	docs, err := h.service.GetPublicDocuments(r.Context())
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
+
+	docs, total, err := h.service.GetPublicDocumentsPaginated(r.Context(), pageSize, offset)
 	if err != nil {
 		logger.Log.Error("Ошибка при получении документов", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при получении документов")
 		return
 	}
-	logger.Log.Info("Документы получены", zap.Int("count", len(docs)))
-	helpers.JSON(w, http.StatusOK, docs)
+	helpers.JSON(w, http.StatusOK, map[string]interface{}{
+		"data":      docs,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	})
 }
 
 // DownloadDocument godoc

@@ -27,7 +27,7 @@ type UserRepo interface {
 	SaveRefreshToken(ctx context.Context, userID int, token string) error
 	IsRefreshTokenValid(ctx context.Context, userID int, token string) (bool, error)
 	DeleteRefreshToken(ctx context.Context, userID int, token string) error
-	GetAllUsers(ctx context.Context) ([]*models.User, error)
+	GetAllUsersPaginated(ctx context.Context, limit, offset int) ([]*models.User, int, error)
 	GetUserByID(ctx context.Context, id int) (*models.User, error)
 	UpdateUserFields(ctx context.Context, id int, input *models.UpdateUserRequest) error
 	UpdateSubscriptionStatus(ctx context.Context, userID int, status bool) error
@@ -154,13 +154,8 @@ func (s *AuthService) LoginUserWithUser(
 	return accessToken, refreshToken, user, nil
 }
 
-func (s *AuthService) GetUsers(ctx context.Context) ([]*models.User, error) {
-	logger.Log.Info("Получение всех пользователей (service)")
-	users, err := s.repo.GetAllUsers(ctx)
-	if err != nil {
-		logger.Log.Error("Ошибка получения пользователей (service)", zap.Error(err))
-	}
-	return users, err
+func (s *AuthService) GetUsersPaginated(ctx context.Context, limit, offset int) ([]*models.User, int, error) {
+	return s.repo.GetAllUsersPaginated(ctx, limit, offset)
 }
 
 func (s *AuthService) GetUserByID(ctx context.Context, id int) (*models.User, error) {

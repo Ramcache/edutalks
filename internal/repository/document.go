@@ -19,7 +19,7 @@ func NewDocumentRepository(db *pgxpool.Pool) *DocumentRepository {
 
 type DocumentRepo interface {
 	SaveDocument(ctx context.Context, doc *models.Document) error
-	GetPublicDocuments(ctx context.Context) ([]*models.Document, error)
+	GetPublicDocumentsPaginated(ctx context.Context, limit, offset int) ([]*models.Document, int, error)
 	GetDocumentByID(ctx context.Context, id int) (*models.Document, error)
 	DeleteDocument(ctx context.Context, id int) error
 	GetAllDocuments(ctx context.Context) ([]*models.Document, error)
@@ -44,19 +44,17 @@ func (r *DocumentRepository) SaveDocument(ctx context.Context, doc *models.Docum
 	return err
 }
 
-func (r *DocumentRepository) GetPublicDocuments(ctx context.Context) ([]*models.Document, error) {
-	logger.Log.Info("Репозиторий: получение публичных документов")
-	query := `
+func (r *DocumentRepository) GetPublicDocumentsPaginated(ctx context.Context, limit, offset int) ([]*models.Document, int, error) {
+	rows, err := r.db.Query(ctx, `
 		SELECT id, user_id, filename, filepath, description, is_public, uploaded_at
 		FROM documents
 		WHERE is_public = true
 		ORDER BY uploaded_at DESC
-	`
-
-	rows, err := r.db.Query(ctx, query)
+		LIMIT $1 OFFSET $2
+	`, limit, offset)
 	if err != nil {
 		logger.Log.Error("Ошибка получения публичных документов (repo)", zap.Error(err))
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -74,12 +72,22 @@ func (r *DocumentRepository) GetPublicDocuments(ctx context.Context) ([]*models.
 		)
 		if err != nil {
 			logger.Log.Error("Ошибка сканирования документа (repo)", zap.Error(err))
-			return nil, err
+			return nil, 0, err
 		}
 		docs = append(docs, &d)
 	}
 
-	return docs, nil
+	// Общее число документов (total)
+	var total int
+	err = r.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM documents WHERE is_public = true
+	`).Scan(&total)
+	if err != nil {
+		logger.Log.Error("Ошибка подсчёта документов (repo)", zap.Error(err))
+		return nil, 0, err
+	}
+
+	return docs, total, nil
 }
 
 func (r *DocumentRepository) GetDocumentByID(ctx context.Context, id int) (*models.Document, error) {

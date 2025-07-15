@@ -60,33 +60,50 @@ func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: time.Now(),
 	}
 
-	if err := h.newsService.Create(r.Context(), news); err != nil {
-		logger.Log.Error("Ошибка создания новости", zap.Error(err))
-		helpers.Error(w, http.StatusInternalServerError, "Ошибка создания")
+	sentEmails, err := h.newsService.Create(r.Context(), news)
+	if err != nil {
+		helpers.Error(w, http.StatusInternalServerError, "Не удалось создать новость")
 		return
 	}
 
-	logger.Log.Info("Новость успешно создана", zap.String("title", news.Title))
-	helpers.JSON(w, http.StatusCreated, "Новость создана")
+	helpers.JSON(w, http.StatusOK, map[string]interface{}{
+		"message": "Новость создана и отправлена подписчикам",
+		"sent_to": sentEmails,
+	})
 }
 
 // ListNews godoc
 // @Summary Получить список новостей
 // @Tags news
 // @Produce json
+// @Param page query int false "Номер страницы (начиная с 1)"
+// @Param page_size query int false "Размер страницы"
 // @Success 200 {array} models.News
 // @Router /news [get]
 func (h *NewsHandler) ListNews(w http.ResponseWriter, r *http.Request) {
-	logger.Log.Info("Запрос на получение списка новостей")
-	newsList, err := h.newsService.List(r.Context())
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
+
+	newsList, total, err := h.newsService.ListPaginated(r.Context(), pageSize, offset)
 	if err != nil {
 		logger.Log.Error("Ошибка получения новостей", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка получения новостей")
 		return
 	}
 
-	logger.Log.Info("Новости получены", zap.Int("count", len(newsList)))
-	helpers.JSON(w, http.StatusOK, newsList)
+	helpers.JSON(w, http.StatusOK, map[string]interface{}{
+		"data":      newsList,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	})
 }
 
 // GetNews godoc

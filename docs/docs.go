@@ -337,6 +337,20 @@ const docTemplate = `{
                     "admin-users"
                 ],
                 "summary": "Получить всех пользователей",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Номер страницы (начиная с 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Размер страницы",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -559,6 +573,20 @@ const docTemplate = `{
                     "files"
                 ],
                 "summary": "Список доступных документов (по подписке)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Номер страницы (начиная с 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Размер страницы",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -720,6 +748,20 @@ const docTemplate = `{
                     "news"
                 ],
                 "summary": "Получить список новостей",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Номер страницы (начиная с 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Размер страницы",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",

@@ -32,26 +32,26 @@ func NewNewsService(
 	}
 }
 
-func (s *NewsService) Create(ctx context.Context, news *models.News) error {
+func (s *NewsService) Create(ctx context.Context, news *models.News) ([]string, error) {
 	logger.Log.Info("Сервис: создание новости", zap.String("title", news.Title))
 
 	err := s.repo.Create(ctx, news)
 	if err != nil {
 		logger.Log.Error("Ошибка создания новости (service)", zap.Error(err))
-		return err
+		return nil, err
 	}
 
-	// Получаем подписчиков для рассылки
 	subscribers, err := s.userRepo.GetSubscribedEmails(ctx)
 	if err != nil {
 		logger.Log.Warn("Ошибка получения подписчиков", zap.Error(err))
-		return nil
+		return nil, nil
 	}
 
 	subject := "Новая новость: " + news.Title
 	url := s.siteURL + "/news" // Или "/news/" + strconv.Itoa(news.ID)
 	htmlBody := helpers.BuildNewsHTML(news.Title, news.Content, url)
 
+	var sentEmails []string
 	for _, email := range subscribers {
 		EmailQueue <- EmailJob{
 			To:      []string{email},
@@ -59,18 +59,14 @@ func (s *NewsService) Create(ctx context.Context, news *models.News) error {
 			Body:    htmlBody,
 			IsHTML:  true,
 		}
+		sentEmails = append(sentEmails, email)
 	}
 
-	return nil
+	return sentEmails, nil
 }
 
-func (s *NewsService) List(ctx context.Context) ([]*models.News, error) {
-	logger.Log.Info("Сервис: получение списка новостей")
-	news, err := s.repo.List(ctx)
-	if err != nil {
-		logger.Log.Error("Ошибка получения списка новостей (service)", zap.Error(err))
-	}
-	return news, err
+func (s *NewsService) ListPaginated(ctx context.Context, limit, offset int) ([]*models.News, int, error) {
+	return s.repo.ListPaginated(ctx, limit, offset)
 }
 
 func (s *NewsService) GetByID(ctx context.Context, id int) (*models.News, error) {
