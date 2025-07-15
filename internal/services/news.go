@@ -2,10 +2,11 @@ package services
 
 import (
 	"context"
+	"edutalks/internal/config"
 	"edutalks/internal/logger"
 	"edutalks/internal/models"
 	"edutalks/internal/repository"
-	"fmt"
+	helpers "edutalks/internal/utils/helpres"
 
 	"go.uber.org/zap"
 )
@@ -14,17 +15,20 @@ type NewsService struct {
 	repo         *repository.NewsRepository
 	userRepo     *repository.UserRepository
 	emailService *EmailService
+	siteURL      string
 }
 
 func NewNewsService(
 	repo *repository.NewsRepository,
 	userRepo *repository.UserRepository,
 	emailService *EmailService,
+	cfg *config.Config,
 ) *NewsService {
 	return &NewsService{
 		repo:         repo,
 		userRepo:     userRepo,
 		emailService: emailService,
+		siteURL:      cfg.SiteURL,
 	}
 }
 
@@ -44,17 +48,18 @@ func (s *NewsService) Create(ctx context.Context, news *models.News) error {
 		return nil
 	}
 
-	// Асинхронная отправка почты (в фоне)
-	go func() {
-		subject := "Новая новость: " + news.Title
-		body := fmt.Sprintf("Прочитайте новость: %s\n\n%s", news.Title, news.Content)
+	subject := "Новая новость: " + news.Title
+	url := s.siteURL + "/news" // Или "/news/" + strconv.Itoa(news.ID)
+	htmlBody := helpers.BuildNewsHTML(news.Title, news.Content, url)
 
-		if err := s.emailService.Send(subscribers, subject, body); err != nil {
-			logger.Log.Warn("Ошибка отправки писем подписчикам", zap.Error(err))
-		} else {
-			logger.Log.Info("Письма успешно отправлены подписчикам")
+	for _, email := range subscribers {
+		EmailQueue <- EmailJob{
+			To:      []string{email},
+			Subject: subject,
+			Body:    htmlBody,
+			IsHTML:  true,
 		}
-	}()
+	}
 
 	return nil
 }

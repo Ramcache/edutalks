@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -105,9 +104,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.SendVerificationEmail(r.Context(), user); err != nil {
-		logger.Log.Error("Не удалось отправить письмо верификации", zap.Error(err))
-	}
+	_ = h.SendVerificationEmail(context.Background(), user)
 
 	helpers.JSON(w, http.StatusCreated, "Пользователь успешно зарегистрирован. Проверьте вашу почту для подтверждения.")
 }
@@ -446,36 +443,21 @@ func (h *AuthHandler) NotifySubscribers(w http.ResponseWriter, r *http.Request) 
 		Error string `json:"error,omitempty"`
 	}
 	results := make([]result, len(emails))
-	var wg sync.WaitGroup
 
 	for i, email := range emails {
-		wg.Add(1)
-		go func(i int, email string) {
-			defer wg.Done()
-			err := h.emailService.Send([]string{email}, req.Subject, req.Message)
-			if err != nil {
-				logger.Log.Warn("Ошибка отправки письма", zap.String("email", email), zap.Error(err))
-				results[i] = result{Email: email, Error: err.Error()}
-			} else {
-				results[i] = result{Email: email}
-			}
-		}(i, email)
-	}
-	wg.Wait()
-
-	// Подсчёт успешных/неуспешных отправок
-	success, failed := 0, 0
-	for _, res := range results {
-		if res.Error == "" {
-			success++
-		} else {
-			failed++
+		html := helpers.BuildSimpleHTML(req.Subject, req.Message)
+		services.EmailQueue <- services.EmailJob{
+			To:      []string{email},
+			Subject: req.Subject,
+			Body:    html,
+			IsHTML:  true,
 		}
+		results[i] = result{Email: email}
 	}
 
 	helpers.JSON(w, http.StatusOK, map[string]interface{}{
-		"sent":    success,
-		"failed":  failed,
+		"sent":    len(emails),
+		"failed":  0,
 		"results": results,
 	})
 }
@@ -517,14 +499,13 @@ func (h *AuthHandler) SendVerificationEmail(ctx context.Context, user *models.Us
 
 	cfg, _ := config.LoadConfig()
 	verifyLink := fmt.Sprintf("%s/verify-email?token=%s", cfg.SiteURL, emailToken.Token)
-	emailBody := fmt.Sprintf(
-		"Здравствуйте, %s!\n\nДля подтверждения вашей почты перейдите по ссылке:\n%s\n\nЕсли вы не регистрировались, просто проигнорируйте это письмо.",
-		user.FullName, verifyLink,
-	)
+	htmlBody := helpers.BuildVerificationHTML(user.FullName, verifyLink)
 
-	if err := h.emailService.Send([]string{user.Email}, "Подтверждение регистрации", emailBody); err != nil {
-		logger.Log.Error("Ошибка отправки письма для верификации", zap.Error(err))
-		return err
+	services.EmailQueue <- services.EmailJob{
+		To:      []string{user.Email},
+		Subject: "Подтверждение регистрации",
+		Body:    htmlBody,
+		IsHTML:  true,
 	}
 
 	return nil

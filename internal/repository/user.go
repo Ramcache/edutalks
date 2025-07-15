@@ -267,3 +267,8 @@ func (r *UserRepository) UpdateEmailSubscription(ctx context.Context, userID int
 	_, err := r.db.Exec(ctx, query, subscribe, userID)
 	return err
 }
+
+func (r *UserRepository) SetEmailVerified(ctx context.Context, userID int, verified bool) error {
+	_, err := r.db.Exec(ctx, `UPDATE users SET email_verified = $1 WHERE id = $2`, verified, userID)
+	return err
+}
