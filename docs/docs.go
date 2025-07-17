@@ -1117,10 +1117,10 @@ const docTemplate = `{
                 "email": {
                     "type": "string"
                 },
-                "email_subscription": {
+                "emailVerified": {
                     "type": "boolean"
                 },
-                "email_verified": {
+                "email_subscription": {
                     "type": "boolean"
                 },
                 "full_name": {

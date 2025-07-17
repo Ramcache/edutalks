@@ -124,7 +124,7 @@ definitions:
         type: string
       email_subscription:
         type: boolean
-      email_verified:
+      emailVerified:
         type: boolean
       full_name:
         type: string
