@@ -20,12 +20,12 @@ jobs:
 
       - name: 🔨 Build the app
         run: |
-          cd cmd
+          cd app
           go build -o ../main
           cd ../
 
       - name: 📤 Upload binary and migrations
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@v0.1.7tion
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}

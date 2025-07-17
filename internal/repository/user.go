@@ -78,7 +78,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*m
 		&user.UpdatedAt,
 		&user.HasSubscription,
 		&user.EmailSubscription,
-		&user.Email_verified,
+		&user.EmailVerified,
 	)
 
 	if err != nil {
@@ -146,7 +146,7 @@ func (r *UserRepository) GetAllUsersPaginated(ctx context.Context, limit, offset
 			&u.UpdatedAt,
 			&u.HasSubscription,
 			&u.EmailSubscription,
-			&u.Email_verified,
+			&u.EmailVerified,
 		)
 		if err != nil {
 			logger.Log.Error("Ошибка сканирования пользователя (repo)", zap.Error(err))
@@ -186,7 +186,7 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id int) (*models.User,
 		&u.UpdatedAt,
 		&u.HasSubscription,
 		&u.EmailSubscription,
-		&u.Email_verified,
+		&u.EmailVerified,
 	)
 	if err != nil {
 		logger.Log.Error("Ошибка получения пользователя по ID (repo)", zap.Int("user_id", id), zap.Error(err))
