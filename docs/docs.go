@@ -930,10 +930,16 @@ const docTemplate = `{
         "handlers.createNewsRequest": {
             "type": "object",
             "properties": {
+                "color": {
+                    "type": "string"
+                },
                 "content": {
                     "type": "string"
                 },
                 "image_url": {
+                    "type": "string"
+                },
+                "sticker": {
                     "type": "string"
                 },
                 "title": {
@@ -1028,10 +1034,16 @@ const docTemplate = `{
         "handlers.updateNewsRequest": {
             "type": "object",
             "properties": {
+                "color": {
+                    "type": "string"
+                },
                 "content": {
                     "type": "string"
                 },
                 "image_url": {
+                    "type": "string"
+                },
+                "sticker": {
                     "type": "string"
                 },
                 "title": {
@@ -1068,6 +1080,9 @@ const docTemplate = `{
         "models.News": {
             "type": "object",
             "properties": {
+                "color": {
+                    "type": "string"
+                },
                 "content": {
                     "type": "string"
                 },
@@ -1078,6 +1093,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "image_url": {
+                    "type": "string"
+                },
+                "sticker": {
                     "type": "string"
                 },
                 "title": {

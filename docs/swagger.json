@@ -920,10 +920,16 @@
         "handlers.createNewsRequest": {
             "type": "object",
             "properties": {
+                "color": {
+                    "type": "string"
+                },
                 "content": {
                     "type": "string"
                 },
                 "image_url": {
+                    "type": "string"
+                },
+                "sticker": {
                     "type": "string"
                 },
                 "title": {
@@ -1018,10 +1024,16 @@
         "handlers.updateNewsRequest": {
             "type": "object",
             "properties": {
+                "color": {
+                    "type": "string"
+                },
                 "content": {
                     "type": "string"
                 },
                 "image_url": {
+                    "type": "string"
+                },
+                "sticker": {
                     "type": "string"
                 },
                 "title": {
@@ -1058,6 +1070,9 @@
         "models.News": {
             "type": "object",
             "properties": {
+                "color": {
+                    "type": "string"
+                },
                 "content": {
                     "type": "string"
                 },
@@ -1068,6 +1083,9 @@
                     "type": "integer"
                 },
                 "image_url": {
+                    "type": "string"
+                },
+                "sticker": {
                     "type": "string"
                 },
                 "title": {

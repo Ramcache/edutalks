@@ -26,12 +26,16 @@ type createNewsRequest struct {
 	Title    string `json:"title"`
 	Content  string `json:"content"`
 	ImageURL string `json:"image_url"`
+	Color    string `json:"color"`
+	Sticker  string `json:"sticker"`
 }
 
 type updateNewsRequest struct {
 	Title    string `json:"title"`
 	Content  string `json:"content"`
 	ImageURL string `json:"image_url"`
+	Color    string `json:"color"`
+	Sticker  string `json:"sticker"`
 }
 
 // CreateNews godoc
@@ -146,7 +150,7 @@ func (h *NewsHandler) UpdateNews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.newsService.Update(r.Context(), id, req.Title, req.Content, req.ImageURL); err != nil {
+	if err := h.newsService.Update(r.Context(), id, req.Title, req.Content, req.ImageURL, req.Color, req.Sticker); err != nil {
 		logger.Log.Error("Ошибка обновления новости", zap.Error(err), zap.Int("news_id", id))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка обновления")
 		return
