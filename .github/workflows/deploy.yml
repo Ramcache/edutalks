@@ -25,7 +25,7 @@ jobs:
           cd ../
 
       - name: 📤 Upload binary and migrations
-        uses: appleboy/scp-action@v0.1.7tion
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
