@@ -1,9 +1,13 @@
 definitions:
   handlers.createNewsRequest:
     properties:
+      color:
+        type: string
       content:
         type: string
       image_url:
+        type: string
+      sticker:
         type: string
       title:
         type: string
@@ -64,9 +68,13 @@ definitions:
     type: object
   handlers.updateNewsRequest:
     properties:
+      color:
+        type: string
       content:
         type: string
       image_url:
+        type: string
+      sticker:
         type: string
       title:
         type: string
@@ -90,6 +98,8 @@ definitions:
     type: object
   models.News:
     properties:
+      color:
+        type: string
       content:
         type: string
       created_at:
@@ -97,6 +107,8 @@ definitions:
       id:
         type: integer
       image_url:
+        type: string
+      sticker:
         type: string
       title:
         type: string
