@@ -660,12 +660,17 @@ const docTemplate = `{
                     "200": {
                         "description": "Профиль пользователя",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/models.UserProfileResponse"
                         }
                     },
                     "401": {
                         "description": "Нет доступа",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Пользователь не найден",
                         "schema": {
                             "type": "string"
                         }
@@ -1135,16 +1140,57 @@ const docTemplate = `{
                 "email": {
                     "type": "string"
                 },
-                "emailVerified": {
+                "email_subscription": {
                     "type": "boolean"
                 },
-                "email_subscription": {
+                "email_verified": {
                     "type": "boolean"
                 },
                 "full_name": {
                     "type": "string"
                 },
-                "hasSubscription": {
+                "has_subscription": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.UserProfileResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "email_subscription": {
+                    "type": "boolean"
+                },
+                "email_verified": {
+                    "type": "boolean"
+                },
+                "full_name": {
+                    "type": "string"
+                },
+                "has_subscription": {
                     "type": "boolean"
                 },
                 "id": {

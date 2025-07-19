@@ -161,16 +161,43 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 // @Summary Получить данные профиля
 // @Tags profile
 // @Security ApiKeyAuth
-// @Success 200 {object} map[string]interface{} "Профиль пользователя"
+// @Success 200 {object} models.UserProfileResponse "Профиль пользователя"
 // @Failure 401 {string} string "Нет доступа"
+// @Failure 404 {string} string "Пользователь не найден"
 // @Router /api/profile [get]
 func (h *AuthHandler) Protected(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value(middleware.ContextUserID)
-	role := r.Context().Value(middleware.ContextRole)
-	logger.Log.Debug("Доступ к защищённому маршруту", zap.Any("userID", userID), zap.Any("role", role))
-	helpers.JSON(w, http.StatusOK, map[string]interface{}{
-		"message": fmt.Sprintf("Привет, пользователь #%v с ролью %v", userID, role),
-	})
+	// Получаем userID из контекста
+	userID, ok := r.Context().Value(middleware.ContextUserID).(int)
+	if !ok || userID == 0 {
+		helpers.Error(w, http.StatusUnauthorized, "Нет доступа")
+		return
+	}
+
+	// Получаем профиль пользователя
+	user, err := h.authService.GetUserByID(r.Context(), userID)
+	if err != nil {
+		logger.Log.Warn("Пользователь не найден", zap.Int("user_id", userID))
+		helpers.Error(w, http.StatusNotFound, "Пользователь не найден")
+		return
+	}
+
+	// Собираем ответ (скрываем всё лишнее)
+	resp := models.UserProfileResponse{
+		ID:                user.ID,
+		Username:          user.Username,
+		FullName:          user.FullName,
+		Phone:             user.Phone,
+		Email:             user.Email,
+		Address:           user.Address,
+		Role:              user.Role,
+		CreatedAt:         user.CreatedAt,
+		UpdatedAt:         user.UpdatedAt,
+		HasSubscription:   user.HasSubscription,
+		EmailSubscription: user.EmailSubscription,
+		EmailVerified:     user.EmailVerified,
+	}
+
+	helpers.JSON(w, http.StatusOK, resp)
 }
 
 // Refresh godoc

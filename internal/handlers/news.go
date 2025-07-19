@@ -61,6 +61,8 @@ func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
 		Title:     req.Title,
 		Content:   req.Content,
 		ImageURL:  req.ImageURL,
+		Color:     req.Color,
+		Sticker:   req.Sticker,
 		CreatedAt: time.Now(),
 	}
 
