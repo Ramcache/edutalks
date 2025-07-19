@@ -41,6 +41,7 @@ func NewDocumentHandler(docService *services.DocumentService, userService *servi
 // @Param file formData file true "Файл документа"
 // @Param description formData string false "Описание файла"
 // @Param is_public formData bool false "Доступен по подписке?"
+// @Param category formData string false "Категория документа (например, 'приказ', 'шаблон')"
 // @Success 201 {string} string "Файл загружен"
 // @Failure 400 {string} string "Ошибка загрузки"
 // @Router /api/admin/files/upload [post]
@@ -96,12 +97,15 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	category := r.FormValue("category")
+
 	doc := &models.Document{
 		UserID:      userID,
 		Filename:    handler.Filename,
 		Filepath:    fullPath,
 		Description: description,
 		IsPublic:    isPublic,
+		Category:    category,
 		UploadedAt:  time.Now(),
 	}
 
@@ -124,7 +128,8 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 // @Produce json
 // @Param page query int false "Номер страницы (начиная с 1)"
 // @Param page_size query int false "Размер страницы"
-// @Success 200 {array} models.Document
+// @Param category query string false "Категория документа (например, 'приказ', 'шаблон')"
+// @Success 200 {object} map[string]interface{}
 // @Failure 500 {string} string "Ошибка сервера"
 // @Router /api/files [get]
 func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +143,9 @@ func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Req
 	}
 	offset := (page - 1) * pageSize
 
-	docs, total, err := h.service.GetPublicDocumentsPaginated(r.Context(), pageSize, offset)
+	category := r.URL.Query().Get("category") // <--- вот это!
+
+	docs, total, err := h.service.GetPublicDocumentsPaginated(r.Context(), pageSize, offset, category)
 	if err != nil {
 		logger.Log.Error("Ошибка при получении документов", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при получении документов")

@@ -81,6 +81,8 @@ definitions:
     type: object
   models.Document:
     properties:
+      category:
+        type: string
       description:
         type: string
       filename:
@@ -260,6 +262,10 @@ paths:
         in: formData
         name: is_public
         type: boolean
+      - description: Категория документа (например, 'приказ', 'шаблон')
+        in: formData
+        name: category
+        type: string
       produces:
       - application/json
       responses:
@@ -531,15 +537,18 @@ paths:
         in: query
         name: page_size
         type: integer
+      - description: Категория документа (например, 'приказ', 'шаблон')
+        in: query
+        name: category
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/models.Document'
-            type: array
+            additionalProperties: true
+            type: object
         "500":
           description: Ошибка сервера
           schema:

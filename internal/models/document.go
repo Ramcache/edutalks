@@ -9,5 +9,6 @@ type Document struct {
 	Filepath    string    `json:"filepath"`
 	Description string    `json:"description"`
 	IsPublic    bool      `json:"is_public"`
+	Category    string    `json:"category"`
 	UploadedAt  time.Time `json:"uploaded_at"`
 }

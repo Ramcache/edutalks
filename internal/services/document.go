@@ -34,8 +34,8 @@ func (s *DocumentService) Upload(ctx context.Context, doc *models.Document) erro
 	return err
 }
 
-func (s *DocumentService) GetPublicDocumentsPaginated(ctx context.Context, limit, offset int) ([]*models.Document, int, error) {
-	return s.repo.GetPublicDocumentsPaginated(ctx, limit, offset)
+func (s *DocumentService) GetPublicDocumentsPaginated(ctx context.Context, limit, offset int, category string) ([]*models.Document, int, error) {
+	return s.repo.GetPublicDocumentsPaginated(ctx, limit, offset, category)
 }
 
 func (s *DocumentService) GetDocumentByID(ctx context.Context, id int) (*models.Document, error) {

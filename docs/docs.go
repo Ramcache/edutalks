@@ -111,6 +111,12 @@ const docTemplate = `{
                         "description": "Доступен по подписке?",
                         "name": "is_public",
                         "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Категория документа (например, 'приказ', 'шаблон')",
+                        "name": "category",
+                        "in": "formData"
                     }
                 ],
                 "responses": {
@@ -585,16 +591,20 @@ const docTemplate = `{
                         "description": "Размер страницы",
                         "name": "page_size",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Категория документа (например, 'приказ', 'шаблон')",
+                        "name": "category",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.Document"
-                            }
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "500": {
@@ -1059,6 +1069,9 @@ const docTemplate = `{
         "models.Document": {
             "type": "object",
             "properties": {
+                "category": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
