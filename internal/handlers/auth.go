@@ -252,7 +252,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accessTTL, _ := time.ParseDuration(cfg.AccessTokenTTL)
-	accessToken, err := utils.GenerateToken(cfg.JWTSecret, int(userID), role, accessTTL)
+	accessToken, err := utils.GenerateToken(cfg.JWTSecret, int(userID), role, accessTTL, "access")
 	if err != nil {
 		logger.Log.Error("Ошибка генерации токена", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка генерации токена")
