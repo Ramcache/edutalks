@@ -556,6 +556,7 @@ func (h *AuthHandler) SendVerificationEmail(ctx context.Context, user *models.Us
 		Body:    htmlBody,
 		IsHTML:  true,
 	}
+	logger.Log.Info("Добавление письма в очередь", zap.String("email", user.Email))
 
 	return nil
 }
