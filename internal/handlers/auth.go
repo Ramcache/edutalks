@@ -104,6 +104,12 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	token, err := h.emailTokenService.GetLastTokenByUserID(r.Context(), user.ID)
+	if err == nil && time.Since(token.CreatedAt) < 5*time.Minute {
+		helpers.Error(w, http.StatusTooManyRequests, "Повторная отправка письма возможна через 5 минут")
+		return
+	}
+
 	_ = h.SendVerificationEmail(context.Background(), user)
 
 	helpers.JSON(w, http.StatusCreated, "Пользователь успешно зарегистрирован. Проверьте вашу почту для подтверждения.")

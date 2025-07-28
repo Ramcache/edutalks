@@ -83,3 +83,7 @@ func StartEmailWorker(emailService *EmailService) {
 		}
 	}()
 }
+
+func (s *EmailTokenService) GetLastTokenByUserID(ctx context.Context, userID int) (*models.EmailVerificationToken, error) {
+	return s.repo.GetLastTokenByUserID(ctx, userID)
+}
