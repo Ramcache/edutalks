@@ -1,85 +1,5 @@
 definitions:
-  handlers.createNewsRequest:
-    properties:
-      color:
-        type: string
-      content:
-        type: string
-      image_url:
-        type: string
-      sticker:
-        type: string
-      title:
-        type: string
-    type: object
-  handlers.emailSubscriptionRequest:
-    properties:
-      subscribe:
-        type: boolean
-    type: object
-  handlers.loginRequest:
-    properties:
-      full_name:
-        type: string
-      password:
-        type: string
-      username:
-        type: string
-    type: object
-  handlers.loginResponse:
-    properties:
-      access_token:
-        type: string
-      full_name:
-        type: string
-      refresh_token:
-        type: string
-      role:
-        type: string
-      username:
-        type: string
-    type: object
-  handlers.notifyRequest:
-    properties:
-      message:
-        type: string
-      subject:
-        type: string
-    type: object
-  handlers.registerRequest:
-    properties:
-      address:
-        type: string
-      email:
-        type: string
-      full_name:
-        type: string
-      password:
-        type: string
-      phone:
-        type: string
-      username:
-        type: string
-    type: object
-  handlers.subscriptionRequest:
-    properties:
-      active:
-        type: boolean
-    type: object
-  handlers.updateNewsRequest:
-    properties:
-      color:
-        type: string
-      content:
-        type: string
-      image_url:
-        type: string
-      sticker:
-        type: string
-      title:
-        type: string
-    type: object
-  models.Document:
+  edutalks_internal_models.Document:
     properties:
       category:
         type: string
@@ -98,7 +18,22 @@ definitions:
       user_id:
         type: integer
     type: object
-  models.News:
+  edutalks_internal_models.DocumentPreviewResponse:
+    properties:
+      category:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      message:
+        type: string
+      title:
+        type: string
+      uploaded_at:
+        type: string
+    type: object
+  edutalks_internal_models.News:
     properties:
       color:
         type: string
@@ -115,7 +50,7 @@ definitions:
       title:
         type: string
     type: object
-  models.UpdateUserRequest:
+  edutalks_internal_models.UpdateUserRequest:
     properties:
       address:
         type: string
@@ -128,7 +63,7 @@ definitions:
       role:
         type: string
     type: object
-  models.User:
+  edutalks_internal_models.User:
     properties:
       address:
         type: string
@@ -155,7 +90,7 @@ definitions:
       username:
         type: string
     type: object
-  models.UserProfileResponse:
+  edutalks_internal_models.UserProfileResponse:
     properties:
       address:
         type: string
@@ -180,6 +115,86 @@ definitions:
       updated_at:
         type: string
       username:
+        type: string
+    type: object
+  internal_handlers.createNewsRequest:
+    properties:
+      color:
+        type: string
+      content:
+        type: string
+      image_url:
+        type: string
+      sticker:
+        type: string
+      title:
+        type: string
+    type: object
+  internal_handlers.emailSubscriptionRequest:
+    properties:
+      subscribe:
+        type: boolean
+    type: object
+  internal_handlers.loginRequest:
+    properties:
+      full_name:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  internal_handlers.loginResponse:
+    properties:
+      access_token:
+        type: string
+      full_name:
+        type: string
+      refresh_token:
+        type: string
+      role:
+        type: string
+      username:
+        type: string
+    type: object
+  internal_handlers.notifyRequest:
+    properties:
+      message:
+        type: string
+      subject:
+        type: string
+    type: object
+  internal_handlers.registerRequest:
+    properties:
+      address:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+      username:
+        type: string
+    type: object
+  internal_handlers.subscriptionRequest:
+    properties:
+      active:
+        type: boolean
+    type: object
+  internal_handlers.updateNewsRequest:
+    properties:
+      color:
+        type: string
+      content:
+        type: string
+      image_url:
+        type: string
+      sticker:
+        type: string
+      title:
         type: string
     type: object
 info:
@@ -211,7 +226,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/models.Document'
+              $ref: '#/definitions/edutalks_internal_models.Document'
             type: array
         "500":
           description: Ошибка сервера
@@ -292,7 +307,7 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/handlers.createNewsRequest'
+          $ref: '#/definitions/internal_handlers.createNewsRequest'
       produces:
       - application/json
       responses:
@@ -339,7 +354,7 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/handlers.updateNewsRequest'
+          $ref: '#/definitions/internal_handlers.updateNewsRequest'
       responses:
         "200":
           description: Обновлено
@@ -360,7 +375,7 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/handlers.notifyRequest'
+          $ref: '#/definitions/internal_handlers.notifyRequest'
       responses:
         "200":
           description: Письма отправлены
@@ -397,7 +412,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/models.User'
+              $ref: '#/definitions/edutalks_internal_models.User'
             type: array
         "403":
           description: Доступ запрещён
@@ -422,7 +437,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.User'
+            $ref: '#/definitions/edutalks_internal_models.User'
         "400":
           description: Невалидный ID
           schema:
@@ -450,7 +465,7 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/models.UpdateUserRequest'
+          $ref: '#/definitions/edutalks_internal_models.UpdateUserRequest'
       produces:
       - application/json
       responses:
@@ -484,7 +499,7 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/handlers.subscriptionRequest'
+          $ref: '#/definitions/internal_handlers.subscriptionRequest'
       responses:
         "200":
           description: Статус обновлён
@@ -509,7 +524,7 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/handlers.emailSubscriptionRequest'
+          $ref: '#/definitions/internal_handlers.emailSubscriptionRequest'
       produces:
       - application/json
       responses:
@@ -588,7 +603,7 @@ paths:
         "200":
           description: Профиль пользователя
           schema:
-            $ref: '#/definitions/models.UserProfileResponse'
+            $ref: '#/definitions/edutalks_internal_models.UserProfileResponse'
         "401":
           description: Нет доступа
           schema:
@@ -602,6 +617,33 @@ paths:
       summary: Получить данные профиля
       tags:
       - profile
+  /documents/{id}/preview:
+    get:
+      description: Показывает название, описание и категорию документа. Файл не отдаётся.
+      parameters:
+      - description: ID документа
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/edutalks_internal_models.DocumentPreviewResponse'
+        "403":
+          description: Документ не публичный
+          schema:
+            type: string
+        "404":
+          description: Документ не найден
+          schema:
+            type: string
+      summary: Превью публичного документа (только метаданные)
+      tags:
+      - public-documents
   /login:
     post:
       consumes:
@@ -612,14 +654,14 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/handlers.loginRequest'
+          $ref: '#/definitions/internal_handlers.loginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.loginResponse'
+            $ref: '#/definitions/internal_handlers.loginResponse'
         "401":
           description: Неверный логин или пароль
           schema:
@@ -661,7 +703,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/models.News'
+              $ref: '#/definitions/edutalks_internal_models.News'
             type: array
       summary: Получить список новостей
       tags:
@@ -680,7 +722,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.News'
+            $ref: '#/definitions/edutalks_internal_models.News'
         "404":
           description: Не найдено
           schema:
@@ -718,7 +760,7 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/handlers.registerRequest'
+          $ref: '#/definitions/internal_handlers.registerRequest'
       produces:
       - application/json
       responses:
