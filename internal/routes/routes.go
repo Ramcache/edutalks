@@ -18,7 +18,7 @@ func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentH
 	router.HandleFunc("/news", newsHandler.ListNews).Methods("GET")
 	router.HandleFunc("/news/{id:[0-9]+}", newsHandler.GetNews).Methods("GET")
 	router.HandleFunc("/verify-email", emailHandler.VerifyEmail).Methods("GET")
-	router.HandleFunc("/resend-verification", emailHandler.ResendVerificationEmail).Methods("POST")
+	router.HandleFunc("/resend-verification", authHandler.ResendVerificationEmail).Methods("POST")
 
 	router.HandleFunc("/documents/{id:[0-9]+}/preview", documentHandler.PreviewDocument).Methods("GET")
 
