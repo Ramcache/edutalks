@@ -37,7 +37,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	emailHandler := handlers.NewEmailHandler(emailTokenService)
 
 	for i := 0; i < 3; i++ {
-		services.StartEmailWorker(emaService)
+		go services.StartEmailWorker(emaService)
 	}
 
 	// Маршруты
