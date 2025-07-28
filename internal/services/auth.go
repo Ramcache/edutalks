@@ -86,13 +86,13 @@ func (s *AuthService) LoginUser(
 		return "", "", errors.New("неверный пароль")
 	}
 
-	accessToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, accessTTL)
+	accessToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, accessTTL, "access")
 	if err != nil {
 		logger.Log.Error("Ошибка генерации access-токена", zap.Error(err))
 		return "", "", err
 	}
 
-	refreshToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, refreshTTL)
+	refreshToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, refreshTTL, "refresh")
 	if err != nil {
 		logger.Log.Error("Ошибка генерации refresh-токена", zap.Error(err))
 		return "", "", err
@@ -134,13 +134,13 @@ func (s *AuthService) LoginUserWithUser(
 		return "", "", nil, errors.New("неверный пароль")
 	}
 
-	accessToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, accessTTL)
+	accessToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, accessTTL, "access")
 	if err != nil {
 		logger.Log.Error("Ошибка генерации access-токена", zap.Error(err))
 		return "", "", nil, err
 	}
 
-	refreshToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, refreshTTL)
+	refreshToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, refreshTTL, "refresh")
 	if err != nil {
 		logger.Log.Error("Ошибка генерации refresh-токена", zap.Error(err))
 		return "", "", nil, err
