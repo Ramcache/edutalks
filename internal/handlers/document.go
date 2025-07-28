@@ -270,3 +270,40 @@ func (h *DocumentHandler) GetAllDocuments(w http.ResponseWriter, r *http.Request
 	}
 	helpers.JSON(w, http.StatusOK, docs)
 }
+
+// PreviewDocument godoc
+// @Summary Превью публичного документа (только метаданные)
+// @Description Показывает название, описание и категорию документа. Файл не отдаётся.
+// @Tags public-documents
+// @Param id path int true "ID документа"
+// @Produce json
+// @Success 200 {object} models.DocumentPreviewResponse
+// @Failure 404 {object} string "Документ не найден"
+// @Failure 403 {object} string "Документ не публичный"
+// @Router /documents/{id}/preview [get]
+func (h *DocumentHandler) PreviewDocument(w http.ResponseWriter, r *http.Request) {
+	idStr := mux.Vars(r)["id"]
+	id, _ := strconv.Atoi(idStr)
+
+	doc, err := h.service.GetDocumentByID(r.Context(), id)
+	if err != nil {
+		helpers.Error(w, http.StatusNotFound, "Документ не найден")
+		return
+	}
+
+	if !doc.IsPublic {
+		helpers.Error(w, http.StatusForbidden, "Документ недоступен для просмотра")
+		return
+	}
+
+	resp := models.DocumentPreviewResponse{
+		ID:          doc.ID,
+		Title:       doc.Filename,
+		Description: doc.Description,
+		Category:    doc.Category,
+		UploadedAt:  doc.UploadedAt.Format("2006-01-02"),
+		Message:     "Документ доступен только по подписке",
+	}
+
+	helpers.JSON(w, http.StatusOK, resp)
+}

@@ -7,8 +7,8 @@ type EmailVerificationToken struct {
 	Token     string
 	ExpiresAt time.Time
 	Confirmed bool
+	CreatedAt time.Time
 }
-
 type EmailJob struct {
 	To      []string
 	Subject string

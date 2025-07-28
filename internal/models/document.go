@@ -12,3 +12,12 @@ type Document struct {
 	Category    string    `json:"category"`
 	UploadedAt  time.Time `json:"uploaded_at"`
 }
+
+type DocumentPreviewResponse struct {
+	ID          int    `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Category    string `json:"category,omitempty"`
+	UploadedAt  string `json:"uploaded_at"`
+	Message     string `json:"message"`
+}

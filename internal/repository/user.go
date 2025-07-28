@@ -269,8 +269,6 @@ func (r *UserRepository) GetSubscribedEmails(ctx context.Context) ([]string, err
 	return emails, nil
 }
 
-// internal/repository/user.go
-
 func (r *UserRepository) UpdateEmailSubscription(ctx context.Context, userID int, subscribe bool) error {
 	query := `UPDATE users SET email_subscription = $1 WHERE id = $2`
 	_, err := r.db.Exec(ctx, query, subscribe, userID)
@@ -280,4 +278,34 @@ func (r *UserRepository) UpdateEmailSubscription(ctx context.Context, userID int
 func (r *UserRepository) SetEmailVerified(ctx context.Context, userID int, verified bool) error {
 	_, err := r.db.Exec(ctx, `UPDATE users SET email_verified = $1 WHERE id = $2`, verified, userID)
 	return err
+}
+
+func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+	logger.Log.Debug("Получение пользователя по email (repo)", zap.String("email", email))
+	query := `SELECT id, username, full_name, phone, email, address, password_hash, role, created_at, updated_at, has_subscription, email_subscription, email_verified
+	FROM users 
+	WHERE email = $1`
+
+	var user models.User
+	err := r.db.QueryRow(ctx, query, email).Scan(
+		&user.ID,
+		&user.Username,
+		&user.FullName,
+		&user.Phone,
+		&user.Email,
+		&user.Address,
+		&user.PasswordHash,
+		&user.Role,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&user.HasSubscription,
+		&user.EmailSubscription,
+		&user.EmailVerified,
+	)
+
+	if err != nil {
+		logger.Log.Error("Ошибка получения пользователя по email (repo)", zap.String("email", email), zap.Error(err))
+		return nil, err
+	}
+	return &user, nil
 }

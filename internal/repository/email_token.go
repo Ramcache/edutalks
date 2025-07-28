@@ -34,3 +34,19 @@ func (r *EmailTokenRepository) MarkConfirmed(ctx context.Context, token string) 
 	_, err := r.db.Exec(ctx, `UPDATE email_verification_tokens SET confirmed = true WHERE token = $1`, token)
 	return err
 }
+
+func (r *EmailTokenRepository) GetLastTokenByUserID(ctx context.Context, userID int) (*models.EmailVerificationToken, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT user_id, token, expires_at, confirmed, created_at
+		FROM email_verification_tokens
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, userID)
+
+	var t models.EmailVerificationToken
+	if err := row.Scan(&t.UserID, &t.Token, &t.ExpiresAt, &t.Confirmed, &t.CreatedAt); err != nil {
+		return nil, err
+	}
+	return &t, nil
+}

@@ -62,7 +62,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.Document"
+                                "$ref": "#/definitions/edutalks_internal_models.Document"
                             }
                         }
                     },
@@ -195,7 +195,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.createNewsRequest"
+                            "$ref": "#/definitions/internal_handlers.createNewsRequest"
                         }
                     }
                 ],
@@ -268,7 +268,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.updateNewsRequest"
+                            "$ref": "#/definitions/internal_handlers.updateNewsRequest"
                         }
                     }
                 ],
@@ -303,7 +303,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.notifyRequest"
+                            "$ref": "#/definitions/internal_handlers.notifyRequest"
                         }
                     }
                 ],
@@ -363,7 +363,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.User"
+                                "$ref": "#/definitions/edutalks_internal_models.User"
                             }
                         }
                     },
@@ -403,7 +403,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.User"
+                            "$ref": "#/definitions/edutalks_internal_models.User"
                         }
                     },
                     "400": {
@@ -450,7 +450,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.UpdateUserRequest"
+                            "$ref": "#/definitions/edutalks_internal_models.UpdateUserRequest"
                         }
                     }
                 ],
@@ -501,7 +501,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.subscriptionRequest"
+                            "$ref": "#/definitions/internal_handlers.subscriptionRequest"
                         }
                     }
                 ],
@@ -545,7 +545,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.emailSubscriptionRequest"
+                            "$ref": "#/definitions/internal_handlers.emailSubscriptionRequest"
                         }
                     }
                 ],
@@ -670,7 +670,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Профиль пользователя",
                         "schema": {
-                            "$ref": "#/definitions/models.UserProfileResponse"
+                            "$ref": "#/definitions/edutalks_internal_models.UserProfileResponse"
                         }
                     },
                     "401": {
@@ -681,6 +681,47 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Пользователь не найден",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/documents/{id}/preview": {
+            "get": {
+                "description": "Показывает название, описание и категорию документа. Файл не отдаётся.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "public-documents"
+                ],
+                "summary": "Превью публичного документа (только метаданные)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID документа",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/edutalks_internal_models.DocumentPreviewResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Документ не публичный",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Документ не найден",
                         "schema": {
                             "type": "string"
                         }
@@ -707,7 +748,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.loginRequest"
+                            "$ref": "#/definitions/internal_handlers.loginRequest"
                         }
                     }
                 ],
@@ -715,7 +756,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.loginResponse"
+                            "$ref": "#/definitions/internal_handlers.loginResponse"
                         }
                     },
                     "401": {
@@ -783,7 +824,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.News"
+                                "$ref": "#/definitions/edutalks_internal_models.News"
                             }
                         }
                     }
@@ -812,7 +853,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.News"
+                            "$ref": "#/definitions/edutalks_internal_models.News"
                         }
                     },
                     "404": {
@@ -876,7 +917,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.registerRequest"
+                            "$ref": "#/definitions/internal_handlers.registerRequest"
                         }
                     }
                 ],
@@ -891,6 +932,72 @@ const docTemplate = `{
                         "description": "Ошибка валидации",
                         "schema": {
                             "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/resend-verification": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "email"
+                ],
+                "summary": "Повторная отправка письма для подтверждения e-mail",
+                "parameters": [
+                    {
+                        "description": "Email пользователя",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
@@ -942,131 +1049,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "handlers.createNewsRequest": {
-            "type": "object",
-            "properties": {
-                "color": {
-                    "type": "string"
-                },
-                "content": {
-                    "type": "string"
-                },
-                "image_url": {
-                    "type": "string"
-                },
-                "sticker": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.emailSubscriptionRequest": {
-            "type": "object",
-            "properties": {
-                "subscribe": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "handlers.loginRequest": {
-            "type": "object",
-            "properties": {
-                "full_name": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.loginResponse": {
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string"
-                },
-                "full_name": {
-                    "type": "string"
-                },
-                "refresh_token": {
-                    "type": "string"
-                },
-                "role": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.notifyRequest": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string"
-                },
-                "subject": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.registerRequest": {
-            "type": "object",
-            "properties": {
-                "address": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "full_name": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string"
-                },
-                "phone": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.subscriptionRequest": {
-            "type": "object",
-            "properties": {
-                "active": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "handlers.updateNewsRequest": {
-            "type": "object",
-            "properties": {
-                "color": {
-                    "type": "string"
-                },
-                "content": {
-                    "type": "string"
-                },
-                "image_url": {
-                    "type": "string"
-                },
-                "sticker": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.Document": {
+        "edutalks_internal_models.Document": {
             "type": "object",
             "properties": {
                 "category": {
@@ -1095,7 +1078,30 @@ const docTemplate = `{
                 }
             }
         },
-        "models.News": {
+        "edutalks_internal_models.DocumentPreviewResponse": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "uploaded_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "edutalks_internal_models.News": {
             "type": "object",
             "properties": {
                 "color": {
@@ -1121,7 +1127,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.UpdateUserRequest": {
+        "edutalks_internal_models.UpdateUserRequest": {
             "type": "object",
             "properties": {
                 "address": {
@@ -1141,7 +1147,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.User": {
+        "edutalks_internal_models.User": {
             "type": "object",
             "properties": {
                 "address": {
@@ -1182,7 +1188,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.UserProfileResponse": {
+        "edutalks_internal_models.UserProfileResponse": {
             "type": "object",
             "properties": {
                 "address": {
@@ -1219,6 +1225,130 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.createNewsRequest": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "sticker": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.emailSubscriptionRequest": {
+            "type": "object",
+            "properties": {
+                "subscribe": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "internal_handlers.loginRequest": {
+            "type": "object",
+            "properties": {
+                "full_name": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.loginResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.notifyRequest": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.registerRequest": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.subscriptionRequest": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "internal_handlers.updateNewsRequest": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "sticker": {
+                    "type": "string"
+                },
+                "title": {
                     "type": "string"
                 }
             }
