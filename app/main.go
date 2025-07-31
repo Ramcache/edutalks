@@ -33,7 +33,7 @@ func main() {
 	if err != nil {
 		logger.Log.Fatal("Ошибка инициализации приложения", zap.Error(err))
 	}
-
+	//
 	logger.Log.Info("Сервер запущен", zap.String("port", cfg.Port))
 
 	corsMiddleware := cors.New(cors.Options{
