@@ -37,7 +37,7 @@ func main() {
 	logger.Log.Info("Сервер запущен", zap.String("port", cfg.Port))
 
 	corsMiddleware := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   []string{"http://localhost:3000", "https://edutalks.ru"},
 		AllowCredentials: true,
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Authorization", "Content-Type"},
