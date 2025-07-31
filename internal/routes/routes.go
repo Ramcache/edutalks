@@ -7,15 +7,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-package routes
-
-import (
-"edutalks/internal/handlers"
-"edutalks/internal/middleware"
-
-"github.com/gorilla/mux"
-)
-
 func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentHandler *handlers.DocumentHandler, newsHandler *handlers.NewsHandler, emailHandler *handlers.EmailHandler) {
 	router.Use(middleware.Logging)
 
