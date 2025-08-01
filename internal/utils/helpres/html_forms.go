@@ -94,3 +94,61 @@ func BuildVerificationHTML(name, link string) string {
 </html>
 `, name, link)
 }
+
+func BuildVerifySuccessHTML() string {
+	return `
+<html>
+  <body style="font-family:Arial,sans-serif; background:#f9f9f9;">
+    <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#f9f9f9">
+      <tr>
+        <td align="center" style="padding:48px 0;">
+          <table width="440" bgcolor="#fff" cellpadding="24" cellspacing="0" style="border-radius:10px; box-shadow:0 1px 8px #eee;">
+            <tr>
+              <td align="center">
+                <div style="font-size:60px;line-height:1;margin-bottom:18px;">✅</div>
+                <h2 style="color:#2d74da; margin:0 0 16px 0;">Почта подтверждена!</h2>
+                <div style="font-size:17px; color:#222;">
+                  Спасибо, ваша почта успешно подтверждена.<br>
+                  Теперь вы можете войти в свой аккаунт.
+                </div>
+                <a href="https://edutalks.ru/auth" style="display:inline-block;padding:13px 32px;margin:32px 0 0 0;background:#2d74da;color:#fff;text-decoration:none;border-radius:7px;font-weight:600;font-size:15px;">
+                  Войти
+                </a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+`
+}
+
+// Ошибка подтверждения email
+func BuildVerifyErrorHTML(errorMsg string) string {
+	return fmt.Sprintf(`
+<html>
+  <body style="font-family:Arial,sans-serif; background:#f9f9f9;">
+    <table width="100%%" cellpadding="0" cellspacing="0" bgcolor="#f9f9f9">
+      <tr>
+        <td align="center" style="padding:48px 0;">
+          <table width="440" bgcolor="#fff" cellpadding="24" cellspacing="0" style="border-radius:10px; box-shadow:0 1px 8px #eee;">
+            <tr>
+              <td align="center">
+                <div style="font-size:60px;line-height:1;margin-bottom:18px;">❌</div>
+                <h2 style="color:#ee4444; margin:0 0 16px 0;">Ошибка подтверждения</h2>
+                <div style="font-size:17px; color:#222;">%s</div>
+                <a href="https://edutalks.ru/" style="display:inline-block;padding:13px 32px;margin:32px 0 0 0;background:#ee4444;color:#fff;text-decoration:none;border-radius:7px;font-weight:600;font-size:15px;">
+                  На главную
+                </a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+`, errorMsg)
+}
