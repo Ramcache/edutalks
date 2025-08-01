@@ -560,3 +560,43 @@ func (h *AuthHandler) SendVerificationEmail(ctx context.Context, user *models.Us
 
 	return nil
 }
+
+// DeleteUser
+// @Summary Удалить пользователя
+// @Description Удаляет пользователя по его ID
+// @Tags Users
+// @Param id path int true "ID пользователя"
+// @Success 200 {object} map[string]string "Пользователь успешно удалён"
+// @Failure 400 {object} string "Некорректный id пользователя"
+// @Failure 404 {object} string "Пользователь не найден"
+// @Failure 500 {object} string "Ошибка при удалении пользователя"
+// @Security ApiKeyAuth
+// @Router /api/admin/users/{id} [delete]
+func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		helpers.Error(w, http.StatusBadRequest, "Некорректный id пользователя")
+		return
+	}
+
+	logger.Log.Info("Запрос на удаление пользователя", zap.Int("user_id", id))
+
+	_, err = h.authService.GetUserByID(r.Context(), id)
+	if err != nil {
+		logger.Log.Warn("Пользователь не найден для удаления", zap.Int("user_id", id))
+		helpers.Error(w, http.StatusNotFound, "Пользователь не найден")
+		return
+	}
+
+	err = h.authService.DeleteUserByID(r.Context(), id)
+	if err != nil {
+		logger.Log.Error("Ошибка при удалении пользователя из базы", zap.Error(err), zap.Int("user_id", id))
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка при удалении пользователя")
+		return
+	}
+
+	logger.Log.Info("Пользователь успешно удалён", zap.Int("user_id", id))
+	helpers.JSON(w, http.StatusOK, map[string]string{"message": "Пользователь удалён"})
+}

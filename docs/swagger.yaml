@@ -424,6 +424,38 @@ paths:
       tags:
       - admin-users
   /api/admin/users/{id}:
+    delete:
+      description: Удаляет пользователя по его ID
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: Пользователь успешно удалён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Некорректный id пользователя
+          schema:
+            type: string
+        "404":
+          description: Пользователь не найден
+          schema:
+            type: string
+        "500":
+          description: Ошибка при удалении пользователя
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Удалить пользователя
+      tags:
+      - Users
     get:
       parameters:
       - description: ID пользователя

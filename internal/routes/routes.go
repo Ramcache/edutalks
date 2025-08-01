@@ -50,4 +50,5 @@ func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentH
 	admin.HandleFunc("/news/{id:[0-9]+}", newsHandler.UpdateNews).Methods("PATCH")
 	admin.HandleFunc("/news/{id:[0-9]+}", newsHandler.DeleteNews).Methods("DELETE")
 	admin.HandleFunc("/notify", authHandler.NotifySubscribers).Methods("POST")
+	admin.HandleFunc("/users/{id}", authHandler.DeleteUser).Methods("DELETE")
 }
