@@ -5,6 +5,7 @@ import (
 	"edutalks/internal/services"
 	helpers "edutalks/internal/utils/helpres"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -31,26 +32,33 @@ func NewEmailHandler(emailTokenService *services.EmailTokenService) *EmailHandle
 // @Router /verify-email [get]
 func (h *EmailHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
 	if token == "" {
-		helpers.Error(w, http.StatusBadRequest, "Токен отсутствует")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, helpers.BuildVerifyErrorHTML("Токен отсутствует"))
 		return
 	}
 
 	err := h.emailTokenService.ConfirmToken(r.Context(), token)
 	if err != nil {
 		logger.Log.Warn("Ошибка подтверждения email", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		var errMsg string
 		switch err {
 		case services.ErrTokenInvalid:
-			helpers.Error(w, http.StatusBadRequest, "Неверный токен")
+			errMsg = "Неверный или уже использованный токен."
 		case services.ErrTokenExpired:
-			helpers.Error(w, http.StatusBadRequest, "Токен истёк")
+			errMsg = "Срок действия токена истёк."
 		default:
-			helpers.Error(w, http.StatusInternalServerError, "Ошибка подтверждения")
+			errMsg = "Внутренняя ошибка сервиса."
 		}
+		fmt.Fprint(w, helpers.BuildVerifyErrorHTML(errMsg))
 		return
 	}
 
-	helpers.JSON(w, http.StatusOK, map[string]string{"message": "Почта успешно подтверждена"})
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, helpers.BuildVerifySuccessHTML())
 }
 
 // ResendVerificationEmail godoc
