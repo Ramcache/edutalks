@@ -309,3 +309,13 @@ func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*mod
 	}
 	return &user, nil
 }
+
+func (r *UserRepository) DeleteUserByID(ctx context.Context, userID int) error {
+	logger.Log.Debug("Удаление user id (repo)", zap.Int("user_id", userID))
+	query := `DELETE FROM users WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, userID)
+	if err != nil {
+		logger.Log.Error("Ошибка удаления user (repo)", zap.Error(err))
+	}
+	return err
+}

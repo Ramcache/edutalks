@@ -35,6 +35,7 @@ type UserRepo interface {
 	UpdateEmailSubscription(ctx context.Context, userID int, subscribe bool) error
 	SetEmailVerified(ctx context.Context, userID int, verified bool) error
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
+	DeleteUserByID(ctx context.Context, userID int) error
 }
 
 func (s *AuthService) RegisterUser(ctx context.Context, input *models.User, plainPassword string) error {
@@ -203,4 +204,13 @@ func (s *AuthService) GetUserByEmail(ctx context.Context, email string) (*models
 		logger.Log.Warn("Пользователь не найден по email (service)", zap.String("email", email), zap.Error(err))
 	}
 	return user, err
+}
+
+func (s *AuthService) DeleteUserByID(ctx context.Context, id int) error {
+	logger.Log.Info("Сервис: удаление user", zap.Int("user_id", id))
+	err := s.repo.DeleteUserByID(ctx, id)
+	if err != nil {
+		logger.Log.Error("Ошибка удаления users (service)", zap.Int("user_id", id), zap.Error(err))
+	}
+	return err
 }

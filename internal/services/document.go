@@ -20,6 +20,7 @@ func NewDocumentService(repo *repository.DocumentRepository) *DocumentService {
 type DocumentServiceInterface interface {
 	Upload(ctx context.Context, doc *models.Document) error
 	GetPublicDocuments(ctx context.Context) ([]*models.Document, error)
+	GetPublicDocumentsPaginated(ctx context.Context, limit, offset int, category string) ([]*models.Document, int, error)
 	GetDocumentByID(ctx context.Context, id int) (*models.Document, error)
 	Delete(ctx context.Context, id int) error
 	GetAllDocuments(ctx context.Context) ([]*models.Document, error)
