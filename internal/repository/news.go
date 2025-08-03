@@ -23,6 +23,7 @@ type NewsRepo interface {
 	GetByID(ctx context.Context, id int) (*models.News, error)
 	Update(ctx context.Context, id int, title, content, imageURL, color, sticker string) error
 	Delete(ctx context.Context, id int) error
+	Search(ctx context.Context, query string) ([]models.News, error)
 }
 
 func (r *NewsRepository) Create(ctx context.Context, news *models.News) error {
@@ -109,4 +110,27 @@ func (r *NewsRepository) Delete(ctx context.Context, id int) error {
 		logger.Log.Error("Ошибка удаления новости (repo)", zap.Int("news_id", id), zap.Error(err))
 	}
 	return err
+}
+
+func (r *NewsRepository) Search(ctx context.Context, query string) ([]models.News, error) {
+	q := `%` + query + `%`
+	rows, err := r.db.Query(ctx, `
+		SELECT id, title, content, image_url, color, sticker, created_at
+		FROM news
+		WHERE title ILIKE $1 OR content ILIKE $1
+	`, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []models.News
+	for rows.Next() {
+		var news models.News
+		if err := rows.Scan(&news.ID, &news.Title, &news.Content, &news.ImageURL, &news.Color, &news.Sticker, &news.CreatedAt); err != nil {
+			return nil, err
+		}
+		results = append(results, news)
+	}
+	return results, nil
 }
