@@ -30,11 +30,13 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	newsService := services.NewNewsService(newsRepo, userRepo, emailService, cfg)
 	emailTokenService := services.NewEmailTokenService(emailTokenRepo, userRepo)
 	emaService := services.NewEmailService(cfg)
+
 	// Хендлеры
 	authHandler := handlers.NewAuthHandler(authService, emailService, emailTokenService)
 	docHandler := handlers.NewDocumentHandler(docService, authService)
 	newsHandler := handlers.NewNewsHandler(newsService)
 	emailHandler := handlers.NewEmailHandler(emailTokenService)
+	searchHandler := handlers.NewSearchHandler(newsService, docService)
 
 	for i := 0; i < 3; i++ {
 		go services.StartEmailWorker(emaService)
@@ -42,7 +44,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 
 	// Маршруты
 	router := mux.NewRouter()
-	routes.InitRoutes(router, authHandler, docHandler, newsHandler, emailHandler)
+	routes.InitRoutes(router, authHandler, docHandler, newsHandler, emailHandler, searchHandler)
 
 	return router, nil
 }

@@ -95,3 +95,7 @@ func (s *NewsService) Delete(ctx context.Context, id int) error {
 	}
 	return err
 }
+
+func (s *NewsService) Search(ctx context.Context, query string) ([]models.News, error) {
+	return s.repo.Search(ctx, query)
+}

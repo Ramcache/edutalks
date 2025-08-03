@@ -24,6 +24,7 @@ type DocumentRepo interface {
 	GetDocumentByID(ctx context.Context, id int) (*models.Document, error)
 	DeleteDocument(ctx context.Context, id int) error
 	GetAllDocuments(ctx context.Context) ([]*models.Document, error)
+	Search(ctx context.Context, query string) ([]models.Document, error)
 }
 
 // Сохранение документа
@@ -172,6 +173,32 @@ func (r *DocumentRepository) GetAllDocuments(ctx context.Context) ([]*models.Doc
 			return nil, err
 		}
 		docs = append(docs, &d)
+	}
+	return docs, nil
+}
+
+func (r *DocumentRepository) Search(ctx context.Context, query string) ([]models.Document, error) {
+	q := "%" + query + "%"
+	rows, err := r.db.Query(ctx, `
+		SELECT id, user_id, filename, description, is_public, category, uploaded_at
+		FROM documents
+		WHERE filename ILIKE $1 OR description ILIKE $1 OR category ILIKE $1
+	`, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var docs []models.Document
+	for rows.Next() {
+		var doc models.Document
+		if err := rows.Scan(
+			&doc.ID, &doc.UserID, &doc.Filename, &doc.Description,
+			&doc.IsPublic, &doc.Category, &doc.UploadedAt,
+		); err != nil {
+			return nil, err
+		}
+		docs = append(docs, doc)
 	}
 	return docs, nil
 }

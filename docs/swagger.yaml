@@ -850,6 +850,29 @@ paths:
       summary: Повторная отправка письма для подтверждения e-mail
       tags:
       - email
+  /search:
+    get:
+      parameters:
+      - description: Поисковый запрос
+        in: query
+        name: query
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Пустой запрос
+          schema:
+            type: string
+      summary: Глобальный поиск по материалам
+      tags:
+      - search
   /verify-email:
     get:
       consumes:
