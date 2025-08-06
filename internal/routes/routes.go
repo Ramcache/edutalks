@@ -27,8 +27,7 @@ func InitRoutes(
 	api.HandleFunc("/refresh", authHandler.Refresh).Methods("POST")
 	api.HandleFunc("/logout", authHandler.Logout).Methods("POST")
 
-	api.HandleFunc("/pay", paymentHandler.CreatePayment).Methods("GET")               // ← ДОСТУПЕН ВСЕМ
-	api.HandleFunc("/payments/webhook", webhookHandler.HandleWebhook).Methods("POST") // ← ДОСТУПЕН ЮKassa
+	api.HandleFunc("/payments/webhook", webhookHandler.HandleWebhook).Methods("POST")
 
 	api.HandleFunc("/news", newsHandler.ListNews).Methods("GET")
 	api.HandleFunc("/news/{id:[0-9]+}", newsHandler.GetNews).Methods("GET")
@@ -42,6 +41,8 @@ func InitRoutes(
 	// --- Защищённые JWT ---
 	protected := api.PathPrefix("").Subrouter()
 	protected.Use(middleware.JWTAuth)
+
+	protected.HandleFunc("/pay", paymentHandler.CreatePayment).Methods("GET")
 
 	protected.HandleFunc("/profile", authHandler.Protected).Methods("GET")
 	protected.HandleFunc("/email-subscription", authHandler.EmailSubscribe).Methods("PATCH")
