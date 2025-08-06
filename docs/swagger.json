@@ -722,28 +722,40 @@
                     }
                 ],
                 "responses": {
-                    "302": {
-                        "description": "Redirect to YooKassa",
+                    "200": {
+                        "description": "OK",
                         "schema": {
-                            "type": "string"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/edutalks_internal_utils_helpres.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/internal_handlers.PaymentResult"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
-                        "description": "Некорректный запрос",
+                        "description": "Bad Request",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/edutalks_internal_utils_helpres.Response"
                         }
                     },
                     "401": {
-                        "description": "Неавторизован",
+                        "description": "Unauthorized",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/edutalks_internal_utils_helpres.Response"
                         }
                     },
                     "500": {
-                        "description": "Ошибка сервера",
+                        "description": "Internal Server Error",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/edutalks_internal_utils_helpres.Response"
                         }
                     }
                 }
@@ -1388,6 +1400,23 @@
                     "type": "string"
                 },
                 "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "edutalks_internal_utils_helpres.Response": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.PaymentResult": {
+            "type": "object",
+            "properties": {
+                "confirmation_url": {
                     "type": "string"
                 }
             }
