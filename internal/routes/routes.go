@@ -7,7 +7,16 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentHandler *handlers.DocumentHandler, newsHandler *handlers.NewsHandler, emailHandler *handlers.EmailHandler, searchHandler *handlers.SearchHandler) {
+func InitRoutes(
+	router *mux.Router,
+	authHandler *handlers.AuthHandler,
+	documentHandler *handlers.DocumentHandler,
+	newsHandler *handlers.NewsHandler,
+	emailHandler *handlers.EmailHandler,
+	searchHandler *handlers.SearchHandler,
+	paymentHandler *handlers.PaymentHandler,
+	webhookHandler *handlers.WebhookHandler,
+) {
 	router.Use(middleware.Logging)
 
 	api := router.PathPrefix("/api").Subrouter()
@@ -17,6 +26,9 @@ func InitRoutes(router *mux.Router, authHandler *handlers.AuthHandler, documentH
 	api.HandleFunc("/login", authHandler.Login).Methods("POST")
 	api.HandleFunc("/refresh", authHandler.Refresh).Methods("POST")
 	api.HandleFunc("/logout", authHandler.Logout).Methods("POST")
+
+	api.HandleFunc("/pay", paymentHandler.CreatePayment).Methods("GET")               // ← ДОСТУПЕН ВСЕМ
+	api.HandleFunc("/payments/webhook", webhookHandler.HandleWebhook).Methods("POST") // ← ДОСТУПЕН ЮKassa
 
 	api.HandleFunc("/news", newsHandler.ListNews).Methods("GET")
 	api.HandleFunc("/news/{id:[0-9]+}", newsHandler.GetNews).Methods("GET")

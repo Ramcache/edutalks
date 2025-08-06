@@ -214,3 +214,8 @@ func (s *AuthService) DeleteUserByID(ctx context.Context, id int) error {
 	}
 	return err
 }
+
+func (s *AuthService) SetSubscriptionTrue(userID int) error {
+	ctx := context.Background()
+	return s.repo.UpdateSubscriptionStatus(ctx, userID, true)
+}
