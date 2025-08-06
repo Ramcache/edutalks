@@ -56,7 +56,7 @@ func LoadConfig() (*Config, error) {
 		SMTPUser:          os.Getenv("SMTP_USER"),
 		SMTPPassword:      os.Getenv("SMTP_PASSWORD"),
 		SiteURL:           os.Getenv("SITEURL"),
-		YooKassaReturnURL: os.Getenv("YOOKASSA_RETURE_URL"),
+		YooKassaReturnURL: os.Getenv("YOOKASSA_RETUN_URL"),
 		YooKassaSecret:    os.Getenv("YOOKASSA_SECRET"),
 		YooKassaShopID:    os.Getenv("YOOKASSA_SHOP_ID"),
 	}
