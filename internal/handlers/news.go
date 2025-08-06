@@ -4,7 +4,7 @@ import (
 	"edutalks/internal/logger"
 	"edutalks/internal/models"
 	"edutalks/internal/services"
-	helpers "edutalks/internal/utils/helpres"
+	helpers "edutalks/internal/utils/helpers"
 	"encoding/json"
 	"net/http"
 	"strconv"

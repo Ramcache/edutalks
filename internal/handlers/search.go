@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"edutalks/internal/services"
-	helpers "edutalks/internal/utils/helpres"
+	helpers "edutalks/internal/utils/helpers"
 	"net/http"
 	"strings"
 )

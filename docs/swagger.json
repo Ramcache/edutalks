@@ -727,7 +727,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/edutalks_internal_utils_helpres.Response"
+                                    "$ref": "#/definitions/edutalks_internal_utils_helpers.Response"
                                 },
                                 {
                                     "type": "object",
@@ -743,19 +743,19 @@
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/edutalks_internal_utils_helpres.Response"
+                            "$ref": "#/definitions/edutalks_internal_utils_helpers.Response"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/edutalks_internal_utils_helpres.Response"
+                            "$ref": "#/definitions/edutalks_internal_utils_helpers.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/edutalks_internal_utils_helpres.Response"
+                            "$ref": "#/definitions/edutalks_internal_utils_helpers.Response"
                         }
                     }
                 }
@@ -1404,7 +1404,7 @@
                 }
             }
         },
-        "edutalks_internal_utils_helpres.Response": {
+        "edutalks_internal_utils_helpers.Response": {
             "type": "object",
             "properties": {
                 "data": {},

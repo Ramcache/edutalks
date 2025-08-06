@@ -3,7 +3,7 @@ package handlers
 import (
 	"edutalks/internal/logger"
 	"edutalks/internal/services"
-	helpers "edutalks/internal/utils/helpres"
+	helpers "edutalks/internal/utils/helpers"
 	"encoding/json"
 	"net/http"
 	"time"
