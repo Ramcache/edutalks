@@ -31,6 +31,15 @@ type PaymentWebhook struct {
 	} `json:"object"`
 }
 
+// HandleWebhook godoc
+// @Summary Обработка webhook от YooKassa
+// @Tags Оплата
+// @Accept json
+// @Produce json
+// @Success 200 {string} string "OK"
+// @Failure 400 {string} string "Ошибка парсинга запроса"
+// @Failure 500 {string} string "Ошибка обновления подписки"
+// @Router /api/payments/webhook [post]
 func (h *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {

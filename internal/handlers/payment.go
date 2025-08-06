@@ -16,6 +16,18 @@ func NewPaymentHandler(yoo *services.YooKassaService) *PaymentHandler {
 	}
 }
 
+// CreatePayment godoc
+// @Summary Инициализировать оплату подписки
+// @Tags Оплата
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Param plan query string true "Тип подписки: monthly, halfyear, yearly"
+// @Success 302 {string} string "Redirect to YooKassa"
+// @Failure 400 {string} string "Некорректный запрос"
+// @Failure 401 {string} string "Неавторизован"
+// @Failure 500 {string} string "Ошибка сервера"
+// @Router /api/pay [get]
 func (h *PaymentHandler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 	plan := r.URL.Query().Get("plan")
 	if plan == "" {

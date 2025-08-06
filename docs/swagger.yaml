@@ -629,6 +629,62 @@ paths:
       summary: Скачать документ по ID
       tags:
       - files
+  /api/pay:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: 'Тип подписки: monthly, halfyear, yearly'
+        in: query
+        name: plan
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "302":
+          description: Redirect to YooKassa
+          schema:
+            type: string
+        "400":
+          description: Некорректный запрос
+          schema:
+            type: string
+        "401":
+          description: Неавторизован
+          schema:
+            type: string
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Инициализировать оплату подписки
+      tags:
+      - Оплата
+  /api/payments/webhook:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Ошибка парсинга запроса
+          schema:
+            type: string
+        "500":
+          description: Ошибка обновления подписки
+          schema:
+            type: string
+      summary: Обработка webhook от YooKassa
+      tags:
+      - Оплата
   /api/profile:
     get:
       responses:
