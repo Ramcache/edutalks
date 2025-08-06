@@ -5,7 +5,7 @@ import (
 	"edutalks/internal/middleware"
 	"edutalks/internal/models"
 	"edutalks/internal/services"
-	helpers "edutalks/internal/utils/helpres"
+	helpers "edutalks/internal/utils/helpers"
 	"fmt"
 	"io"
 	"mime/multipart"

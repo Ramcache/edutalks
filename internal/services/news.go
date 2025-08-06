@@ -6,7 +6,7 @@ import (
 	"edutalks/internal/logger"
 	"edutalks/internal/models"
 	"edutalks/internal/repository"
-	helpers "edutalks/internal/utils/helpres"
+	helpers "edutalks/internal/utils/helpers"
 
 	"go.uber.org/zap"
 )

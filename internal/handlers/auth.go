@@ -8,7 +8,7 @@ import (
 	"edutalks/internal/models"
 	"edutalks/internal/services"
 	"edutalks/internal/utils"
-	helpers "edutalks/internal/utils/helpres"
+	helpers "edutalks/internal/utils/helpers"
 	"encoding/json"
 	"fmt"
 	"net/http"

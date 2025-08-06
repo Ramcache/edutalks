@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 
 	"edutalks/internal/logger"
@@ -41,24 +40,23 @@ type PaymentWebhook struct {
 // @Failure 500 {string} string "Ошибка обновления подписки"
 // @Router /api/payments/webhook [post]
 func (h *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		logger.Log.Error("Ошибка чтения тела webhook", zap.Error(err))
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-
 	var webhook PaymentWebhook
-	if err := json.Unmarshal(body, &webhook); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&webhook); err != nil {
 		logger.Log.Error("Ошибка парсинга webhook", zap.Error(err))
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
 
-	logger.Log.Info("Webhook получен", zap.String("event", webhook.Event), zap.Int("user_id", webhook.Object.Metadata.UserID))
+	userID := webhook.Object.Metadata.UserID
+	if userID == 0 {
+		logger.Log.Error("user_id отсутствует в webhook")
+		http.Error(w, "missing user_id", http.StatusBadRequest)
+		return
+	}
+
+	logger.Log.Info("Webhook получен", zap.String("event", webhook.Event), zap.Int("user_id", userID))
 
 	if webhook.Event == "payment.succeeded" && webhook.Object.Status == "succeeded" {
-		userID := webhook.Object.Metadata.UserID
 		if err := h.UserService.SetSubscriptionTrue(userID); err != nil {
 			logger.Log.Error("Не удалось обновить подписку", zap.Int("user_id", userID), zap.Error(err))
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -67,5 +65,7 @@ func (h *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		logger.Log.Info("Подписка активирована", zap.Int("user_id", userID))
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"ok"}`))
 }

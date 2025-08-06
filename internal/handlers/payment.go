@@ -3,7 +3,7 @@ package handlers
 import (
 	"edutalks/internal/middleware"
 	"edutalks/internal/services"
-	"edutalks/internal/utils/helpres"
+	"edutalks/internal/utils/helpers"
 	"net/http"
 )
 
