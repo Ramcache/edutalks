@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"edutalks/internal/logger"
 	"edutalks/internal/services"
@@ -25,7 +26,7 @@ type PaymentWebhook struct {
 		ID       string `json:"id"`
 		Status   string `json:"status"`
 		Metadata struct {
-			UserID int `json:"user_id"`
+			UserID string `json:"user_id"`
 		} `json:"metadata"`
 	} `json:"object"`
 }
@@ -47,10 +48,11 @@ func (h *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := webhook.Object.Metadata.UserID
-	if userID == 0 {
-		logger.Log.Error("user_id отсутствует в webhook")
-		http.Error(w, "missing user_id", http.StatusBadRequest)
+	userIDStr := webhook.Object.Metadata.UserID
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		logger.Log.Error("Некорректный user_id в webhook", zap.String("raw_user_id", userIDStr), zap.Error(err))
+		http.Error(w, "invalid user_id", http.StatusBadRequest)
 		return
 	}
 
