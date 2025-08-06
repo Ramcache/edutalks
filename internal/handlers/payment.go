@@ -1,10 +1,9 @@
 package handlers
 
 import (
-	"net/http"
-	"strconv"
-
+	"edutalks/internal/middleware"
 	"edutalks/internal/services"
+	"net/http"
 )
 
 type PaymentHandler struct {
@@ -19,18 +18,13 @@ func NewPaymentHandler(yoo *services.YooKassaService) *PaymentHandler {
 
 func (h *PaymentHandler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 	plan := r.URL.Query().Get("plan")
-	userIDStr := r.URL.Query().Get("user_id") // можно получать из токена, но сейчас берём из query
-
-	if plan == "" || userIDStr == "" {
-		http.Error(w, "missing plan or user_id", http.StatusBadRequest)
+	if plan == "" {
+		http.Error(w, "missing plan", http.StatusBadRequest)
 		return
 	}
 
-	userID, err := strconv.Atoi(userIDStr)
-	if err != nil {
-		http.Error(w, "invalid user_id", http.StatusBadRequest)
-		return
-	}
+	// ✅ userID теперь берём из JWT
+	userID := r.Context().Value(middleware.ContextUserID).(int)
 
 	var amount float64
 	var description string
@@ -56,6 +50,5 @@ func (h *PaymentHandler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Перенаправление пользователя на ЮKassa
 	http.Redirect(w, r, paymentURL, http.StatusFound)
 }
