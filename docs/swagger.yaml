@@ -117,6 +117,17 @@ definitions:
       username:
         type: string
     type: object
+  edutalks_internal_utils_helpres.Response:
+    properties:
+      data: {}
+      error:
+        type: string
+    type: object
+  internal_handlers.PaymentResult:
+    properties:
+      confirmation_url:
+        type: string
+    type: object
   internal_handlers.createNewsRequest:
     properties:
       color:
@@ -642,22 +653,27 @@ paths:
       produces:
       - application/json
       responses:
-        "302":
-          description: Redirect to YooKassa
+        "200":
+          description: OK
           schema:
-            type: string
+            allOf:
+            - $ref: '#/definitions/edutalks_internal_utils_helpres.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_handlers.PaymentResult'
+              type: object
         "400":
-          description: Некорректный запрос
+          description: Bad Request
           schema:
-            type: string
+            $ref: '#/definitions/edutalks_internal_utils_helpres.Response'
         "401":
-          description: Неавторизован
+          description: Unauthorized
           schema:
-            type: string
+            $ref: '#/definitions/edutalks_internal_utils_helpres.Response'
         "500":
-          description: Ошибка сервера
+          description: Internal Server Error
           schema:
-            type: string
+            $ref: '#/definitions/edutalks_internal_utils_helpres.Response'
       security:
       - ApiKeyAuth: []
       summary: Инициализировать оплату подписки
