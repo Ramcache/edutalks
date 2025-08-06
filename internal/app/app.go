@@ -31,6 +31,13 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	emailTokenService := services.NewEmailTokenService(emailTokenRepo, userRepo)
 	emaService := services.NewEmailService(cfg)
 
+	// ⬇️ Новый сервис ЮKassa
+	yookassaService := services.NewYooKassaService(
+		cfg.YooKassaShopID,
+		cfg.YooKassaSecret,
+		cfg.YooKassaReturnURL,
+	)
+
 	// Хендлеры
 	authHandler := handlers.NewAuthHandler(authService, emailService, emailTokenService)
 	docHandler := handlers.NewDocumentHandler(docService, authService)
@@ -38,13 +45,20 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	emailHandler := handlers.NewEmailHandler(emailTokenService)
 	searchHandler := handlers.NewSearchHandler(newsService, docService)
 
+	// ⬇️ Хендлер оплаты и вебхука
+	paymentHandler := handlers.NewPaymentHandler(yookassaService)
+	webhookHandler := handlers.NewWebhookHandler(authService)
+
+	// Запуск воркера email (как было)
 	for i := 0; i < 3; i++ {
 		go services.StartEmailWorker(emaService)
 	}
 
 	// Маршруты
 	router := mux.NewRouter()
-	routes.InitRoutes(router, authHandler, docHandler, newsHandler, emailHandler, searchHandler)
+	routes.InitRoutes(router, authHandler, docHandler, newsHandler, emailHandler, searchHandler, paymentHandler, webhookHandler)
+
+	// ⬇️ Регистрируем маршруты оплаты
 
 	return router, nil
 }
