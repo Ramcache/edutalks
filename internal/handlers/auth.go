@@ -580,7 +580,7 @@ func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		helpers.Error(w, http.StatusBadRequest, "Некорректный id пользователя")
 		return
 	}
-
+	//
 	logger.Log.Info("Запрос на удаление пользователя", zap.Int("user_id", id))
 
 	_, err = h.authService.GetUserByID(r.Context(), id)
