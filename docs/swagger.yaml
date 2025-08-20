@@ -252,6 +252,127 @@ info:
   contact: {}
   title: Edutalks API
 paths:
+  /api/admin/articles:
+    post:
+      consumes:
+      - application/json
+      description: Создаёт новую статью (как в Хабре/Вики). Поддерживает до 5 тегов.
+      parameters:
+      - description: Данные статьи
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/edutalks_internal_models.CreateArticleRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/edutalks_internal_models.Article'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Создать статью
+      tags:
+      - articles
+  /api/admin/articles/{id}:
+    delete:
+      parameters:
+      - description: ID статьи
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: no content
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Удалить статью
+      tags:
+      - articles
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID статьи
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Данные статьи
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/edutalks_internal_models.CreateArticleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/edutalks_internal_models.Article'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Обновить статью
+      tags:
+      - articles
+  /api/admin/articles/preview:
+    post:
+      consumes:
+      - application/json
+      description: Возвращает очищенный HTML (без сохранения в БД)
+      parameters:
+      - description: Сырый HTML статьи
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Предпросмотр статьи
+      tags:
+      - articles
   /api/admin/dashboard:
     get:
       responses:
@@ -597,6 +718,69 @@ paths:
       summary: Включение или отключение подписки у пользователя
       tags:
       - admin-users
+  /api/articles:
+    get:
+      parameters:
+      - default: 20
+        description: Количество
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Смещение
+        in: query
+        name: offset
+        type: integer
+      - description: Фильтр по тегу
+        in: query
+        name: tag
+        type: string
+      - description: Только опубликованные
+        in: query
+        name: published
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/edutalks_internal_models.Article'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить список статей
+      tags:
+      - articles
+  /api/articles/{id}:
+    get:
+      parameters:
+      - description: ID статьи
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/edutalks_internal_models.Article'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить статью по ID
+      tags:
+      - articles
   /api/email-subscription:
     patch:
       consumes:
@@ -761,68 +945,6 @@ paths:
       summary: Получить данные профиля
       tags:
       - profile
-  /api/v1/articles:
-    post:
-      consumes:
-      - application/json
-      description: Создаёт новую статью (как в Хабре/Вики). Поддерживает до 5 тегов.
-      parameters:
-      - description: Данные статьи
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/edutalks_internal_models.CreateArticleRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/edutalks_internal_models.Article'
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - BearerAuth: []
-      summary: Создать статью
-      tags:
-      - articles
-  /api/v1/articles/preview:
-    post:
-      consumes:
-      - application/json
-      description: Возвращает очищенный HTML (без сохранения в БД)
-      parameters:
-      - description: Сырый HTML статьи
-        in: body
-        name: body
-        required: true
-        schema:
-          additionalProperties:
-            type: string
-          type: object
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Предпросмотр статьи
-      tags:
-      - articles
   /documents/{id}/preview:
     get:
       description: Показывает название, описание и категорию документа. Файл не отдаётся.

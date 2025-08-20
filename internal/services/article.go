@@ -17,6 +17,10 @@ import (
 type ArticleService interface {
 	Create(ctx context.Context, authorID *int64, req models.CreateArticleRequest) (*models.Article, error)
 	PreviewHTML(rawHTML string) string
+	GetAll(ctx context.Context, limit, offset int, tag string, onlyPublished bool) ([]*models.Article, error)
+	GetByID(ctx context.Context, id int64) (*models.Article, error)
+	Update(ctx context.Context, id int64, req models.CreateArticleRequest) (*models.Article, error)
+	Delete(ctx context.Context, id int64) error
 }
 
 type articleService struct {
@@ -84,4 +88,33 @@ func normalizeTags(in []string) []string {
 		out = append(out, t)
 	}
 	return out
+}
+
+func (s *articleService) GetAll(ctx context.Context, limit, offset int, tag string, onlyPublished bool) ([]*models.Article, error) {
+	return s.repo.GetAll(ctx, limit, offset, tag, onlyPublished)
+}
+
+func (s *articleService) GetByID(ctx context.Context, id int64) (*models.Article, error) {
+	return s.repo.GetByID(ctx, id)
+}
+
+func (s *articleService) Update(ctx context.Context, id int64, req models.CreateArticleRequest) (*models.Article, error) {
+	a, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	a.Title = req.Title
+	a.Summary = strPtr(req.Summary)
+	a.BodyHTML = s.policy.Sanitize(req.BodyHTML)
+	a.Tags = normalizeTags(req.Tags)
+	a.IsPublished = req.Publish
+
+	if err := s.repo.Update(ctx, a); err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+func (s *articleService) Delete(ctx context.Context, id int64) error {
+	return s.repo.Delete(ctx, id)
 }
