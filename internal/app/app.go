@@ -22,6 +22,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	docRepo := repository.NewDocumentRepository(conn)
 	newsRepo := repository.NewNewsRepository(conn)
 	emailTokenRepo := repository.NewEmailTokenRepository(conn)
+	articleRepo := repository.NewArticleRepo(conn)
 
 	// Сервисы
 	authService := services.NewAuthService(userRepo)
@@ -30,6 +31,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	newsService := services.NewNewsService(newsRepo, userRepo, emailService, cfg)
 	emailTokenService := services.NewEmailTokenService(emailTokenRepo, userRepo)
 	emaService := services.NewEmailService(cfg)
+	articleSvc := services.NewArticleService(articleRepo)
 
 	// ⬇️ Новый сервис ЮKassa
 	yookassaService := services.NewYooKassaService(
@@ -37,13 +39,13 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 		cfg.YooKassaSecret,
 		cfg.YooKassaReturnURL,
 	)
-
 	// Хендлеры
 	authHandler := handlers.NewAuthHandler(authService, emailService, emailTokenService)
 	docHandler := handlers.NewDocumentHandler(docService, authService)
 	newsHandler := handlers.NewNewsHandler(newsService)
 	emailHandler := handlers.NewEmailHandler(emailTokenService)
 	searchHandler := handlers.NewSearchHandler(newsService, docService)
+	articleH := handlers.NewArticleHandler(articleSvc)
 
 	// ⬇️ Хендлер оплаты и вебхука
 	paymentHandler := handlers.NewPaymentHandler(yookassaService)
@@ -56,7 +58,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 
 	// Маршруты
 	router := mux.NewRouter()
-	routes.InitRoutes(router, authHandler, docHandler, newsHandler, emailHandler, searchHandler, paymentHandler, webhookHandler)
+	routes.InitRoutes(router, authHandler, docHandler, newsHandler, emailHandler, searchHandler, paymentHandler, webhookHandler, articleH)
 
 	// ⬇️ Регистрируем маршруты оплаты
 

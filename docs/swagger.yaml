@@ -1,4 +1,44 @@
 definitions:
+  edutalks_internal_models.Article:
+    properties:
+      authorId:
+        type: integer
+      bodyHtml:
+        type: string
+      createdAt:
+        type: string
+      id:
+        type: integer
+      isPublished:
+        type: boolean
+      publishedAt:
+        type: string
+      summary:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  edutalks_internal_models.CreateArticleRequest:
+    properties:
+      bodyHtml:
+        type: string
+      publish:
+        type: boolean
+      summary:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+    type: object
   edutalks_internal_models.Document:
     properties:
       category:
@@ -721,6 +761,68 @@ paths:
       summary: Получить данные профиля
       tags:
       - profile
+  /api/v1/articles:
+    post:
+      consumes:
+      - application/json
+      description: Создаёт новую статью (как в Хабре/Вики). Поддерживает до 5 тегов.
+      parameters:
+      - description: Данные статьи
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/edutalks_internal_models.CreateArticleRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/edutalks_internal_models.Article'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Создать статью
+      tags:
+      - articles
+  /api/v1/articles/preview:
+    post:
+      consumes:
+      - application/json
+      description: Возвращает очищенный HTML (без сохранения в БД)
+      parameters:
+      - description: Сырый HTML статьи
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Предпросмотр статьи
+      tags:
+      - articles
   /documents/{id}/preview:
     get:
       description: Показывает название, описание и категорию документа. Файл не отдаётся.

@@ -3,6 +3,7 @@ package routes
 import (
 	"edutalks/internal/handlers"
 	"edutalks/internal/middleware"
+	"net/http"
 
 	"github.com/gorilla/mux"
 )
@@ -16,6 +17,7 @@ func InitRoutes(
 	searchHandler *handlers.SearchHandler,
 	paymentHandler *handlers.PaymentHandler,
 	webhookHandler *handlers.WebhookHandler,
+	articleH *handlers.ArticleHandler,
 ) {
 	router.Use(middleware.Logging)
 
@@ -35,9 +37,12 @@ func InitRoutes(
 	api.HandleFunc("/verify-email", emailHandler.VerifyEmail).Methods("GET")
 	api.HandleFunc("/resend-verification", authHandler.ResendVerificationEmail).Methods("POST")
 	api.HandleFunc("/documents/{id:[0-9]+}/preview", documentHandler.PreviewDocument).Methods("GET")
-	api.HandleFunc("/documents/preview", documentHandler.PreviewAllDocuments).Methods("GET")
+	api.HandleFunc("/documents/preview", documentHandler.PreviewDocuments).Methods("GET")
 
 	api.HandleFunc("/search", searchHandler.GlobalSearch).Methods("GET")
+
+	api.HandleFunc("/articles/preview", articleH.Preview).Methods(http.MethodPost)
+	api.HandleFunc("/articles", articleH.Create).Methods(http.MethodPost)
 
 	// --- Защищённые JWT ---
 	protected := api.PathPrefix("").Subrouter()
