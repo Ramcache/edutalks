@@ -307,3 +307,36 @@ func (h *DocumentHandler) PreviewDocument(w http.ResponseWriter, r *http.Request
 
 	helpers.JSON(w, http.StatusOK, resp)
 }
+
+// PreviewAllDocuments godoc
+// @Summary Превью всех публичных документов (только метаданные)
+// @Description Возвращает список документов с названием, описанием и категорией. Файлы не отдаются.
+// @Tags public-documents
+// @Produce json
+// @Success 200 {array} models.DocumentPreviewResponse
+// @Failure 500 {string} string "Ошибка сервера"
+// @Router /documents/preview [get]
+func (h *DocumentHandler) PreviewAllDocuments(w http.ResponseWriter, r *http.Request) {
+	docs, err := h.service.GetAllDocuments(r.Context())
+	if err != nil {
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка получения документов")
+		return
+	}
+
+	var previews []models.DocumentPreviewResponse
+	for _, doc := range docs {
+		if !doc.IsPublic {
+			continue // пропускаем приватные документы
+		}
+		previews = append(previews, models.DocumentPreviewResponse{
+			ID:          doc.ID,
+			Title:       doc.Filename,
+			Description: doc.Description,
+			Category:    doc.Category,
+			UploadedAt:  doc.UploadedAt.Format("2006-01-02"),
+			Message:     "Документ доступен только по подписке",
+		})
+	}
+
+	helpers.JSON(w, http.StatusOK, previews)
+}
