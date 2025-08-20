@@ -750,22 +750,33 @@ paths:
       - public-documents
   /documents/preview:
     get:
-      description: Возвращает список документов с названием, описанием и категорией.
-        Файлы не отдаются.
+      description: Возвращает список превью документов c пагинацией и фильтром категории.
+      parameters:
+      - description: Номер страницы (>=1)
+        in: query
+        name: page
+        type: integer
+      - description: Размер страницы (1..100)
+        in: query
+        name: page_size
+        type: integer
+      - description: Категория (например, 'приказ', 'шаблон')
+        in: query
+        name: category
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/edutalks_internal_models.DocumentPreviewResponse'
-            type: array
+            additionalProperties: true
+            type: object
         "500":
           description: Ошибка сервера
           schema:
             type: string
-      summary: Превью всех публичных документов (только метаданные)
+      summary: Превью публичных документов (список, метаданные)
       tags:
       - public-documents
   /login:
