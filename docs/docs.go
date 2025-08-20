@@ -838,24 +838,139 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/articles": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Создаёт новую статью (как в Хабре/Вики). Поддерживает до 5 тегов.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "articles"
+                ],
+                "summary": "Создать статью",
+                "parameters": [
+                    {
+                        "description": "Данные статьи",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/edutalks_internal_models.CreateArticleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/edutalks_internal_models.Article"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/articles/preview": {
+            "post": {
+                "description": "Возвращает очищенный HTML (без сохранения в БД)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "articles"
+                ],
+                "summary": "Предпросмотр статьи",
+                "parameters": [
+                    {
+                        "description": "Сырый HTML статьи",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/documents/preview": {
             "get": {
-                "description": "Возвращает список документов с названием, описанием и категорией. Файлы не отдаются.",
+                "description": "Возвращает список превью документов c пагинацией и фильтром категории.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "public-documents"
                 ],
-                "summary": "Превью всех публичных документов (только метаданные)",
+                "summary": "Превью публичных документов (список, метаданные)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Номер страницы (\u003e=1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Размер страницы (1..100)",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Категория (например, 'приказ', 'шаблон')",
+                        "name": "category",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/edutalks_internal_models.DocumentPreviewResponse"
-                            }
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "500": {
@@ -1263,6 +1378,67 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "edutalks_internal_models.Article": {
+            "type": "object",
+            "properties": {
+                "authorId": {
+                    "type": "integer"
+                },
+                "bodyHtml": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "isPublished": {
+                    "type": "boolean"
+                },
+                "publishedAt": {
+                    "type": "string"
+                },
+                "summary": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "edutalks_internal_models.CreateArticleRequest": {
+            "type": "object",
+            "properties": {
+                "bodyHtml": {
+                    "type": "string"
+                },
+                "publish": {
+                    "type": "boolean"
+                },
+                "summary": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
         "edutalks_internal_models.Document": {
             "type": "object",
             "properties": {

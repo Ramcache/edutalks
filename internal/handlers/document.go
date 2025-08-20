@@ -308,35 +308,60 @@ func (h *DocumentHandler) PreviewDocument(w http.ResponseWriter, r *http.Request
 	helpers.JSON(w, http.StatusOK, resp)
 }
 
-// PreviewAllDocuments godoc
-// @Summary Превью всех публичных документов (только метаданные)
-// @Description Возвращает список документов с названием, описанием и категорией. Файлы не отдаются.
+// PreviewDocuments godoc
+// @Summary Превью публичных документов (список, метаданные)
+// @Description Возвращает список превью документов c пагинацией и фильтром категории.
 // @Tags public-documents
 // @Produce json
-// @Success 200 {array} models.DocumentPreviewResponse
+// @Param page query int false "Номер страницы (>=1)"
+// @Param page_size query int false "Размер страницы (1..100)"
+// @Param category query string false "Категория (например, 'приказ', 'шаблон')"
+// @Success 200 {object} map[string]interface{}
 // @Failure 500 {string} string "Ошибка сервера"
 // @Router /documents/preview [get]
-func (h *DocumentHandler) PreviewAllDocuments(w http.ResponseWriter, r *http.Request) {
-	docs, err := h.service.GetAllDocuments(r.Context())
+func (h *DocumentHandler) PreviewDocuments(w http.ResponseWriter, r *http.Request) {
+	// пагинация
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
+
+	// фильтр по категории
+	category := r.URL.Query().Get("category")
+
+	// берём из сервиса только публичные документы
+	docs, total, err := h.service.GetPublicDocumentsPaginated(r.Context(), pageSize, offset, category)
 	if err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка получения документов")
 		return
 	}
 
-	var previews []models.DocumentPreviewResponse
-	for _, doc := range docs {
-		if !doc.IsPublic {
-			continue // пропускаем приватные документы
+	// собираем превью (метаданные)
+	previews := make([]models.DocumentPreviewResponse, 0, len(docs))
+	for _, d := range docs {
+		if !d.IsPublic {
+			continue
 		}
 		previews = append(previews, models.DocumentPreviewResponse{
-			ID:          doc.ID,
-			Title:       doc.Filename,
-			Description: doc.Description,
-			Category:    doc.Category,
-			UploadedAt:  doc.UploadedAt.Format("2006-01-02"),
+			ID:          d.ID,
+			Title:       d.Filename,
+			Description: d.Description,
+			Category:    d.Category,
+			UploadedAt:  d.UploadedAt.Format("2006-01-02"),
 			Message:     "Документ доступен только по подписке",
 		})
 	}
 
-	helpers.JSON(w, http.StatusOK, previews)
+	helpers.JSON(w, http.StatusOK, map[string]interface{}{
+		"data":      previews,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+		"category":  category,
+	})
 }

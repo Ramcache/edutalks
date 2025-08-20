@@ -19,15 +19,18 @@ require (
 require (
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
+	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.20.0 // indirect
 	github.com/go-openapi/spec v0.20.6 // indirect
 	github.com/go-openapi/swag v0.19.15 // indirect
+	github.com/gorilla/css v1.0.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
+	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/swaggo/files v1.0.1 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
