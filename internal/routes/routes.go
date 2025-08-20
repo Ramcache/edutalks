@@ -3,8 +3,6 @@ package routes
 import (
 	"edutalks/internal/handlers"
 	"edutalks/internal/middleware"
-	"net/http"
-
 	"github.com/gorilla/mux"
 )
 
@@ -40,9 +38,9 @@ func InitRoutes(
 	api.HandleFunc("/documents/preview", documentHandler.PreviewDocuments).Methods("GET")
 
 	api.HandleFunc("/search", searchHandler.GlobalSearch).Methods("GET")
+	api.HandleFunc("/articles/{id:[0-9]+}", articleH.GetByID).Methods("GET")
 
-	api.HandleFunc("/articles/preview", articleH.Preview).Methods(http.MethodPost)
-	api.HandleFunc("/articles", articleH.Create).Methods(http.MethodPost)
+	api.HandleFunc("/articles", articleH.GetAll).Methods("GET")
 
 	// --- Защищённые JWT ---
 	protected := api.PathPrefix("").Subrouter()
@@ -72,4 +70,8 @@ func InitRoutes(
 	admin.HandleFunc("/news/{id:[0-9]+}", newsHandler.DeleteNews).Methods("DELETE")
 	admin.HandleFunc("/notify", authHandler.NotifySubscribers).Methods("POST")
 	admin.HandleFunc("/users/{id}", authHandler.DeleteUser).Methods("DELETE")
+	admin.HandleFunc("/articles/preview", articleH.Preview).Methods("POST")
+	admin.HandleFunc("/articles", articleH.Create).Methods("POST")
+	admin.HandleFunc("/articles/{id:[0-9]+}", articleH.Update).Methods("PATCH")
+	admin.HandleFunc("/articles/{id:[0-9]+}", articleH.Delete).Methods("DELETE")
 }
