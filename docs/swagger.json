@@ -828,6 +828,35 @@
                 }
             }
         },
+        "/documents/preview": {
+            "get": {
+                "description": "Возвращает список документов с названием, описанием и категорией. Файлы не отдаются.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "public-documents"
+                ],
+                "summary": "Превью всех публичных документов (только метаданные)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/edutalks_internal_models.DocumentPreviewResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Ошибка сервера",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/documents/{id}/preview": {
             "get": {
                 "description": "Показывает название, описание и категорию документа. Файл не отдаётся.",

@@ -35,6 +35,7 @@ func InitRoutes(
 	api.HandleFunc("/verify-email", emailHandler.VerifyEmail).Methods("GET")
 	api.HandleFunc("/resend-verification", authHandler.ResendVerificationEmail).Methods("POST")
 	api.HandleFunc("/documents/{id:[0-9]+}/preview", documentHandler.PreviewDocument).Methods("GET")
+	api.HandleFunc("/documents/preview", documentHandler.PreviewAllDocuments).Methods("GET")
 
 	api.HandleFunc("/search", searchHandler.GlobalSearch).Methods("GET")
 

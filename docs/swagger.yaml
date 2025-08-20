@@ -748,6 +748,26 @@ paths:
       summary: Превью публичного документа (только метаданные)
       tags:
       - public-documents
+  /documents/preview:
+    get:
+      description: Возвращает список документов с названием, описанием и категорией.
+        Файлы не отдаются.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/edutalks_internal_models.DocumentPreviewResponse'
+            type: array
+        "500":
+          description: Ошибка сервера
+          schema:
+            type: string
+      summary: Превью всех публичных документов (только метаданные)
+      tags:
+      - public-documents
   /login:
     post:
       consumes:
