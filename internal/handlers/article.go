@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"edutalks/internal/logger"
 	"edutalks/internal/models"
@@ -51,9 +53,11 @@ func (h *ArticleHandler) Preview(w http.ResponseWriter, r *http.Request) {
 
 // Create
 // @Summary      Создать статью
-// @Description  Создаёт новую статью (как в Хабре/Вики). Поддерживает до 5 тегов.
+// @Description  Поддерживает JSON и form-data. Поле публикации: `publish` (также принимается `isPublished`).
 // @Tags         articles
 // @Accept       json
+// @Accept       mpfd
+// @Accept       x-www-form-urlencoded
 // @Produce      json
 // @Param        body  body   models.CreateArticleRequest  true  "Данные статьи"
 // @Success      201   {object}  models.Article
@@ -61,14 +65,14 @@ func (h *ArticleHandler) Preview(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Router       /api/admin/articles [post]
 func (h *ArticleHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateArticleRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.Log.Error("ошибка декодирования JSON при создании статьи", zap.Error(err))
-		helpers.Error(w, http.StatusBadRequest, "invalid json")
+	req, err := readCreateArticleRequest(r)
+	if err != nil {
+		logger.Log.Error("ошибка чтения тела при создании статьи", zap.Error(err))
+		helpers.Error(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
 
-	authorID := authorIDFromCtx(r.Context()) // берём user_id из JWT (если есть)
+	authorID := authorIDFromCtx(r.Context())
 	article, err := h.svc.Create(r.Context(), authorID, req)
 	if err != nil {
 		logger.Log.Error("ошибка создания статьи", zap.Error(err))
@@ -133,8 +137,11 @@ func (h *ArticleHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 // Update
 // @Summary      Обновить статью
+// @Description  Поддерживает JSON и form-data. Поле публикации: `publish` (также принимается `isPublished`).
 // @Tags         articles
 // @Accept       json
+// @Accept       mpfd
+// @Accept       x-www-form-urlencoded
 // @Produce      json
 // @Param        id   path int true "ID статьи"
 // @Param        body body models.CreateArticleRequest true "Данные статьи"
@@ -146,10 +153,10 @@ func (h *ArticleHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	aid, _ := strconv.ParseInt(id, 10, 64)
 
-	var req models.CreateArticleRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.Log.Error("ошибка JSON при обновлении статьи", zap.Error(err))
-		helpers.Error(w, http.StatusBadRequest, "invalid json")
+	req, err := readCreateArticleRequest(r)
+	if err != nil {
+		logger.Log.Error("ошибка чтения тела при обновлении статьи", zap.Error(err))
+		helpers.Error(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
 
@@ -211,4 +218,77 @@ func parseIntQuery(r *http.Request, key string, def int) int {
 		return n
 	}
 	return def
+}
+
+// readCreateArticleRequest читает JSON или form-data и принимает оба поля publish/isPublished.
+func readCreateArticleRequest(r *http.Request) (models.CreateArticleRequest, error) {
+	ct := r.Header.Get("Content-Type")
+	var req models.CreateArticleRequest
+
+	switch {
+	case ct == "" || strings.HasPrefix(ct, "application/json"):
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			return req, fmt.Errorf("invalid json: %w", err)
+		}
+
+	case strings.HasPrefix(ct, "multipart/form-data"):
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			return req, fmt.Errorf("invalid multipart: %w", err)
+		}
+		fillFromForm(&req, r)
+
+	case strings.HasPrefix(ct, "application/x-www-form-urlencoded"):
+		if err := r.ParseForm(); err != nil {
+			return req, fmt.Errorf("invalid form: %w", err)
+		}
+		fillFromForm(&req, r)
+
+	default:
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			return req, fmt.Errorf("unsupported content-type: %s", ct)
+		}
+	}
+
+	// Алиас: если фронт прислал isPublished, используем его.
+	if req.IsPublished != nil {
+		req.Publish = *req.IsPublished
+	}
+	return req, nil
+}
+
+func fillFromForm(req *models.CreateArticleRequest, r *http.Request) {
+	req.Title = r.FormValue("title")
+	req.Summary = r.FormValue("summary")
+	req.BodyHTML = r.FormValue("bodyHtml")
+
+	// Теги: tags[]=a&tags[]=b ИЛИ tags="a,b"
+	tags := r.Form["tags[]"]
+	if len(tags) == 0 {
+		if raw := r.FormValue("tags"); raw != "" {
+			for _, t := range strings.Split(raw, ",") {
+				t = strings.TrimSpace(t)
+				if t != "" {
+					tags = append(tags, t)
+				}
+			}
+		}
+	}
+	req.Tags = tags
+
+	// publish / isPublished
+	pub := firstNonEmpty(
+		r.FormValue("publish"),
+		r.FormValue("isPublished"),
+	)
+	pub = strings.ToLower(strings.TrimSpace(pub))
+	req.Publish = pub == "true" || pub == "1" || pub == "on"
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
 }

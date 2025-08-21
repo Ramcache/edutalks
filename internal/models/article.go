@@ -15,10 +15,12 @@ type Article struct {
 	UpdatedAt   time.Time  `db:"updated_at"   json:"updatedAt"`
 }
 
+// swagger:model CreateArticleRequest
 type CreateArticleRequest struct {
-	Title    string   `json:"title"`
-	Summary  string   `json:"summary"`
-	BodyHTML string   `json:"bodyHtml"`
-	Tags     []string `json:"tags"`
-	Publish  bool     `json:"publish"`
+	Title       string   `json:"title"    example:"Как писать middleware в Go"`
+	Summary     string   `json:"summary"  example:"Короткое описание для превью"`
+	BodyHTML    string   `json:"bodyHtml" example:"<p>Контент</p>"`
+	Tags        []string `json:"tags"     example:"go,backend,markdown"`
+	Publish     bool     `json:"publish"`               // основной вариант
+	IsPublished *bool    `json:"isPublished,omitempty"` // алиас: если пришёл, перепишем Publish
 }
