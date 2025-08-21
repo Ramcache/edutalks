@@ -22,9 +22,11 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Создаёт новую статью (как в Хабре/Вики). Поддерживает до 5 тегов.",
+                "description": "Поддерживает JSON и form-data. Поле публикации: ` + "`" + `publish` + "`" + ` (также принимается ` + "`" + `isPublished` + "`" + `).",
                 "consumes": [
-                    "application/json"
+                    "application/json",
+                    "multipart/form-data",
+                    "application/x-www-form-urlencoded"
                 ],
                 "produces": [
                     "application/json"
@@ -159,8 +161,11 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Поддерживает JSON и form-data. Поле публикации: ` + "`" + `publish` + "`" + ` (также принимается ` + "`" + `isPublished` + "`" + `).",
                 "consumes": [
-                    "application/json"
+                    "application/json",
+                    "multipart/form-data",
+                    "application/x-www-form-urlencoded"
                 ],
                 "produces": [
                     "application/json"
@@ -1610,22 +1615,35 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "bodyHtml": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "\u003cp\u003eКонтент\u003c/p\u003e"
+                },
+                "isPublished": {
+                    "description": "алиас: если пришёл, перепишем Publish",
+                    "type": "boolean"
                 },
                 "publish": {
+                    "description": "основной вариант",
                     "type": "boolean"
                 },
                 "summary": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Короткое описание для превью"
                 },
                 "tags": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
+                    },
+                    "example": [
+                        "go",
+                        "backend",
+                        "markdown"
+                    ]
                 },
                 "title": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Как писать middleware в Go"
                 }
             }
         },

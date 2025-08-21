@@ -27,16 +27,27 @@ definitions:
   edutalks_internal_models.CreateArticleRequest:
     properties:
       bodyHtml:
+        example: <p>Контент</p>
         type: string
+      isPublished:
+        description: 'алиас: если пришёл, перепишем Publish'
+        type: boolean
       publish:
+        description: основной вариант
         type: boolean
       summary:
+        example: Короткое описание для превью
         type: string
       tags:
+        example:
+        - go
+        - backend
+        - markdown
         items:
           type: string
         type: array
       title:
+        example: Как писать middleware в Go
         type: string
     type: object
   edutalks_internal_models.Document:
@@ -256,7 +267,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Создаёт новую статью (как в Хабре/Вики). Поддерживает до 5 тегов.
+      - multipart/form-data
+      - application/x-www-form-urlencoded
+      description: 'Поддерживает JSON и form-data. Поле публикации: `publish` (также
+        принимается `isPublished`).'
       parameters:
       - description: Данные статьи
         in: body
@@ -311,6 +325,10 @@ paths:
     patch:
       consumes:
       - application/json
+      - multipart/form-data
+      - application/x-www-form-urlencoded
+      description: 'Поддерживает JSON и form-data. Поле публикации: `publish` (также
+        принимается `isPublished`).'
       parameters:
       - description: ID статьи
         in: path
