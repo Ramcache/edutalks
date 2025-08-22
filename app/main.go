@@ -41,6 +41,7 @@ func main() {
 		AllowCredentials: true,
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Authorization", "Content-Type", "Accept", "X-Requested-With"},
+		Debug:            true,
 	})
 
 	router.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
