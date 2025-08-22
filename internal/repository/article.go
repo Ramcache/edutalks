@@ -17,6 +17,8 @@ type ArticleRepo interface {
 	GetByID(ctx context.Context, id int64) (*models.Article, error)
 	Update(ctx context.Context, a *models.Article) error
 	Delete(ctx context.Context, id int64) error
+	Exists(ctx context.Context, id int64) (bool, error)
+	UpdatePublish(ctx context.Context, id int64, publish bool) error
 }
 
 type articleRepo struct{ db *pgxpool.Pool }
@@ -28,36 +30,35 @@ func (r *articleRepo) Create(ctx context.Context, a *models.Article) (*models.Ar
 
 	const q = `
 		INSERT INTO articles (author_id, title, summary, body_html, tags, is_published, published_at)
-		VALUES ($1,$2,$3,$4,$5::jsonb,$6, CASE WHEN $6 THEN now() ELSE NULL END)
-		RETURNING id, author_id, title, summary, body_html, is_published, published_at, created_at, updated_at
+		VALUES ($1,$2,$3,$4,$5::jsonb,$6, CASE WHEN $6 THEN NOW() ELSE NULL END)
+		RETURNING id, author_id, title, summary, body_html, is_published, published_at, created_at, updated_at, tags
 	`
 
 	var out models.Article
-	err := r.db.
-		QueryRow(ctx, q,
-			a.AuthorID,    // *int64 (nullable)
-			a.Title,       // string
-			a.Summary,     // *string (nullable)
-			a.BodyHTML,    // string
-			tagsJSON,      // []byte -> jsonb
-			a.IsPublished, // bool
-		).
-		Scan(
-			&out.ID,
-			&out.AuthorID, // *int64
-			&out.Title,
-			&out.Summary, // *string
-			&out.BodyHTML,
-			&out.IsPublished,
-			&out.PublishedAt, // *time.Time
-			&out.CreatedAt,
-			&out.UpdatedAt,
-		)
+	var tagsRaw []byte
+	err := r.db.QueryRow(ctx, q,
+		a.AuthorID,    // *int64 (nullable)
+		a.Title,       // string
+		a.Summary,     // *string (nullable)
+		a.BodyHTML,    // string
+		tagsJSON,      // jsonb
+		a.IsPublished, // bool
+	).Scan(
+		&out.ID,
+		&out.AuthorID,
+		&out.Title,
+		&out.Summary,
+		&out.BodyHTML,
+		&out.IsPublished,
+		&out.PublishedAt,
+		&out.CreatedAt,
+		&out.UpdatedAt,
+		&tagsRaw,
+	)
 	if err != nil {
 		return nil, err
 	}
-
-	out.Tags = a.Tags
+	_ = json.Unmarshal(tagsRaw, &out.Tags)
 	return &out, nil
 }
 
@@ -76,7 +77,15 @@ func (r *articleRepo) GetAll(ctx context.Context, limit, offset int, tag string,
 		i++
 	}
 	if tag != "" {
-		where = append(where, fmt.Sprintf("$%d = ANY (tags::text[])", i))
+		// tags — jsonb-массив строк: ["a","b"]
+		// проверяем наличие значения через jsonb_array_elements_text
+		where = append(where, fmt.Sprintf(`
+			EXISTS (
+				SELECT 1
+				FROM jsonb_array_elements_text(tags) AS t(val)
+				WHERE t.val = $%d
+			)
+		`, i))
 		args = append(args, tag)
 		i++
 	}
@@ -131,8 +140,13 @@ func (r *articleRepo) Update(ctx context.Context, a *models.Article) error {
 	tagsJSON, _ := json.Marshal(a.Tags)
 	const q = `
 		UPDATE articles
-		SET title=$1, summary=$2, body_html=$3, tags=$4::jsonb, is_published=$5, 
-		    published_at=CASE WHEN $5 THEN now() ELSE published_at END, updated_at=now()
+		SET title=$1,
+		    summary=$2,
+		    body_html=$3,
+		    tags=$4::jsonb,
+		    is_published=$5,
+		    published_at = CASE WHEN $5 THEN COALESCE(published_at, NOW()) ELSE NULL END,
+		    updated_at=NOW()
 		WHERE id=$6
 	`
 	_, err := r.db.Exec(ctx, q, a.Title, a.Summary, a.BodyHTML, tagsJSON, a.IsPublished, a.ID)
@@ -141,5 +155,26 @@ func (r *articleRepo) Update(ctx context.Context, a *models.Article) error {
 
 func (r *articleRepo) Delete(ctx context.Context, id int64) error {
 	_, err := r.db.Exec(ctx, "DELETE FROM articles WHERE id=$1", id)
+	return err
+}
+
+func (r *articleRepo) Exists(ctx context.Context, id int64) (bool, error) {
+	const q = `SELECT EXISTS(SELECT 1 FROM articles WHERE id = $1)`
+	var ok bool
+	if err := r.db.QueryRow(ctx, q, id).Scan(&ok); err != nil {
+		return false, err
+	}
+	return ok, nil
+}
+
+func (r *articleRepo) UpdatePublish(ctx context.Context, id int64, publish bool) error {
+	const q = `
+		UPDATE articles
+		SET is_published = $2,
+		    published_at = CASE WHEN $2 THEN COALESCE(published_at, NOW()) ELSE NULL END,
+		    updated_at = NOW()
+		WHERE id = $1
+	`
+	_, err := r.db.Exec(ctx, q, id, publish)
 	return err
 }

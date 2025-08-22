@@ -4,6 +4,7 @@ import (
 	"edutalks/internal/handlers"
 	"edutalks/internal/middleware"
 	"github.com/gorilla/mux"
+	"net/http"
 )
 
 func InitRoutes(
@@ -74,4 +75,6 @@ func InitRoutes(
 	admin.HandleFunc("/articles", articleH.Create).Methods("POST")
 	admin.HandleFunc("/articles/{id:[0-9]+}", articleH.Update).Methods("PATCH")
 	admin.HandleFunc("/articles/{id:[0-9]+}", articleH.Delete).Methods("DELETE")
+	admin.HandleFunc("/articles/{id:[0-9]+}/publish", articleH.SetPublish).Methods(http.MethodPatch, http.MethodOptions)
+
 }
