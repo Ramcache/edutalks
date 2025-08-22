@@ -4,6 +4,7 @@ import (
 	"context"
 	"edutalks/internal/logger"
 	"errors"
+	"fmt"
 	"strings"
 	"unicode/utf8"
 
@@ -21,6 +22,7 @@ type ArticleService interface {
 	GetByID(ctx context.Context, id int64) (*models.Article, error)
 	Update(ctx context.Context, id int64, req models.CreateArticleRequest) (*models.Article, error)
 	Delete(ctx context.Context, id int64) error
+	SetPublish(ctx context.Context, id int64, publish bool) (*models.Article, error)
 }
 
 type articleService struct {
@@ -117,4 +119,18 @@ func (s *articleService) Update(ctx context.Context, id int64, req models.Create
 
 func (s *articleService) Delete(ctx context.Context, id int64) error {
 	return s.repo.Delete(ctx, id)
+}
+
+func (s *articleService) SetPublish(ctx context.Context, id int64, publish bool) (*models.Article, error) {
+	exists, err := s.repo.Exists(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("check exists: %w", err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("not found")
+	}
+	if err := s.repo.UpdatePublish(ctx, id, publish); err != nil {
+		return nil, fmt.Errorf("update publish: %w", err)
+	}
+	return s.repo.GetByID(ctx, id)
 }

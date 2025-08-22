@@ -179,6 +179,12 @@ definitions:
       confirmation_url:
         type: string
     type: object
+  internal_handlers.SetPublishBody:
+    properties:
+      publish:
+        example: true
+        type: boolean
+    type: object
   internal_handlers.createNewsRequest:
     properties:
       color:
@@ -357,6 +363,47 @@ paths:
       security:
       - BearerAuth: []
       summary: Обновить статью
+      tags:
+      - articles
+  /api/admin/articles/{id}/publish:
+    patch:
+      consumes:
+      - application/json
+      description: 'Лёгкий PATCH: принимает только флаг публикации.'
+      parameters:
+      - description: ID статьи
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Флаг публикации
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.SetPublishBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/edutalks_internal_models.Article'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Установить публикацию статьи
       tags:
       - articles
   /api/admin/articles/preview:

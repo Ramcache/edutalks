@@ -292,3 +292,45 @@ func firstNonEmpty(vals ...string) string {
 	}
 	return ""
 }
+
+// SetPublish
+// @Summary      Установить публикацию статьи
+// @Description  Лёгкий PATCH: принимает только флаг публикации.
+// @Tags         articles
+// @Accept       json
+// @Produce      json
+// @Param        id    path   int             true  "ID статьи"
+// @Param        body  body   SetPublishBody  true  "Флаг публикации"
+// @Success      200   {object}  models.Article
+// @Failure      400   {object}  map[string]string
+// @Failure      404   {object}  map[string]string
+// @Security     BearerAuth
+// @Router       /api/admin/articles/{id}/publish [patch]
+func (h *ArticleHandler) SetPublish(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	aid, err := strconv.ParseInt(vars["id"], 10, 64)
+	if err != nil || aid <= 0 {
+		helpers.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	var body SetPublishBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Publish == nil {
+		helpers.Error(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+
+	article, err := h.svc.SetPublish(r.Context(), aid, *body.Publish)
+	if err != nil {
+		logger.Log.Error("ошибка выставления публикации", zap.Int64("id", aid), zap.Error(err))
+		helpers.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	helpers.JSON(w, http.StatusOK, article)
+}
+
+// SetPublishBody — модель тела запроса для Swagger
+type SetPublishBody struct {
+	Publish *bool `json:"publish" example:"true"`
+}
