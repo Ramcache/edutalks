@@ -8,8 +8,10 @@ import (
 	helpers "edutalks/internal/utils/helpers"
 	"fmt"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -189,32 +191,55 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// --- доступ как у тебя сейчас ---
 	if !user.HasSubscription {
 		logger.Log.Warn("Попытка доступа к файлу без подписки", zap.Int("user_id", userID), zap.Int("doc_id", id))
 		helpers.Error(w, http.StatusForbidden, "Нет доступа — купите подписку")
 		return
 	}
-
 	if !doc.IsPublic {
 		logger.Log.Warn("Попытка доступа к закрытому документу", zap.Int("user_id", userID), zap.Int("doc_id", id))
 		helpers.Error(w, http.StatusForbidden, "Этот документ закрыт")
 		return
 	}
+	// ---------------------------------
 
-	fileBytes, err := os.ReadFile(doc.Filepath)
+	// Открываем файл и определяем корректный Content-Type
+	f, err := os.Open(doc.Filepath)
 	if err != nil {
 		logger.Log.Error("Файл не найден на диске", zap.String("filepath", doc.Filepath), zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Файл не найден")
 		return
 	}
+	defer f.Close()
+
+	// 1) по расширению
+	ctype := mime.TypeByExtension(strings.ToLower(filepath.Ext(doc.Filename)))
+	if ctype == "" {
+		// 2) по содержимому (первые 512 байт)
+		buf := make([]byte, 512)
+		n, _ := f.Read(buf)
+		ctype = http.DetectContentType(buf[:n])
+		_, _ = f.Seek(0, io.SeekStart)
+	}
+	if ctype == "" {
+		ctype = "application/octet-stream"
+	}
+
+	// Безопасное имя файла (UTF-8, пробелы/кириллица ок)
+	encoded := url.PathEscape(doc.Filename)
+	w.Header().Set("Content-Type", ctype)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename*=UTF-8''%s", encoded))
+
+	// (необязательно) длина файла
+	if fi, err := f.Stat(); err == nil {
+		w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
+	}
+
+	// Эффективная отдача с поддержкой Range/кэша
+	http.ServeContent(w, r, doc.Filename, doc.UploadedAt, f)
 
 	logger.Log.Info("Документ успешно скачан", zap.String("filename", doc.Filename), zap.Int("user_id", userID))
-	w.Header().Set("Content-Disposition", "attachment; filename="+doc.Filename)
-	w.Header().Set("Content-Type", "application/octet-stream")
-	_, err = w.Write(fileBytes)
-	if err != nil {
-		return
-	}
 }
 
 // DeleteDocument godoc
