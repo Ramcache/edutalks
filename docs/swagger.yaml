@@ -602,6 +602,42 @@ paths:
       summary: Обновить новость (только admin)
       tags:
       - admin-news
+  /api/admin/news/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Файл изображения (jpeg/png/webp/gif)
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: 'url: публичная ссылка'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "413":
+          description: Request Entity Too Large
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Загрузка изображения для новости
+      tags:
+      - news
   /api/admin/notify:
     post:
       consumes:
