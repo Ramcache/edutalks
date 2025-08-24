@@ -56,9 +56,8 @@ func (h *EmailHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	helpers.JSON(w, http.StatusOK, map[string]string{
-		"message": "Email успешно подтверждён",
-	})
+	http.Redirect(w, r, "https://edutalks.ru/verify-email?status=success", http.StatusFound)
+
 }
 
 // ResendVerificationEmail godoc
