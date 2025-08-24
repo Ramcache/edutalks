@@ -1,13 +1,20 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"edutalks/internal/logger"
 	"edutalks/internal/models"
 	"edutalks/internal/services"
 	helpers "edutalks/internal/utils/helpers"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -180,4 +187,131 @@ func (h *NewsHandler) DeleteNews(w http.ResponseWriter, r *http.Request) {
 
 	logger.Log.Info("Новость успешно удалена", zap.Int("news_id", id))
 	helpers.JSON(w, http.StatusOK, "Удалено")
+}
+
+func uploadsRoot() string {
+	if v := os.Getenv("UPLOADS_DIR"); strings.TrimSpace(v) != "" {
+		return v // например: /edu-talks/uploads
+	}
+	return "/edu-talks/uploads"
+}
+
+// helper для мапы allowed
+func allowed(ct string) (string, bool) {
+	switch ct {
+	case "image/jpeg":
+		return ".jpg", true
+	case "image/png":
+		return ".png", true
+	case "image/webp":
+		return ".webp", true
+	case "image/gif":
+		return ".gif", true
+	default:
+		return "", false
+	}
+}
+
+// UploadNewsImage godoc
+// @Summary Загрузка изображения для новости
+// @Tags news
+// @Accept mpfd
+// @Produce json
+// @Param file formData file true "Файл изображения (jpeg/png/webp/gif)"
+// @Success 201 {object} map[string]string "url: публичная ссылка"
+// @Failure 400 {object} map[string]string
+// @Failure 413 {object} map[string]string
+// @Security ApiKeyAuth
+// @Router /api/admin/news/upload [post]
+func (h *NewsHandler) UploadNewsImage(w http.ResponseWriter, r *http.Request) {
+	const maxUpload = 10 << 20 // 10 MiB
+	r.Body = http.MaxBytesReader(w, r.Body, maxUpload)
+
+	if err := r.ParseMultipartForm(maxUpload); err != nil {
+		logger.Log.Warn("multipart parse error", zap.Error(err))
+		helpers.Error(w, http.StatusRequestEntityTooLarge, "файл слишком большой (макс 10 МБ)")
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		helpers.Error(w, http.StatusBadRequest, "поле file обязательно")
+		return
+	}
+	defer file.Close()
+
+	// определить content-type по содержимому
+	sniff := make([]byte, 512)
+	n, _ := file.Read(sniff)
+	contentType := http.DetectContentType(sniff[:n])
+
+	// допустимые типы -> расширения (ПЕРЕИМЕНОВАЛ!)
+	allowedTypes := map[string]string{
+		"image/jpeg": ".jpg",
+		"image/png":  ".png",
+		"image/webp": ".webp",
+		"image/gif":  ".gif",
+	}
+
+	ext, ok := allowedTypes[contentType]
+	if !ok {
+		// fallback по имени файла
+		ext = strings.ToLower(filepath.Ext(header.Filename))
+		if ext == ".jpeg" {
+			ext = ".jpg"
+		}
+		if _, ok := map[string]struct{}{".jpg": {}, ".png": {}, ".webp": {}, ".gif": {}}[ext]; !ok {
+			helpers.Error(w, http.StatusBadRequest, "допустимы только изображения: jpg, png, webp, gif")
+			return
+		}
+	}
+
+	// абсолютный путь на диске
+	root := uploadsRoot()              // /edu-talks/uploads или из ENV
+	dir := filepath.Join(root, "news") // /edu-talks/uploads/news
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		logger.Log.Error("mkdir uploads/news", zap.Error(err))
+		helpers.Error(w, http.StatusInternalServerError, "не удалось создать директорию")
+		return
+	}
+
+	name := fmt.Sprintf("%d_%s%s", time.Now().Unix(), randHex(6), ext)
+	fullPath := filepath.Join(dir, name)
+
+	dst, err := os.Create(fullPath)
+	if err != nil {
+		logger.Log.Error("create dst", zap.Error(err))
+		helpers.Error(w, http.StatusInternalServerError, "ошибка сохранения файла")
+		return
+	}
+	defer dst.Close()
+
+	// дописываем уже прочитанные байты и остаток
+	if n > 0 {
+		if _, err := dst.Write(sniff[:n]); err != nil {
+			helpers.Error(w, http.StatusInternalServerError, "ошибка записи файла")
+			return
+		}
+	}
+	if _, err := io.Copy(dst, file); err != nil {
+		helpers.Error(w, http.StatusInternalServerError, "ошибка записи файла")
+		return
+	}
+
+	publicURL := "/uploads/news/" + name
+
+	logger.Log.Info("news image uploaded",
+		zap.String("name", name),
+		zap.String("ctype", contentType),
+		zap.String("path", fullPath),
+		zap.String("url", publicURL),
+	)
+
+	helpers.JSON(w, http.StatusCreated, map[string]string{"url": publicURL})
+}
+
+func randHex(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
