@@ -91,6 +91,7 @@ func InitRoutes(
 	admin.HandleFunc("/news", newsHandler.CreateNews).Methods("POST", http.MethodOptions)
 	admin.HandleFunc("/news/{id:[0-9]+}", newsHandler.UpdateNews).Methods("PATCH", http.MethodOptions)
 	admin.HandleFunc("/news/{id:[0-9]+}", newsHandler.DeleteNews).Methods("DELETE", http.MethodOptions)
+	admin.HandleFunc("/news/upload", newsHandler.UploadNewsImage).Methods("POST", http.MethodOptions)
 
 	admin.HandleFunc("/notify", authHandler.NotifySubscribers).Methods("POST", http.MethodOptions)
 
