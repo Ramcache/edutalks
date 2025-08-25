@@ -335,3 +335,15 @@ func (r *UserRepository) SetSubscriptionWithExpiry(ctx context.Context, userID i
 	_, err := r.db.Exec(ctx, query, int64(duration.Seconds()), userID)
 	return err
 }
+
+// repository
+func (r *UserRepository) ExpireSubscriptions(ctx context.Context) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE users
+		SET has_subscription = false
+		WHERE has_subscription = true
+		  AND subscription_expires_at IS NOT NULL
+		  AND subscription_expires_at <= NOW()
+	`)
+	return err
+}

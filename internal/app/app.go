@@ -1,12 +1,14 @@
 package app
 
 import (
+	"context"
 	"edutalks/internal/config"
 	"edutalks/internal/db"
 	"edutalks/internal/handlers"
 	"edutalks/internal/repository"
 	"edutalks/internal/routes"
 	"edutalks/internal/services"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -16,7 +18,6 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	// Репозитории
 	userRepo := repository.NewUserRepository(conn)
 	docRepo := repository.NewDocumentRepository(conn)
@@ -51,6 +52,11 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	paymentHandler := handlers.NewPaymentHandler(yookassaService)
 	webhookHandler := handlers.NewWebhookHandler(authService)
 
+	_ = userRepo.ExpireSubscriptions(context.Background())
+
+	// ▶️ Запустим периодическую чистку
+	StartSubscriptionCleaner(userRepo)
+
 	// Запуск воркера email (как было)
 	for i := 0; i < 3; i++ {
 		go services.StartEmailWorker(emaService)
@@ -60,7 +66,14 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	router := mux.NewRouter()
 	routes.InitRoutes(router, authHandler, docHandler, newsHandler, emailHandler, searchHandler, paymentHandler, webhookHandler, articleH)
 
-	// ⬇️ Регистрируем маршруты оплаты
-
 	return router, nil
+}
+
+func StartSubscriptionCleaner(repo *repository.UserRepository) {
+	t := time.NewTicker(1 * time.Hour)
+	go func() {
+		for range t.C {
+			_ = repo.ExpireSubscriptions(context.Background())
+		}
+	}()
 }

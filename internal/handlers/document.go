@@ -192,8 +192,9 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 	}
 
 	// --- доступ как у тебя сейчас ---
-	if !user.HasSubscription || (user.SubscriptionExpiresAt != nil && user.SubscriptionExpiresAt.Before(time.Now())) {
-		logger.Log.Warn("Попытка доступа к файлу без подписки", zap.Int("user_id", userID), zap.Int("doc_id", id))
+	now := time.Now().UTC()
+	if !(user.HasSubscription && user.SubscriptionExpiresAt != nil && user.SubscriptionExpiresAt.After(now)) {
+		logger.Log.Warn("Подписка неактивна", zap.Int("user_id", userID), zap.Timep("expires_at", user.SubscriptionExpiresAt))
 		helpers.Error(w, http.StatusForbidden, "Нет доступа — купите подписку")
 		return
 	}
