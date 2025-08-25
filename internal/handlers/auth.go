@@ -189,18 +189,19 @@ func (h *AuthHandler) Protected(w http.ResponseWriter, r *http.Request) {
 
 	// Собираем ответ (скрываем всё лишнее)
 	resp := models.UserProfileResponse{
-		ID:                user.ID,
-		Username:          user.Username,
-		FullName:          user.FullName,
-		Phone:             user.Phone,
-		Email:             user.Email,
-		Address:           user.Address,
-		Role:              user.Role,
-		CreatedAt:         user.CreatedAt,
-		UpdatedAt:         user.UpdatedAt,
-		HasSubscription:   user.HasSubscription,
-		EmailSubscription: user.EmailSubscription,
-		EmailVerified:     user.EmailVerified,
+		ID:                    user.ID,
+		Username:              user.Username,
+		FullName:              user.FullName,
+		Phone:                 user.Phone,
+		Email:                 user.Email,
+		Address:               user.Address,
+		Role:                  user.Role,
+		CreatedAt:             user.CreatedAt,
+		UpdatedAt:             user.UpdatedAt,
+		HasSubscription:       user.HasSubscription,
+		SubscriptionExpiresAt: user.SubscriptionExpiresAt,
+		EmailSubscription:     user.EmailSubscription,
+		EmailVerified:         user.EmailVerified,
 	}
 
 	helpers.JSON(w, http.StatusOK, resp)

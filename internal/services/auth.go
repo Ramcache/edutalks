@@ -36,6 +36,7 @@ type UserRepo interface {
 	SetEmailVerified(ctx context.Context, userID int, verified bool) error
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
 	DeleteUserByID(ctx context.Context, userID int) error
+	SetSubscriptionWithExpiry(ctx context.Context, userID int, duration time.Duration) error
 }
 
 func (s *AuthService) RegisterUser(ctx context.Context, input *models.User, plainPassword string) error {
@@ -218,4 +219,18 @@ func (s *AuthService) DeleteUserByID(ctx context.Context, id int) error {
 func (s *AuthService) SetSubscriptionTrue(userID int) error {
 	ctx := context.Background()
 	return s.repo.UpdateSubscriptionStatus(ctx, userID, true)
+}
+
+func (s *AuthService) SetSubscriptionWithExpiry(ctx context.Context, userID int, duration time.Duration) error {
+	logger.Log.Info("Установка подписки с истечением (service)",
+		zap.Int("user_id", userID),
+		zap.Duration("duration", duration),
+	)
+
+	if err := s.repo.SetSubscriptionWithExpiry(ctx, userID, duration); err != nil {
+		logger.Log.Error("Ошибка установки подписки с истечением (service)", zap.Error(err))
+		return err
+	}
+	logger.Log.Info("Подписка с истечением успешно установлена", zap.Int("user_id", userID))
+	return nil
 }
