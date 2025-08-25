@@ -187,7 +187,9 @@ func (h *AuthHandler) Protected(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Собираем ответ (скрываем всё лишнее)
+	now := time.Now().UTC()
+	isActive := user.HasSubscription && user.SubscriptionExpiresAt != nil && user.SubscriptionExpiresAt.After(now)
+
 	resp := models.UserProfileResponse{
 		ID:                    user.ID,
 		Username:              user.Username,
@@ -200,6 +202,7 @@ func (h *AuthHandler) Protected(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:             user.UpdatedAt,
 		HasSubscription:       user.HasSubscription,
 		SubscriptionExpiresAt: user.SubscriptionExpiresAt,
+		IsSubscriptionActive:  isActive,
 		EmailSubscription:     user.EmailSubscription,
 		EmailVerified:         user.EmailVerified,
 	}
