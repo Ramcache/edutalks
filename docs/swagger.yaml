@@ -136,6 +136,8 @@ definitions:
         type: string
       role:
         type: string
+      subscription_expires_at:
+        type: string
       updated_at:
         type: string
       username:
@@ -162,6 +164,8 @@ definitions:
       phone:
         type: string
       role:
+        type: string
+      subscription_expires_at:
         type: string
       updated_at:
         type: string

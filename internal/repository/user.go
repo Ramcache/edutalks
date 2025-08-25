@@ -6,6 +6,7 @@ import (
 	"edutalks/internal/models"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
@@ -60,7 +61,7 @@ func (r *UserRepository) IsEmailTaken(ctx context.Context, email string) (bool, 
 
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*models.User, error) {
 	logger.Log.Debug("Получение пользователя по username (repo)", zap.String("username", username))
-	query := `SELECT id, username, full_name, phone, email, address, password_hash, role, created_at, updated_at, has_subscription, email_subscription, email_verified
+	query := `SELECT id, username, full_name, phone, email, address, password_hash, role, created_at, updated_at, has_subscription, subscription_expires_at, email_subscription, email_verified
 	FROM users 
 	WHERE username = $1`
 
@@ -77,6 +78,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*m
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.HasSubscription,
+		&user.SubscriptionExpiresAt,
 		&user.EmailSubscription,
 		&user.EmailVerified,
 	)
@@ -120,7 +122,7 @@ func (r *UserRepository) DeleteRefreshToken(ctx context.Context, userID int, tok
 }
 
 func (r *UserRepository) GetAllUsersPaginated(ctx context.Context, limit, offset int) ([]*models.User, int, error) {
-	query := `SELECT id, username, full_name, phone, email, address, role, created_at, updated_at, has_subscription, email_subscription, email_verified
+	query := `SELECT id, username, full_name, phone, email, address, role, created_at, updated_at, has_subscription, subscription_expires_at, email_subscription, email_verified
 	          FROM users
 	          ORDER BY created_at DESC
 	          LIMIT $1 OFFSET $2`
@@ -145,6 +147,7 @@ func (r *UserRepository) GetAllUsersPaginated(ctx context.Context, limit, offset
 			&u.CreatedAt,
 			&u.UpdatedAt,
 			&u.HasSubscription,
+			&u.SubscriptionExpiresAt,
 			&u.EmailSubscription,
 			&u.EmailVerified,
 		)
@@ -168,7 +171,7 @@ func (r *UserRepository) GetAllUsersPaginated(ctx context.Context, limit, offset
 func (r *UserRepository) GetUserByID(ctx context.Context, id int) (*models.User, error) {
 	logger.Log.Debug("Получение пользователя по ID (repo)", zap.Int("user_id", id))
 	query := `
-		SELECT id, username, full_name, phone, email, address, role, created_at, updated_at, has_subscription, email_subscription, email_verified
+		SELECT id, username, full_name, phone, email, address, role, created_at, updated_at, has_subscription, subscription_expires_at, email_subscription, email_verified
 		FROM users
 		WHERE id = $1
 	`
@@ -185,6 +188,7 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id int) (*models.User,
 		&u.CreatedAt,
 		&u.UpdatedAt,
 		&u.HasSubscription,
+		&u.SubscriptionExpiresAt,
 		&u.EmailSubscription,
 		&u.EmailVerified,
 	)
@@ -282,7 +286,7 @@ func (r *UserRepository) SetEmailVerified(ctx context.Context, userID int, verif
 
 func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	logger.Log.Debug("Получение пользователя по email (repo)", zap.String("email", email))
-	query := `SELECT id, username, full_name, phone, email, address, password_hash, role, created_at, updated_at, has_subscription, email_subscription, email_verified
+	query := `SELECT id, username, full_name, phone, email, address, password_hash, role, created_at, updated_at, has_subscription, subscription_expires_at, email_subscription, email_verified
 	FROM users 
 	WHERE email = $1`
 
@@ -299,6 +303,7 @@ func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*mod
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.HasSubscription,
+		&user.SubscriptionExpiresAt,
 		&user.EmailSubscription,
 		&user.EmailVerified,
 	)
@@ -317,5 +322,16 @@ func (r *UserRepository) DeleteUserByID(ctx context.Context, userID int) error {
 	if err != nil {
 		logger.Log.Error("Ошибка удаления user (repo)", zap.Error(err))
 	}
+	return err
+}
+
+func (r *UserRepository) SetSubscriptionWithExpiry(ctx context.Context, userID int, duration time.Duration) error {
+	query := `
+		UPDATE users
+		SET has_subscription = true,
+		    subscription_expires_at = NOW() + $1 * interval '1 second'
+		WHERE id = $2;
+	`
+	_, err := r.db.Exec(ctx, query, int64(duration.Seconds()), userID)
 	return err
 }

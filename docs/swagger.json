@@ -1889,6 +1889,9 @@
                 "role": {
                     "type": "string"
                 },
+                "subscription_expires_at": {
+                    "type": "string"
+                },
                 "updated_at": {
                     "type": "string"
                 },
@@ -1928,6 +1931,9 @@
                     "type": "string"
                 },
                 "role": {
+                    "type": "string"
+                },
+                "subscription_expires_at": {
                     "type": "string"
                 },
                 "updated_at": {

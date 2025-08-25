@@ -1899,6 +1899,9 @@ const docTemplate = `{
                 "role": {
                     "type": "string"
                 },
+                "subscription_expires_at": {
+                    "type": "string"
+                },
                 "updated_at": {
                     "type": "string"
                 },
@@ -1938,6 +1941,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "role": {
+                    "type": "string"
+                },
+                "subscription_expires_at": {
                     "type": "string"
                 },
                 "updated_at": {
