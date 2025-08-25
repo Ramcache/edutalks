@@ -1174,12 +1174,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/edutalks_internal_utils_helpers.Response"
                         }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/edutalks_internal_utils_helpers.Response"
-                        }
                     }
                 }
             }
