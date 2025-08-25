@@ -1931,6 +1931,9 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "is_subscription_active": {
+                    "type": "boolean"
+                },
                 "phone": {
                     "type": "string"
                 },

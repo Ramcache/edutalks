@@ -37,6 +37,7 @@ type UserRepo interface {
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
 	DeleteUserByID(ctx context.Context, userID int) error
 	SetSubscriptionWithExpiry(ctx context.Context, userID int, duration time.Duration) error
+	ExpireSubscriptions(ctx context.Context) error
 }
 
 func (s *AuthService) RegisterUser(ctx context.Context, input *models.User, plainPassword string) error {

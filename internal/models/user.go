@@ -39,6 +39,7 @@ type UserProfileResponse struct {
 	UpdatedAt             time.Time  `json:"updated_at"`
 	HasSubscription       bool       `json:"has_subscription"`
 	SubscriptionExpiresAt *time.Time `json:"subscription_expires_at,omitempty"`
+	IsSubscriptionActive  bool       `json:"is_subscription_active"`
 	EmailSubscription     bool       `json:"email_subscription"`
 	EmailVerified         bool       `json:"email_verified"`
 }
