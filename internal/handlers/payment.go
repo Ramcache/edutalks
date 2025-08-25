@@ -12,9 +12,7 @@ type PaymentHandler struct {
 }
 
 func NewPaymentHandler(yoo *services.YooKassaService) *PaymentHandler {
-	return &PaymentHandler{
-		YooKassaService: yoo,
-	}
+	return &PaymentHandler{YooKassaService: yoo}
 }
 
 type PaymentResult struct {
@@ -31,7 +29,6 @@ type PaymentResult struct {
 // @Success 200 {object} helpers.Response{data=handlers.PaymentResult}
 // @Failure 400 {object} helpers.Response
 // @Failure 401 {object} helpers.Response
-// @Failure 500 {object} helpers.Response
 // @Router /api/pay [get]
 func (h *PaymentHandler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 	plan := r.URL.Query().Get("plan")
@@ -40,14 +37,17 @@ func (h *PaymentHandler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// userID берём из JWT
 	userID, ok := r.Context().Value(middleware.ContextUserID).(int)
-	if !ok {
+	if !ok || userID == 0 {
 		helpers.Error(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
-	var amount float64
-	var description string
+	var (
+		amount      float64
+		description string
+	)
 
 	switch plan {
 	case "monthly":
@@ -64,11 +64,13 @@ func (h *PaymentHandler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	paymentURL, err := h.YooKassaService.CreatePayment(amount, description, userID)
+	// !! ВАЖНО: передаём plan дальше в сервис
+	paymentURL, err := h.YooKassaService.CreatePayment(amount, description, userID, plan)
 	if err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "failed to create payment: "+err.Error())
 		return
 	}
 
+	// Отдаём JSON с ссылкой (фронт делает window.location.href = paymentURL)
 	helpers.JSON(w, http.StatusOK, PaymentResult{ConfirmationURL: paymentURL})
 }

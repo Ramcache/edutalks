@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -52,7 +53,8 @@ type CreatePaymentResponse struct {
 	} `json:"confirmation"`
 }
 
-func (s *YooKassaService) CreatePayment(value float64, description string, userID int) (string, error) {
+// !! ДОБАВИЛИ plan в сигнатуру
+func (s *YooKassaService) CreatePayment(value float64, description string, userID int, plan string) (string, error) {
 	reqBody := CreatePaymentRequest{
 		Amount: Amount{
 			Value:    fmt.Sprintf("%.2f", value),
@@ -65,7 +67,9 @@ func (s *YooKassaService) CreatePayment(value float64, description string, userI
 		Capture:     true,
 		Description: description,
 		Metadata: map[string]any{
-			"user_id": userID,
+			// ЮKassa любит строки в metadata
+			"user_id": strconv.Itoa(userID),
+			"plan":    plan,
 		},
 	}
 
@@ -94,6 +98,5 @@ func (s *YooKassaService) CreatePayment(value float64, description string, userI
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
 		return "", err
 	}
-
 	return res.Confirmation.ConfirmationURL, nil
 }
