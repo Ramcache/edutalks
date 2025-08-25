@@ -248,7 +248,13 @@ func (r *UserRepository) UpdateUserFields(ctx context.Context, id int, input *mo
 
 func (r *UserRepository) UpdateSubscriptionStatus(ctx context.Context, userID int, status bool) error {
 	logger.Log.Info("Изменение статуса подписки (repo)", zap.Int("user_id", userID), zap.Bool("status", status))
-	query := `UPDATE users SET has_subscription = $1 WHERE id = $2`
+
+	query := `
+		UPDATE users
+		SET has_subscription = $1,
+		    subscription_expires_at = CASE WHEN $1 THEN subscription_expires_at ELSE NULL END
+		WHERE id = $2
+	`
 	_, err := r.db.Exec(ctx, query, status, userID)
 	if err != nil {
 		logger.Log.Error("Ошибка обновления подписки (repo)", zap.Error(err), zap.Int("user_id", userID))
