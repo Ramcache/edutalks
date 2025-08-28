@@ -75,12 +75,15 @@ WITH s AS (
   ) d ON d.section_id = s.id
   WHERE s.is_active = true
 )
-SELECT t.id, t.slug, t.title, t.position, t.is_active, t.created_at, t.updated_at,
-       s.id, s.tab_id, s.slug, s.title, s.description, s.position, s.is_active, s.created_at, s.updated_at, s.docs_count
+SELECT
+  t.id, t.slug, t.title, t.position, t.is_active, t.created_at, t.updated_at,
+  -- nullable поля раздела (из LEFT JOIN)
+  s.id, s.tab_id, s.slug, s.title, s.description, s.position, s.is_active, s.created_at, s.updated_at, s.docs_count
 FROM tabs t
 LEFT JOIN s ON s.tab_id = t.id
 WHERE t.is_active = true
-ORDER BY t.position, t.id, s.position, s.id;`
+ORDER BY t.position, t.id, s.position, s.id;
+`
 
 	rows, err := r.db.Query(ctx, q)
 	if err != nil {
@@ -92,22 +95,51 @@ ORDER BY t.position, t.id, s.position, s.id;`
 	var cur *models.TabTree
 
 	for rows.Next() {
+		// вкладка — без NULL
 		var t models.Tab
-		var s models.Section
-		var docsCount sql.NullInt64
+
+		// раздел — всё nullable, т.к. LEFT JOIN
+		var (
+			secID        sql.NullInt32
+			secTabID     sql.NullInt32
+			secSlug      sql.NullString
+			secTitle     sql.NullString
+			secDesc      sql.NullString
+			secPos       sql.NullInt32
+			secActive    sql.NullBool
+			secCreatedAt sql.NullTime
+			secUpdatedAt sql.NullTime
+			docsCount    sql.NullInt64
+		)
 
 		if err := rows.Scan(
+			// tab
 			&t.ID, &t.Slug, &t.Title, &t.Position, &t.IsActive, &t.CreatedAt, &t.UpdatedAt,
-			&s.ID, &s.TabID, &s.Slug, &s.Title, &s.Description, &s.Position, &s.IsActive, &s.CreatedAt, &s.UpdatedAt, &docsCount,
+			// section (nullable)
+			&secID, &secTabID, &secSlug, &secTitle, &secDesc, &secPos, &secActive, &secCreatedAt, &secUpdatedAt, &docsCount,
 		); err != nil {
 			return nil, err
 		}
 
+		// новая вкладка?
 		if cur == nil || cur.Tab.ID != t.ID {
 			out = append(out, models.TabTree{Tab: t})
 			cur = &out[len(out)-1]
 		}
-		if s.ID != 0 {
+
+		// добавляем раздел только если он действительно есть (secID.Valid)
+		if secID.Valid {
+			s := models.Section{
+				ID:          int(secID.Int32),
+				TabID:       int(secTabID.Int32),
+				Slug:        secSlug.String,
+				Title:       secTitle.String,
+				Description: secDesc.String,
+				Position:    int(secPos.Int32),
+				IsActive:    secActive.Bool,
+				CreatedAt:   secCreatedAt.Time,
+				UpdatedAt:   secUpdatedAt.Time,
+			}
 			cnt := 0
 			if docsCount.Valid {
 				cnt = int(docsCount.Int64)
@@ -118,5 +150,9 @@ ORDER BY t.position, t.id, s.position, s.id;`
 			})
 		}
 	}
-	return out, rows.Err()
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
