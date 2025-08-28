@@ -2,9 +2,9 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"edutalks/internal/models"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -94,7 +94,7 @@ ORDER BY t.position, t.id, s.position, s.id;`
 	for rows.Next() {
 		var t models.Tab
 		var s models.Section
-		var docsCount pgx.NullInt64
+		var docsCount sql.NullInt64
 
 		if err := rows.Scan(
 			&t.ID, &t.Slug, &t.Title, &t.Position, &t.IsActive, &t.CreatedAt, &t.UpdatedAt,
