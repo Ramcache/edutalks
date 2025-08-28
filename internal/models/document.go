@@ -10,6 +10,7 @@ type Document struct {
 	Description string    `json:"description"`
 	IsPublic    bool      `json:"is_public"`
 	Category    string    `json:"category"`
+	SectionID   *int      `json:"section_id,omitempty"`
 	UploadedAt  time.Time `json:"uploaded_at"`
 }
 

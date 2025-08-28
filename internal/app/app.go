@@ -24,6 +24,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	newsRepo := repository.NewNewsRepository(conn)
 	emailTokenRepo := repository.NewEmailTokenRepository(conn)
 	articleRepo := repository.NewArticleRepo(conn)
+	taxonomyRepo := repository.NewTaxonomyRepo(conn)
 
 	// Сервисы
 	authService := services.NewAuthService(userRepo)
@@ -33,6 +34,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	emailTokenService := services.NewEmailTokenService(emailTokenRepo, userRepo)
 	emaService := services.NewEmailService(cfg)
 	articleSvc := services.NewArticleService(articleRepo)
+	taxonomySvc := services.NewTaxonomyService(taxonomyRepo)
 
 	// ⬇️ Новый сервис ЮKassa
 	yookassaService := services.NewYooKassaService(
@@ -47,6 +49,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	emailHandler := handlers.NewEmailHandler(emailTokenService)
 	searchHandler := handlers.NewSearchHandler(newsService, docService)
 	articleH := handlers.NewArticleHandler(articleSvc)
+	taxonomyH := handlers.NewTaxonomyHandler(taxonomySvc)
 
 	// ⬇️ Хендлер оплаты и вебхука
 	paymentHandler := handlers.NewPaymentHandler(yookassaService)
@@ -64,7 +67,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 
 	// Маршруты
 	router := mux.NewRouter()
-	routes.InitRoutes(router, authHandler, docHandler, newsHandler, emailHandler, searchHandler, paymentHandler, webhookHandler, articleH)
+	routes.InitRoutes(router, authHandler, docHandler, newsHandler, emailHandler, searchHandler, paymentHandler, webhookHandler, articleH, taxonomyH)
 
 	return router, nil
 }

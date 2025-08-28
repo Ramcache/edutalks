@@ -34,23 +34,24 @@ func NewDocumentHandler(docService *services.DocumentService, userService *servi
 	}
 }
 
-// UploadDocument godoc
-// @Summary Загрузка документа (только для админа)
-// @Tags admin-files
-// @Security ApiKeyAuth
-// @Accept multipart/form-data
-// @Produce json
-// @Param file formData file true "Файл документа"
-// @Param description formData string false "Описание файла"
-// @Param is_public formData bool false "Доступен по подписке?"
-// @Param category formData string false "Категория документа (например, 'приказ', 'шаблон')"
-// @Success 201 {string} string "Файл загружен"
-// @Failure 400 {string} string "Ошибка загрузки"
-// @Router /api/admin/files/upload [post]
+// UploadDocument
+// @Summary      Загрузить документ
+// @Description  Админ может загрузить документ и привязать его к разделу
+// @Tags         documents
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        file        formData  file    true   "Файл"
+// @Param        description formData  string  false  "Описание"
+// @Param        is_public   formData  bool    true   "Публичный документ?"
+// @Param        category    formData  string  false  "Категория"
+// @Param        section_id  formData  int     false  "ID раздела"
+// @Success      201 {object} map[string]int
+// @Failure      400 {object} map[string]string
+// @Failure      500 {object} map[string]string
+// @Router       /api/admin/files/upload [post]
 func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	logger.Log.Info("Запрос на загрузку документа")
-	err := r.ParseMultipartForm(10 << 20) // 10MB
-	if err != nil {
+	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10MB
 		logger.Log.Warn("Ошибка разбора формы при загрузке документа", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "Ошибка разбора формы")
 		return
@@ -63,19 +64,28 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	defer func(file multipart.File) {
-		err := file.Close()
-		if err != nil {
-			logger.Log.Error("ошибка при закрытии файла: %v", zap.Error(err))
+		if cerr := file.Close(); cerr != nil {
+			logger.Log.Error("ошибка при закрытии файла", zap.Error(cerr))
 		}
 	}(file)
 
 	description := r.FormValue("description")
 	isPublic := strings.ToLower(r.FormValue("is_public")) == "true"
+	category := r.FormValue("category")
+
+	var sectionIDPtr *int
+	if s := r.FormValue("section_id"); s != "" {
+		if sid, err := strconv.Atoi(s); err == nil {
+			sectionIDPtr = &sid
+		}
+	}
 
 	userID := r.Context().Value(middleware.ContextUserID).(int)
+
 	uploadDir := "uploaded"
-	err = os.MkdirAll(uploadDir, os.ModePerm)
-	if err != nil {
+	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+		logger.Log.Error("Ошибка создания директории загрузки", zap.Error(err))
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка сохранения файла")
 		return
 	}
 
@@ -89,17 +99,16 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	defer func(dst *os.File) {
-		err := dst.Close()
-		if err != nil {
-			logger.Log.Error("ошибка при закрытии файла: %v", zap.Error(err))
+		if cerr := dst.Close(); cerr != nil {
+			logger.Log.Error("ошибка при закрытии файла", zap.Error(cerr))
 		}
 	}(dst)
-	_, err = io.Copy(dst, file)
-	if err != nil {
+
+	if _, err := io.Copy(dst, file); err != nil {
+		logger.Log.Error("Ошибка записи файла", zap.Error(err))
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка при сохранении файла")
 		return
 	}
-
-	category := r.FormValue("category")
 
 	doc := &models.Document{
 		UserID:      userID,
@@ -108,12 +117,12 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 		Description: description,
 		IsPublic:    isPublic,
 		Category:    category,
+		SectionID:   sectionIDPtr,
 		UploadedAt:  time.Now(),
 	}
 
 	logger.Log.Info("Сохраняем информацию о документе", zap.String("filename", handler.Filename), zap.Int("user_id", userID))
-	err = h.service.Upload(r.Context(), doc)
-	if err != nil {
+	if err := h.service.Upload(r.Context(), doc); err != nil {
 		logger.Log.Error("Ошибка при сохранении документа в базе", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при сохранении документа")
 		return
@@ -123,17 +132,18 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 	helpers.JSON(w, http.StatusCreated, "Файл загружен")
 }
 
-// ListPublicDocuments godoc
-// @Summary Список доступных документов (по подписке)
-// @Tags files
-// @Security ApiKeyAuth
-// @Produce json
-// @Param page query int false "Номер страницы (начиная с 1)"
-// @Param page_size query int false "Размер страницы"
-// @Param category query string false "Категория документа (например, 'приказ', 'шаблон')"
-// @Success 200 {object} map[string]interface{}
-// @Failure 500 {string} string "Ошибка сервера"
-// @Router /api/files [get]
+// ListPublicDocuments
+// @Summary      Получить список публичных документов
+// @Description  Поддерживает фильтры: section_id и category
+// @Tags         documents
+// @Produce      json
+// @Param        page        query  int     false  "Номер страницы (по умолчанию 1)"
+// @Param        page_size   query  int     false  "Размер страницы (по умолчанию 10)"
+// @Param        section_id  query  int     false  "ID раздела"
+// @Param        category    query  string  false  "Категория документа"
+// @Success      200 {object} map[string]interface{} "items, page, page_size, total"
+// @Failure      500 {object} map[string]string
+// @Router       /api/files [get]
 func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Request) {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
@@ -145,19 +155,38 @@ func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Req
 	}
 	offset := (page - 1) * pageSize
 
-	category := r.URL.Query().Get("category") // <--- вот это!
+	category := r.URL.Query().Get("category")
+	var sectionIDPtr *int
+	if s := r.URL.Query().Get("section_id"); s != "" {
+		if sid, err := strconv.Atoi(s); err == nil {
+			sectionIDPtr = &sid
+		}
+	}
 
-	docs, total, err := h.service.GetPublicDocumentsPaginated(r.Context(), pageSize, offset, category)
+	var (
+		docs  []*models.Document
+		total int
+		err   error
+	)
+
+	if sectionIDPtr != nil || category != "" {
+		docs, total, err = h.service.GetPublicDocumentsByFilterPaginated(r.Context(), pageSize, offset, sectionIDPtr, category)
+	} else {
+		docs, total, err = h.service.GetPublicDocumentsPaginated(r.Context(), pageSize, offset, "")
+	}
 	if err != nil {
 		logger.Log.Error("Ошибка при получении документов", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при получении документов")
 		return
 	}
+
 	helpers.JSON(w, http.StatusOK, map[string]interface{}{
-		"data":      docs,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
+		"data":       docs,
+		"total":      total,
+		"page":       page,
+		"page_size":  pageSize,
+		"category":   category,
+		"section_id": func() *int { return sectionIDPtr }(), // просто чтобы видеть в ответе
 	})
 }
 

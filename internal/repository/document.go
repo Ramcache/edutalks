@@ -4,6 +4,8 @@ import (
 	"context"
 	"edutalks/internal/logger"
 	"edutalks/internal/models"
+	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,14 +27,21 @@ type DocumentRepo interface {
 	DeleteDocument(ctx context.Context, id int) error
 	GetAllDocuments(ctx context.Context) ([]*models.Document, error)
 	Search(ctx context.Context, query string) ([]models.Document, error)
+	GetPublicDocumentsByFilterPaginated(
+		ctx context.Context,
+		limit, offset int,
+		sectionID *int,
+		category string,
+	) ([]*models.Document, int, error)
+	UpdateDocumentSection(ctx context.Context, id int, sectionID *int) error
 }
 
 // Сохранение документа
 func (r *DocumentRepository) SaveDocument(ctx context.Context, doc *models.Document) error {
 	logger.Log.Info("Репозиторий: сохранение документа", zap.String("filename", doc.Filename), zap.Int("user_id", doc.UserID))
 	query := `
-		INSERT INTO documents (user_id, filename, filepath, description, is_public, category, uploaded_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)`
+		INSERT INTO documents (user_id, filename, filepath, description, is_public, category, section_id, uploaded_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
 	_, err := r.db.Exec(ctx, query,
 		doc.UserID,
 		doc.Filename,
@@ -40,6 +49,7 @@ func (r *DocumentRepository) SaveDocument(ctx context.Context, doc *models.Docum
 		doc.Description,
 		doc.IsPublic,
 		doc.Category,
+		doc.SectionID,
 		doc.UploadedAt,
 	)
 	if err != nil {
@@ -201,4 +211,72 @@ func (r *DocumentRepository) Search(ctx context.Context, query string) ([]models
 		docs = append(docs, doc)
 	}
 	return docs, nil
+}
+
+// Публичные документы с фильтрами (section_id и/или category)
+func (r *DocumentRepository) GetPublicDocumentsByFilterPaginated(
+	ctx context.Context,
+	limit, offset int,
+	sectionID *int,
+	category string,
+) ([]*models.Document, int, error) {
+
+	var (
+		rows  pgx.Rows
+		err   error
+		docs  []*models.Document
+		args  []interface{}
+		cond  []string
+		total int
+	)
+
+	queryBase := `SELECT id, user_id, filename, filepath, description, is_public, category, section_id, uploaded_at
+	              FROM documents WHERE is_public = true`
+
+	if sectionID != nil {
+		cond = append(cond, "section_id = $"+strconv.Itoa(len(args)+1))
+		args = append(args, *sectionID)
+	}
+	if category != "" {
+		cond = append(cond, "category = $"+strconv.Itoa(len(args)+1))
+		args = append(args, category)
+	}
+	if len(cond) > 0 {
+		queryBase += " AND " + strings.Join(cond, " AND ")
+	}
+
+	query := queryBase + " ORDER BY uploaded_at DESC LIMIT $" + strconv.Itoa(len(args)+1) + " OFFSET $" + strconv.Itoa(len(args)+2)
+	args = append(args, limit, offset)
+
+	rows, err = r.db.Query(ctx, query, args...)
+	if err != nil {
+		logger.Log.Error("Ошибка выборки документов (repo, filter)", zap.Error(err))
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var d models.Document
+		if err := rows.Scan(&d.ID, &d.UserID, &d.Filename, &d.Filepath, &d.Description, &d.IsPublic, &d.Category, &d.SectionID, &d.UploadedAt); err != nil {
+			return nil, 0, err
+		}
+		docs = append(docs, &d)
+	}
+
+	// total
+	countQuery := `SELECT COUNT(*) FROM documents WHERE is_public = true`
+	argsCnt := []interface{}{}
+	if len(cond) > 0 {
+		countQuery += " AND " + strings.Join(cond, " AND ")
+		argsCnt = append(argsCnt, args[:len(args)-2]...) // без limit/offset
+	}
+	if err := r.db.QueryRow(ctx, countQuery, argsCnt...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	return docs, total, nil
+}
+
+func (r *DocumentRepository) UpdateDocumentSection(ctx context.Context, id int, sectionID *int) error {
+	_, err := r.db.Exec(ctx, `UPDATE documents SET section_id=$1, uploaded_at=uploaded_at WHERE id=$2`, sectionID, id)
+	return err
 }

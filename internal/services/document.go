@@ -66,3 +66,9 @@ func (s *DocumentService) GetAllDocuments(ctx context.Context) ([]*models.Docume
 func (s *DocumentService) Search(ctx context.Context, query string) ([]models.Document, error) {
 	return s.repo.Search(ctx, query)
 }
+
+func (s *DocumentService) GetPublicDocumentsByFilterPaginated(
+	ctx context.Context, limit, offset int, sectionID *int, category string,
+) ([]*models.Document, int, error) {
+	return s.repo.GetPublicDocumentsByFilterPaginated(ctx, limit, offset, sectionID, category)
+}
