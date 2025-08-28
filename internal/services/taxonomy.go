@@ -35,3 +35,7 @@ func (s *TaxonomyService) DeleteSection(ctx context.Context, id int) error {
 func (s *TaxonomyService) PublicTree(ctx context.Context) ([]models.TabTree, error) {
 	return s.repo.ListTabTree(ctx)
 }
+
+func (s *TaxonomyService) PublicTreeFiltered(ctx context.Context, tabID *int, tabSlug *string) ([]models.TabTree, error) {
+	return s.repo.ListTabTreeFilter(ctx, tabID, tabSlug)
+}

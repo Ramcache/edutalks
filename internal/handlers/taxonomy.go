@@ -171,3 +171,48 @@ func (h *TaxonomyHandler) DeleteSection(w http.ResponseWriter, r *http.Request) 
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// PublicTreeByTab
+// @Summary      Получить дерево по конкретной вкладке
+// @Description  {tab} может быть slug или числовой ID. Параметры ?id= и ?slug= также поддерживаются и необязательны.
+// @Tags         taxonomy
+// @Produce      json
+// @Param        tab   path   string  true   "Slug или ID вкладки"
+// @Param        id    query  int     false  "ID вкладки (необязателен)"
+// @Param        slug  query  string  false  "Slug вкладки (необязателен)"
+// @Success      200 {object} map[string][]models.TabTree
+// @Failure      500 {object} map[string]string
+// @Router       /api/taxonomy/tree/{tab} [get]
+func (h *TaxonomyHandler) PublicTreeByTab(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	pathVal := vars["tab"]
+
+	var (
+		tabID   *int
+		tabSlug *string
+	)
+
+	// path: попытка как id
+	if id, err := strconv.Atoi(pathVal); err == nil {
+		tabID = &id
+	} else {
+		s := pathVal
+		tabSlug = &s
+	}
+
+	if qid := r.URL.Query().Get("id"); qid != "" {
+		if v, err := strconv.Atoi(qid); err == nil {
+			tabID = &v
+		}
+	}
+	if qs := r.URL.Query().Get("slug"); qs != "" {
+		tabSlug = &qs
+	}
+
+	items, err := h.svc.PublicTreeFiltered(r.Context(), tabID, tabSlug)
+	if err != nil {
+		helpers.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	helpers.JSON(w, http.StatusOK, map[string]any{"items": items})
+}

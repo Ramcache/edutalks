@@ -54,6 +54,7 @@ func InitRoutes(
 	api.HandleFunc("/articles", articleH.GetAll).Methods("GET", http.MethodOptions)
 
 	api.HandleFunc("/taxonomy/tree", taxonomyH.PublicTree).Methods("GET", http.MethodOptions)
+	api.HandleFunc("/taxonomy/tree/{tab}", taxonomyH.PublicTreeByTab).Methods("GET", http.MethodOptions)
 
 	// --- Защищённые JWT ---
 	protected := api.PathPrefix("").Subrouter()

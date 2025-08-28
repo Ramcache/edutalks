@@ -1341,6 +1341,44 @@ paths:
       summary: Получить дерево вкладок и разделов
       tags:
       - taxonomy
+  /api/taxonomy/tree/{tab}:
+    get:
+      description: '{tab} может быть slug или числовой ID. Параметры ?id= и ?slug=
+        также поддерживаются и необязательны.'
+      parameters:
+      - description: Slug или ID вкладки
+        in: path
+        name: tab
+        required: true
+        type: string
+      - description: ID вкладки (необязателен)
+        in: query
+        name: id
+        type: integer
+      - description: Slug вкладки (необязателен)
+        in: query
+        name: slug
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/edutalks_internal_models.TabTree'
+              type: array
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить дерево по конкретной вкладке
+      tags:
+      - taxonomy
   /documents/{id}/preview:
     get:
       description: Показывает название, описание и категорию документа. Файл не отдаётся.
