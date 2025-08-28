@@ -17,6 +17,7 @@ func InitRoutes(
 	paymentHandler *handlers.PaymentHandler,
 	webhookHandler *handlers.WebhookHandler,
 	articleH *handlers.ArticleHandler,
+	taxonomyH *handlers.TaxonomyHandler,
 ) {
 	router.Use(middleware.Logging)
 
@@ -51,6 +52,8 @@ func InitRoutes(
 	api.HandleFunc("/search", searchHandler.GlobalSearch).Methods("GET", http.MethodOptions)
 	api.HandleFunc("/articles/{id:[0-9]+}", articleH.GetByID).Methods("GET", http.MethodOptions)
 	api.HandleFunc("/articles", articleH.GetAll).Methods("GET", http.MethodOptions)
+
+	api.HandleFunc("/taxonomy/tree", taxonomyH.PublicTree).Methods("GET", http.MethodOptions)
 
 	// --- Защищённые JWT ---
 	protected := api.PathPrefix("").Subrouter()
@@ -100,4 +103,15 @@ func InitRoutes(
 	admin.HandleFunc("/articles/{id:[0-9]+}", articleH.Update).Methods("PATCH", http.MethodOptions)
 	admin.HandleFunc("/articles/{id:[0-9]+}", articleH.Delete).Methods("DELETE", http.MethodOptions)
 	admin.HandleFunc("/articles/{id:[0-9]+}/publish", articleH.SetPublish).Methods(http.MethodPatch, http.MethodOptions)
+
+	// Tabs
+	admin.HandleFunc("/tabs", taxonomyH.CreateTab).Methods("POST", http.MethodOptions)
+	admin.HandleFunc("/tabs/{id:[0-9]+}", taxonomyH.UpdateTab).Methods("PATCH", http.MethodOptions)
+	admin.HandleFunc("/tabs/{id:[0-9]+}", taxonomyH.DeleteTab).Methods("DELETE", http.MethodOptions)
+
+	// Sections
+	admin.HandleFunc("/sections", taxonomyH.CreateSection).Methods("POST", http.MethodOptions)
+	admin.HandleFunc("/sections/{id:[0-9]+}", taxonomyH.UpdateSection).Methods("PATCH", http.MethodOptions)
+	admin.HandleFunc("/sections/{id:[0-9]+}", taxonomyH.DeleteSection).Methods("DELETE", http.MethodOptions)
+
 }

@@ -337,11 +337,7 @@ const docTemplate = `{
         },
         "/api/admin/files/upload": {
             "post": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
+                "description": "Админ может загрузить документ и привязать его к разделу",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -349,47 +345,69 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "admin-files"
+                    "documents"
                 ],
-                "summary": "Загрузка документа (только для админа)",
+                "summary": "Загрузить документ",
                 "parameters": [
                     {
                         "type": "file",
-                        "description": "Файл документа",
+                        "description": "Файл",
                         "name": "file",
                         "in": "formData",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "Описание файла",
+                        "description": "Описание",
                         "name": "description",
                         "in": "formData"
                     },
                     {
                         "type": "boolean",
-                        "description": "Доступен по подписке?",
+                        "description": "Публичный документ?",
                         "name": "is_public",
-                        "in": "formData"
+                        "in": "formData",
+                        "required": true
                     },
                     {
                         "type": "string",
-                        "description": "Категория документа (например, 'приказ', 'шаблон')",
+                        "description": "Категория",
                         "name": "category",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "ID раздела",
+                        "name": "section_id",
                         "in": "formData"
                     }
                 ],
                 "responses": {
                     "201": {
-                        "description": "Файл загружен",
+                        "description": "Created",
                         "schema": {
-                            "type": "string"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer"
+                            }
                         }
                     },
                     "400": {
-                        "description": "Ошибка загрузки",
+                        "description": "Bad Request",
                         "schema": {
-                            "type": "string"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
@@ -641,6 +659,300 @@ const docTemplate = `{
                         "description": "Ошибка отправки",
                         "schema": {
                             "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/sections": {
+            "post": {
+                "description": "Доступно только администратору",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "taxonomy"
+                ],
+                "summary": "Создать раздел во вкладке",
+                "parameters": [
+                    {
+                        "description": "Данные раздела",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/edutalks_internal_models.Section"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/sections/{id}": {
+            "delete": {
+                "description": "Доступно только администратору",
+                "tags": [
+                    "taxonomy"
+                ],
+                "summary": "Удалить раздел",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID раздела",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "description": "Доступно только администратору",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "taxonomy"
+                ],
+                "summary": "Обновить раздел",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID раздела",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Обновлённые данные",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/edutalks_internal_models.Section"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/tabs": {
+            "post": {
+                "description": "Доступно только администратору",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "taxonomy"
+                ],
+                "summary": "Создать вкладку",
+                "parameters": [
+                    {
+                        "description": "Данные вкладки",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/edutalks_internal_models.Tab"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/tabs/{id}": {
+            "delete": {
+                "description": "Доступно только администратору",
+                "tags": [
+                    "taxonomy"
+                ],
+                "summary": "Удалить вкладку",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID вкладки",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "description": "Доступно только администратору",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "taxonomy"
+                ],
+                "summary": "Обновить вкладку",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID вкладки",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Обновлённые данные",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/edutalks_internal_models.Tab"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
@@ -1030,50 +1342,55 @@ const docTemplate = `{
         },
         "/api/files": {
             "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
+                "description": "Поддерживает фильтры: section_id и category",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "files"
+                    "documents"
                 ],
-                "summary": "Список доступных документов (по подписке)",
+                "summary": "Получить список публичных документов",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Номер страницы (начиная с 1)",
+                        "description": "Номер страницы (по умолчанию 1)",
                         "name": "page",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Размер страницы",
+                        "description": "Размер страницы (по умолчанию 10)",
                         "name": "page_size",
                         "in": "query"
                     },
                     {
+                        "type": "integer",
+                        "description": "ID раздела",
+                        "name": "section_id",
+                        "in": "query"
+                    },
+                    {
                         "type": "string",
-                        "description": "Категория документа (например, 'приказ', 'шаблон')",
+                        "description": "Категория документа",
                         "name": "category",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "items, page, page_size, total",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
                         }
                     },
                     "500": {
-                        "description": "Ошибка сервера",
+                        "description": "Internal Server Error",
                         "schema": {
-                            "type": "string"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
@@ -1240,6 +1557,41 @@ const docTemplate = `{
                         "description": "Пользователь не найден",
                         "schema": {
                             "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/taxonomy/tree": {
+            "get": {
+                "description": "Возвращает список вкладок с разделами и количеством документов в каждом разделе",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "taxonomy"
+                ],
+                "summary": "Получить дерево вкладок и разделов",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/edutalks_internal_models.TabTree"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
@@ -1783,6 +2135,9 @@ const docTemplate = `{
                 "is_public": {
                     "type": "boolean"
                 },
+                "section_id": {
+                    "type": "integer"
+                },
                 "uploaded_at": {
                     "type": "string"
                 },
@@ -1837,6 +2192,89 @@ const docTemplate = `{
                 },
                 "title": {
                     "type": "string"
+                }
+            }
+        },
+        "edutalks_internal_models.Section": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "tab_id": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "edutalks_internal_models.SectionWithCount": {
+            "type": "object",
+            "properties": {
+                "docs_count": {
+                    "type": "integer"
+                },
+                "section": {
+                    "$ref": "#/definitions/edutalks_internal_models.Section"
+                }
+            }
+        },
+        "edutalks_internal_models.Tab": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "edutalks_internal_models.TabTree": {
+            "type": "object",
+            "properties": {
+                "sections": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/edutalks_internal_models.SectionWithCount"
+                    }
+                },
+                "tab": {
+                    "$ref": "#/definitions/edutalks_internal_models.Tab"
                 }
             }
         },

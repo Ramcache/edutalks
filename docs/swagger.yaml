@@ -64,6 +64,8 @@ definitions:
         type: integer
       is_public:
         type: boolean
+      section_id:
+        type: integer
       uploaded_at:
         type: string
       user_id:
@@ -100,6 +102,60 @@ definitions:
         type: string
       title:
         type: string
+    type: object
+  edutalks_internal_models.Section:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      position:
+        type: integer
+      slug:
+        type: string
+      tab_id:
+        type: integer
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  edutalks_internal_models.SectionWithCount:
+    properties:
+      docs_count:
+        type: integer
+      section:
+        $ref: '#/definitions/edutalks_internal_models.Section'
+    type: object
+  edutalks_internal_models.Tab:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      position:
+        type: integer
+      slug:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  edutalks_internal_models.TabTree:
+    properties:
+      sections:
+        items:
+          $ref: '#/definitions/edutalks_internal_models.SectionWithCount'
+        type: array
+      tab:
+        $ref: '#/definitions/edutalks_internal_models.Tab'
     type: object
   edutalks_internal_models.UpdateUserRequest:
     properties:
@@ -506,40 +562,54 @@ paths:
     post:
       consumes:
       - multipart/form-data
+      description: Админ может загрузить документ и привязать его к разделу
       parameters:
-      - description: Файл документа
+      - description: Файл
         in: formData
         name: file
         required: true
         type: file
-      - description: Описание файла
+      - description: Описание
         in: formData
         name: description
         type: string
-      - description: Доступен по подписке?
+      - description: Публичный документ?
         in: formData
         name: is_public
+        required: true
         type: boolean
-      - description: Категория документа (например, 'приказ', 'шаблон')
+      - description: Категория
         in: formData
         name: category
         type: string
+      - description: ID раздела
+        in: formData
+        name: section_id
+        type: integer
       produces:
       - application/json
       responses:
         "201":
-          description: Файл загружен
+          description: Created
           schema:
-            type: string
+            additionalProperties:
+              type: integer
+            type: object
         "400":
-          description: Ошибка загрузки
+          description: Bad Request
           schema:
-            type: string
-      security:
-      - ApiKeyAuth: []
-      summary: Загрузка документа (только для админа)
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Загрузить документ
       tags:
-      - admin-files
+      - documents
   /api/admin/news:
     post:
       consumes:
@@ -673,6 +743,200 @@ paths:
       summary: Отправить письмо всем подписанным
       tags:
       - admin-notify
+  /api/admin/sections:
+    post:
+      consumes:
+      - application/json
+      description: Доступно только администратору
+      parameters:
+      - description: Данные раздела
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/edutalks_internal_models.Section'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: integer
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Создать раздел во вкладке
+      tags:
+      - taxonomy
+  /api/admin/sections/{id}:
+    delete:
+      description: Доступно только администратору
+      parameters:
+      - description: ID раздела
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Удалить раздел
+      tags:
+      - taxonomy
+    patch:
+      consumes:
+      - application/json
+      description: Доступно только администратору
+      parameters:
+      - description: ID раздела
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Обновлённые данные
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/edutalks_internal_models.Section'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновить раздел
+      tags:
+      - taxonomy
+  /api/admin/tabs:
+    post:
+      consumes:
+      - application/json
+      description: Доступно только администратору
+      parameters:
+      - description: Данные вкладки
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/edutalks_internal_models.Tab'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: integer
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Создать вкладку
+      tags:
+      - taxonomy
+  /api/admin/tabs/{id}:
+    delete:
+      description: Доступно только администратору
+      parameters:
+      - description: ID вкладки
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Удалить вкладку
+      tags:
+      - taxonomy
+    patch:
+      consumes:
+      - application/json
+      description: Доступно только администратору
+      parameters:
+      - description: ID вкладки
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Обновлённые данные
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/edutalks_internal_models.Tab'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновить вкладку
+      tags:
+      - taxonomy
   /api/admin/users:
     get:
       parameters:
@@ -917,16 +1181,21 @@ paths:
       - auth
   /api/files:
     get:
+      description: 'Поддерживает фильтры: section_id и category'
       parameters:
-      - description: Номер страницы (начиная с 1)
+      - description: Номер страницы (по умолчанию 1)
         in: query
         name: page
         type: integer
-      - description: Размер страницы
+      - description: Размер страницы (по умолчанию 10)
         in: query
         name: page_size
         type: integer
-      - description: Категория документа (например, 'приказ', 'шаблон')
+      - description: ID раздела
+        in: query
+        name: section_id
+        type: integer
+      - description: Категория документа
         in: query
         name: category
         type: string
@@ -934,19 +1203,19 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: items, page, page_size, total
           schema:
             additionalProperties: true
             type: object
         "500":
-          description: Ошибка сервера
+          description: Internal Server Error
           schema:
-            type: string
-      security:
-      - ApiKeyAuth: []
-      summary: Список доступных документов (по подписке)
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить список публичных документов
       tags:
-      - files
+      - documents
   /api/files/{id}:
     get:
       parameters:
@@ -1048,6 +1317,30 @@ paths:
       summary: Получить данные профиля
       tags:
       - profile
+  /api/taxonomy/tree:
+    get:
+      description: Возвращает список вкладок с разделами и количеством документов
+        в каждом разделе
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/edutalks_internal_models.TabTree'
+              type: array
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получить дерево вкладок и разделов
+      tags:
+      - taxonomy
   /documents/{id}/preview:
     get:
       description: Показывает название, описание и категорию документа. Файл не отдаётся.
