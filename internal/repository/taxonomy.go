@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"edutalks/internal/models"
+	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -156,3 +158,104 @@ ORDER BY t.position, t.id, s.position, s.id;
 	}
 	return out, nil
 }
+
+// ListTabTreeFilter возвращает дерево по фильтру: по ID или по slug вкладки (любой из них, опционально).
+func (r *TaxonomyRepo) ListTabTreeFilter(ctx context.Context, tabID *int, tabSlug *string) ([]models.TabTree, error) {
+	q := `
+WITH s AS (
+  SELECT s.*, COALESCE(d.cnt,0) AS docs_count
+  FROM sections s
+  LEFT JOIN (SELECT section_id, COUNT(*) cnt FROM documents GROUP BY section_id) d
+    ON d.section_id = s.id
+  WHERE s.is_active = true
+)
+SELECT
+  t.id, t.slug, t.title, t.position, t.is_active, t.created_at, t.updated_at,
+  s.id, s.tab_id, s.slug, s.title, s.description, s.position, s.is_active, s.created_at, s.updated_at, s.docs_count
+FROM tabs t
+LEFT JOIN s ON s.tab_id = t.id
+WHERE t.is_active = true
+`
+	args := []any{}
+	conds := []string{}
+
+	if tabID != nil {
+		conds = append(conds, "t.id = $"+itoa(len(args)+1))
+		args = append(args, *tabID)
+	}
+	if tabSlug != nil && *tabSlug != "" {
+		conds = append(conds, "t.slug = $"+itoa(len(args)+1))
+		args = append(args, *tabSlug)
+	}
+	if len(conds) > 0 {
+		q += " AND (" + strings.Join(conds, " OR ") + ")"
+	}
+
+	q += " ORDER BY t.position, t.id, s.position, s.id;"
+
+	rows, err := r.db.Query(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []models.TabTree
+	var cur *models.TabTree
+
+	for rows.Next() {
+		var t models.Tab
+
+		var (
+			secID        sql.NullInt32
+			secTabID     sql.NullInt32
+			secSlug      sql.NullString
+			secTitle     sql.NullString
+			secDesc      sql.NullString
+			secPos       sql.NullInt32
+			secActive    sql.NullBool
+			secCreatedAt sql.NullTime
+			secUpdatedAt sql.NullTime
+			docsCount    sql.NullInt64
+		)
+
+		if err := rows.Scan(
+			&t.ID, &t.Slug, &t.Title, &t.Position, &t.IsActive, &t.CreatedAt, &t.UpdatedAt,
+			&secID, &secTabID, &secSlug, &secTitle, &secDesc, &secPos, &secActive, &secCreatedAt, &secUpdatedAt, &docsCount,
+		); err != nil {
+			return nil, err
+		}
+
+		if cur == nil || cur.Tab.ID != t.ID {
+			out = append(out, models.TabTree{Tab: t})
+			cur = &out[len(out)-1]
+		}
+		if secID.Valid {
+			s := models.Section{
+				ID:          int(secID.Int32),
+				TabID:       int(secTabID.Int32),
+				Slug:        secSlug.String,
+				Title:       secTitle.String,
+				Description: secDesc.String,
+				Position:    int(secPos.Int32),
+				IsActive:    secActive.Bool,
+				CreatedAt:   secCreatedAt.Time,
+				UpdatedAt:   secUpdatedAt.Time,
+			}
+			cnt := 0
+			if docsCount.Valid {
+				cnt = int(docsCount.Int64)
+			}
+			cur.Sections = append(cur.Sections, models.SectionWithCount{
+				Section:   s,
+				DocsCount: cnt,
+			})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// простой хелпер без strconv импортов
+func itoa(i int) string { return fmt.Sprintf("%d", i) }

@@ -1587,6 +1587,62 @@
                 }
             }
         },
+        "/api/taxonomy/tree/{tab}": {
+            "get": {
+                "description": "{tab} может быть slug или числовой ID. Параметры ?id= и ?slug= также поддерживаются и необязательны.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "taxonomy"
+                ],
+                "summary": "Получить дерево по конкретной вкладке",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Slug или ID вкладки",
+                        "name": "tab",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "ID вкладки (необязателен)",
+                        "name": "id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Slug вкладки (необязателен)",
+                        "name": "slug",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/edutalks_internal_models.TabTree"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/documents/preview": {
             "get": {
                 "description": "Возвращает список превью документов c пагинацией и фильтром категории.",
