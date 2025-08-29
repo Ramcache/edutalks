@@ -18,6 +18,10 @@ const (
 
 func JWTAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		cfg, _ := config.LoadConfig()
 		authHeader := r.Header.Get("Authorization")
 

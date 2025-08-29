@@ -35,7 +35,9 @@ func main() {
 	}
 	//
 	logger.Log.Info("Сервер запущен", zap.String("port", cfg.Port))
-
+	router.Methods(http.MethodOptions).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
 	corsMiddleware := cors.New(cors.Options{
 		// Разрешаем фронты разработки
 		AllowedOrigins: []string{
@@ -54,15 +56,8 @@ func main() {
 
 		AllowCredentials: true,
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Authorization",
-			"Content-Type",
-			"Accept",
-			"X-Requested-With",
-			"X-CSRF-Token",
-			"Cache-Control",
-			"Pragma",
-		},
+		AllowedHeaders:   []string{"*"}, // вместо перечисления вручную
+
 		ExposedHeaders: []string{
 			// если на фронте читаете какие-то заголовки ответа — добавьте их сюда
 			// "X-Total-Count",
