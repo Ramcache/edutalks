@@ -36,13 +36,15 @@ type DocumentRepo interface {
 	UpdateDocumentSection(ctx context.Context, id int, sectionID *int) error
 }
 
-// Сохранение документа
-func (r *DocumentRepository) SaveDocument(ctx context.Context, doc *models.Document) error {
+// Сохранение документа и возврат ID
+func (r *DocumentRepository) SaveDocument(ctx context.Context, doc *models.Document) (int, error) {
 	logger.Log.Info("Репозиторий: сохранение документа", zap.String("filename", doc.Filename), zap.Int("user_id", doc.UserID))
 	query := `
 		INSERT INTO documents (user_id, filename, filepath, description, is_public, category, section_id, uploaded_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
-	_, err := r.db.Exec(ctx, query,
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id`
+	var id int
+	err := r.db.QueryRow(ctx, query,
 		doc.UserID,
 		doc.Filename,
 		doc.Filepath,
@@ -51,11 +53,12 @@ func (r *DocumentRepository) SaveDocument(ctx context.Context, doc *models.Docum
 		doc.Category,
 		doc.SectionID,
 		doc.UploadedAt,
-	)
+	).Scan(&id)
 	if err != nil {
 		logger.Log.Error("Ошибка сохранения документа (repo)", zap.Error(err))
+		return 0, err
 	}
-	return err
+	return id, nil
 }
 
 // Публичные документы с фильтром по категории (если передана)

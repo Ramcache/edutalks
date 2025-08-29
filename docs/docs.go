@@ -1426,6 +1426,12 @@ const docTemplate = `{
                             "type": "file"
                         }
                     },
+                    "403": {
+                        "description": "Нет доступа",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "404": {
                         "description": "Документ не найден",
                         "schema": {

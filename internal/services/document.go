@@ -27,13 +27,8 @@ type DocumentServiceInterface interface {
 	Search(ctx context.Context, query string) ([]models.News, error)
 }
 
-func (s *DocumentService) Upload(ctx context.Context, doc *models.Document) error {
-	logger.Log.Info("Сервис: загрузка документа", zap.String("filename", doc.Filename), zap.Int("user_id", doc.UserID))
-	err := s.repo.SaveDocument(ctx, doc)
-	if err != nil {
-		logger.Log.Error("Ошибка загрузки документа (service)", zap.Error(err))
-	}
-	return err
+func (s *DocumentService) Upload(ctx context.Context, doc *models.Document) (int, error) {
+	return s.repo.SaveDocument(ctx, doc)
 }
 
 func (s *DocumentService) GetPublicDocumentsPaginated(ctx context.Context, limit, offset int, category string) ([]*models.Document, int, error) {
