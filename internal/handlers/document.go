@@ -39,6 +39,7 @@ func NewDocumentHandler(docService *services.DocumentService, userService *servi
 // @Tags         documents
 // @Accept       multipart/form-data
 // @Produce      json
+// @Param        title       formData  string  false  "Название документа"
 // @Param        file        formData  file    true   "Файл"
 // @Param        description formData  string  false  "Описание"
 // @Param        is_public   formData  bool    true   "Публичный документ?"
@@ -100,9 +101,11 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при сохранении файла")
 		return
 	}
+	title := r.FormValue("title")
 
 	doc := &models.Document{
 		UserID:      userID,
+		Title:       title,
 		Filename:    handler.Filename,
 		Filepath:    fullPath,
 		Description: description,
@@ -122,8 +125,9 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 
 	helpers.JSON(w, http.StatusCreated, map[string]any{
 		"id": id,
-		"item": map[string]any{
+		"data": map[string]any{
 			"id":          id,
+			"title":       doc.Title,
 			"filename":    doc.Filename,
 			"description": doc.Description,
 			"category":    doc.Category,
@@ -356,7 +360,7 @@ func (h *DocumentHandler) PreviewDocument(w http.ResponseWriter, r *http.Request
 
 	resp := models.DocumentPreviewResponse{
 		ID:          doc.ID,
-		Title:       doc.Filename,
+		Title:       doc.Title, // теперь title, не filename
 		Description: doc.Description,
 		Category:    doc.Category,
 		SectionID:   doc.SectionID,
@@ -364,22 +368,11 @@ func (h *DocumentHandler) PreviewDocument(w http.ResponseWriter, r *http.Request
 		Message:     "Документ доступен только по подписке",
 	}
 	helpers.JSON(w, http.StatusOK, map[string]any{"item": resp})
-
 }
 
 // PreviewDocuments godoc
 // @Summary Превью публичных документов (список, метаданные)
-// @Description Возвращает список превью документов c пагинацией и фильтром категории.
-// @Tags public-documents
-// @Produce json
-// @Param page query int false "Номер страницы (>=1)"
-// @Param page_size query int false "Размер страницы (1..100)"
-// @Param category query string false "Категория (например, 'приказ', 'шаблон')"
-// @Success 200 {object} map[string]interface{}
-// @Failure 500 {string} string "Ошибка сервера"
-// @Router /documents/preview [get]
 func (h *DocumentHandler) PreviewDocuments(w http.ResponseWriter, r *http.Request) {
-	// пагинация
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
 		page = 1
@@ -389,18 +382,14 @@ func (h *DocumentHandler) PreviewDocuments(w http.ResponseWriter, r *http.Reques
 		pageSize = 10
 	}
 	offset := (page - 1) * pageSize
-
-	// фильтр по категории
 	category := r.URL.Query().Get("category")
 
-	// берём из сервиса только публичные документы
 	docs, total, err := h.service.GetPublicDocumentsPaginated(r.Context(), pageSize, offset, category)
 	if err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка получения документов")
 		return
 	}
 
-	// собираем превью (метаданные)
 	previews := make([]models.DocumentPreviewResponse, 0, len(docs))
 	for _, d := range docs {
 		if !d.IsPublic {
@@ -408,7 +397,7 @@ func (h *DocumentHandler) PreviewDocuments(w http.ResponseWriter, r *http.Reques
 		}
 		previews = append(previews, models.DocumentPreviewResponse{
 			ID:          d.ID,
-			Title:       d.Filename,
+			Title:       d.Title, // теперь title, не filename
 			Description: d.Description,
 			Category:    d.Category,
 			SectionID:   d.SectionID,

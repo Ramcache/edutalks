@@ -35,9 +35,7 @@ func main() {
 	}
 	//
 	logger.Log.Info("Сервер запущен", zap.String("port", cfg.Port))
-	router.Methods(http.MethodOptions).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
+
 	corsMiddleware := cors.New(cors.Options{
 		// Разрешаем фронты разработки
 		AllowedOrigins: []string{

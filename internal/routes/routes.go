@@ -59,6 +59,7 @@ func InitRoutes(
 	// --- Защищённые JWT ---
 	protected := api.PathPrefix("").Subrouter()
 	protected.Use(middleware.JWTAuth)
+	protected.Use(middleware.AdminFastLane) // <<< фастлейн: админ игнорит все проверки
 	protected.Methods(http.MethodOptions).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
