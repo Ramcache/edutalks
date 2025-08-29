@@ -31,7 +31,7 @@ func (h *TaxonomyHandler) PublicTree(w http.ResponseWriter, r *http.Request) {
 		helpers.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	helpers.JSON(w, http.StatusOK, map[string]any{"items": tree})
+	helpers.JSON(w, http.StatusOK, map[string]any{"data": tree})
 }
 
 // CreateTab
@@ -214,5 +214,5 @@ func (h *TaxonomyHandler) PublicTreeByTab(w http.ResponseWriter, r *http.Request
 		helpers.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	helpers.JSON(w, http.StatusOK, map[string]any{"items": items})
+	helpers.JSON(w, http.StatusOK, map[string]any{"data": items})
 }

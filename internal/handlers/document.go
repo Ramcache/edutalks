@@ -143,7 +143,7 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 // @Param        page_size   query  int     false  "Размер страницы (по умолчанию 10)"
 // @Param        section_id  query  int     false  "ID раздела"
 // @Param        category    query  string  false  "Категория документа"
-// @Success      200 {object} map[string]interface{} "items, page, page_size, total"
+// @Success      200 {object} map[string]interface{} "data, page, page_size, total"
 // @Failure      500 {object} map[string]string
 // @Router       /api/files [get]
 func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Request) {
@@ -183,7 +183,7 @@ func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Req
 	}
 
 	helpers.JSON(w, http.StatusOK, map[string]any{
-		"items":      docs,
+		"data":       docs,
 		"total":      total,
 		"page":       page,
 		"page_size":  pageSize,
@@ -326,7 +326,7 @@ func (h *DocumentHandler) GetAllDocuments(w http.ResponseWriter, r *http.Request
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка получения документов")
 		return
 	}
-	helpers.JSON(w, http.StatusOK, map[string]any{"items": docs})
+	helpers.JSON(w, http.StatusOK, map[string]any{"data": docs})
 }
 
 // PreviewDocument godoc
@@ -418,7 +418,7 @@ func (h *DocumentHandler) PreviewDocuments(w http.ResponseWriter, r *http.Reques
 	}
 
 	helpers.JSON(w, http.StatusOK, map[string]any{
-		"items":     previews,
+		"data":      previews,
 		"total":     total,
 		"page":      page,
 		"page_size": pageSize,
