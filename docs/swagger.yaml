@@ -64,6 +64,8 @@ definitions:
         type: boolean
       section_id:
         type: integer
+      title:
+        type: string
       uploaded_at:
         type: string
       user_id:
@@ -564,6 +566,10 @@ paths:
       - multipart/form-data
       description: Админ может загрузить документ и привязать его к разделу
       parameters:
+      - description: Название документа
+        in: formData
+        name: title
+        type: string
       - description: Файл
         in: formData
         name: file
@@ -1408,37 +1414,6 @@ paths:
           schema:
             type: string
       summary: Превью публичного документа (только метаданные)
-      tags:
-      - public-documents
-  /documents/preview:
-    get:
-      description: Возвращает список превью документов c пагинацией и фильтром категории.
-      parameters:
-      - description: Номер страницы (>=1)
-        in: query
-        name: page
-        type: integer
-      - description: Размер страницы (1..100)
-        in: query
-        name: page_size
-        type: integer
-      - description: Категория (например, 'приказ', 'шаблон')
-        in: query
-        name: category
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Ошибка сервера
-          schema:
-            type: string
-      summary: Превью публичных документов (список, метаданные)
       tags:
       - public-documents
   /login:

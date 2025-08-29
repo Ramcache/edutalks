@@ -350,6 +350,12 @@ const docTemplate = `{
                 "summary": "Загрузить документ",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "Название документа",
+                        "name": "title",
+                        "in": "formData"
+                    },
+                    {
                         "type": "file",
                         "description": "Файл",
                         "name": "file",
@@ -1659,53 +1665,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/documents/preview": {
-            "get": {
-                "description": "Возвращает список превью документов c пагинацией и фильтром категории.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "public-documents"
-                ],
-                "summary": "Превью публичных документов (список, метаданные)",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Номер страницы (\u003e=1)",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Размер страницы (1..100)",
-                        "name": "page_size",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Категория (например, 'приказ', 'шаблон')",
-                        "name": "category",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Ошибка сервера",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
         "/documents/{id}/preview": {
             "get": {
                 "description": "Показывает название, описание и категорию документа. Файл не отдаётся.",
@@ -2196,6 +2155,9 @@ const docTemplate = `{
                 },
                 "section_id": {
                     "type": "integer"
+                },
+                "title": {
+                    "type": "string"
                 },
                 "uploaded_at": {
                     "type": "string"

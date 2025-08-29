@@ -40,12 +40,14 @@ type DocumentRepo interface {
 func (r *DocumentRepository) SaveDocument(ctx context.Context, doc *models.Document) (int, error) {
 	logger.Log.Info("Репозиторий: сохранение документа", zap.String("filename", doc.Filename), zap.Int("user_id", doc.UserID))
 	query := `
-		INSERT INTO documents (user_id, filename, filepath, description, is_public, category, section_id, uploaded_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		RETURNING id`
+    INSERT INTO documents (user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING id`
 	var id int
+
 	err := r.db.QueryRow(ctx, query,
 		doc.UserID,
+		doc.Title,
 		doc.Filename,
 		doc.Filepath,
 		doc.Description,
@@ -54,6 +56,7 @@ func (r *DocumentRepository) SaveDocument(ctx context.Context, doc *models.Docum
 		doc.SectionID,
 		doc.UploadedAt,
 	).Scan(&id)
+
 	if err != nil {
 		logger.Log.Error("Ошибка сохранения документа (repo)", zap.Error(err))
 		return 0, err
@@ -74,7 +77,7 @@ func (r *DocumentRepository) GetPublicDocumentsPaginated(ctx context.Context, li
 
 	if category != "" {
 		query = `
-			SELECT id, user_id, filename, filepath, description, is_public, category, section_id, uploaded_at
+			SELECT id, user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at
 			FROM documents
 			WHERE is_public = true AND category = $1
 			ORDER BY uploaded_at DESC
@@ -84,7 +87,7 @@ func (r *DocumentRepository) GetPublicDocumentsPaginated(ctx context.Context, li
 		rows, err = r.db.Query(ctx, query, args...)
 	} else {
 		query = `
-			SELECT id, user_id, filename, filepath, description, is_public, category, section_id, uploaded_at
+			SELECT id, user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at
 			FROM documents
 			WHERE is_public = true
 			ORDER BY uploaded_at DESC
@@ -104,6 +107,7 @@ func (r *DocumentRepository) GetPublicDocumentsPaginated(ctx context.Context, li
 		err := rows.Scan(
 			&d.ID,
 			&d.UserID,
+			&d.Title,
 			&d.Filename,
 			&d.Filepath,
 			&d.Description,
@@ -137,13 +141,14 @@ func (r *DocumentRepository) GetPublicDocumentsPaginated(ctx context.Context, li
 func (r *DocumentRepository) GetDocumentByID(ctx context.Context, id int) (*models.Document, error) {
 	logger.Log.Info("Репозиторий: получение документа по ID", zap.Int("doc_id", id))
 	query := `
-		SELECT id, user_id, filename, filepath, description, is_public, category, section_id, uploaded_at
+		SELECT id, user_id,title, filename, filepath, description, is_public, category, section_id, uploaded_at
 		FROM documents WHERE id = $1
 	`
 	var d models.Document
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&d.ID,
 		&d.UserID,
+		&d.Title,
 		&d.Filename,
 		&d.Filepath,
 		&d.Description,
@@ -173,7 +178,7 @@ func (r *DocumentRepository) DeleteDocument(ctx context.Context, id int) error {
 // Для админки — все документы
 func (r *DocumentRepository) GetAllDocuments(ctx context.Context) ([]*models.Document, error) {
 	query := `
-		SELECT id, user_id, filename, filepath, description, is_public, category, section_id, uploaded_at
+		SELECT id, user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at
 		FROM documents
 		ORDER BY uploaded_at DESC
 	`
@@ -190,6 +195,7 @@ func (r *DocumentRepository) GetAllDocuments(ctx context.Context) ([]*models.Doc
 		if err := rows.Scan(
 			&d.ID,
 			&d.UserID,
+			&d.Title,
 			&d.Filename,
 			&d.Filepath,
 			&d.Description,
@@ -209,9 +215,9 @@ func (r *DocumentRepository) GetAllDocuments(ctx context.Context) ([]*models.Doc
 func (r *DocumentRepository) Search(ctx context.Context, query string) ([]models.Document, error) {
 	q := "%" + query + "%"
 	rows, err := r.db.Query(ctx, `
-		SELECT id, user_id, filename, description, is_public, category, section_id, uploaded_at
+		SELECT id, user_id, title, filename, description, is_public, category, section_id, uploaded_at
 		FROM documents
-		WHERE filename ILIKE $1 OR description ILIKE $1 OR category ILIKE $1
+		WHERE title ILIKE $1 OR filename ILIKE $1 OR description ILIKE $1 OR category ILIKE $1
 	`, q)
 	if err != nil {
 		return nil, err
@@ -224,6 +230,7 @@ func (r *DocumentRepository) Search(ctx context.Context, query string) ([]models
 		if err := rows.Scan(
 			&doc.ID,
 			&doc.UserID,
+			&doc.Title,
 			&doc.Filename,
 			&doc.Description,
 			&doc.IsPublic,
@@ -255,7 +262,7 @@ func (r *DocumentRepository) GetPublicDocumentsByFilterPaginated(
 		total int
 	)
 
-	queryBase := `SELECT id, user_id, filename, filepath, description, is_public, category, section_id, uploaded_at
+	queryBase := `SELECT id, user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at
 	              FROM documents WHERE is_public = true`
 
 	if sectionID != nil {
@@ -285,6 +292,7 @@ func (r *DocumentRepository) GetPublicDocumentsByFilterPaginated(
 		if err := rows.Scan(
 			&d.ID,
 			&d.UserID,
+			&d.Title,
 			&d.Filename,
 			&d.Filepath,
 			&d.Description,

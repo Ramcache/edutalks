@@ -5,6 +5,7 @@ import "time"
 type Document struct {
 	ID          int       `json:"id"`
 	UserID      int       `json:"user_id"`
+	Title       string    `json:"title"`
 	Filename    string    `json:"filename"`
 	Filepath    string    `json:"-"`
 	Description string    `json:"description"`
