@@ -359,6 +359,7 @@ func (h *DocumentHandler) PreviewDocument(w http.ResponseWriter, r *http.Request
 		Title:       doc.Filename,
 		Description: doc.Description,
 		Category:    doc.Category,
+		SectionID:   doc.SectionID,
 		UploadedAt:  doc.UploadedAt.Format("2006-01-02"),
 		Message:     "Документ доступен только по подписке",
 	}
@@ -410,6 +411,7 @@ func (h *DocumentHandler) PreviewDocuments(w http.ResponseWriter, r *http.Reques
 			Title:       d.Filename,
 			Description: d.Description,
 			Category:    d.Category,
+			SectionID:   d.SectionID,
 			UploadedAt:  d.UploadedAt.Format("2006-01-02"),
 			Message:     "Документ доступен только по подписке",
 		})

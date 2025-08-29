@@ -2188,9 +2188,6 @@ const docTemplate = `{
                 "filename": {
                     "type": "string"
                 },
-                "filepath": {
-                    "type": "string"
-                },
                 "id": {
                     "type": "integer"
                 },
@@ -2222,6 +2219,9 @@ const docTemplate = `{
                 },
                 "message": {
                     "type": "string"
+                },
+                "section_id": {
+                    "type": "integer"
                 },
                 "title": {
                     "type": "string"
