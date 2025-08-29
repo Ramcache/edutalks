@@ -1378,7 +1378,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "items, page, page_size, total",
+                        "description": "data, page, page_size, total",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
