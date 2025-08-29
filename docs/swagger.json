@@ -2178,9 +2178,6 @@
                 "filename": {
                     "type": "string"
                 },
-                "filepath": {
-                    "type": "string"
-                },
                 "id": {
                     "type": "integer"
                 },
@@ -2212,6 +2209,9 @@
                 },
                 "message": {
                     "type": "string"
+                },
+                "section_id": {
+                    "type": "integer"
                 },
                 "title": {
                     "type": "string"

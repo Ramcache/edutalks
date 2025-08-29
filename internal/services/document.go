@@ -18,13 +18,13 @@ func NewDocumentService(repo *repository.DocumentRepository) *DocumentService {
 }
 
 type DocumentServiceInterface interface {
-	Upload(ctx context.Context, doc *models.Document) error
-	GetPublicDocuments(ctx context.Context) ([]*models.Document, error)
+	Upload(ctx context.Context, doc *models.Document) (int, error) // было error
 	GetPublicDocumentsPaginated(ctx context.Context, limit, offset int, category string) ([]*models.Document, int, error)
 	GetDocumentByID(ctx context.Context, id int) (*models.Document, error)
 	Delete(ctx context.Context, id int) error
 	GetAllDocuments(ctx context.Context) ([]*models.Document, error)
-	Search(ctx context.Context, query string) ([]models.News, error)
+	Search(ctx context.Context, query string) ([]models.Document, error) // было []models.News
+	GetPublicDocumentsByFilterPaginated(ctx context.Context, limit, offset int, sectionID *int, category string) ([]*models.Document, int, error)
 }
 
 func (s *DocumentService) Upload(ctx context.Context, doc *models.Document) (int, error) {
