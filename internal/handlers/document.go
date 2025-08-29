@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"mime"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -51,7 +50,7 @@ func NewDocumentHandler(docService *services.DocumentService, userService *servi
 // @Router       /api/admin/files/upload [post]
 func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	logger.Log.Info("Запрос на загрузку документа")
-	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10MB
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		logger.Log.Warn("Ошибка разбора формы при загрузке документа", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "Ошибка разбора формы")
 		return
@@ -63,11 +62,7 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 		helpers.Error(w, http.StatusBadRequest, "Файл не найден")
 		return
 	}
-	defer func(file multipart.File) {
-		if cerr := file.Close(); cerr != nil {
-			logger.Log.Error("ошибка при закрытии файла", zap.Error(cerr))
-		}
-	}(file)
+	defer file.Close()
 
 	description := r.FormValue("description")
 	isPublic := strings.ToLower(r.FormValue("is_public")) == "true"
@@ -98,11 +93,7 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при сохранении файла")
 		return
 	}
-	defer func(dst *os.File) {
-		if cerr := dst.Close(); cerr != nil {
-			logger.Log.Error("ошибка при закрытии файла", zap.Error(cerr))
-		}
-	}(dst)
+	defer dst.Close()
 
 	if _, err := io.Copy(dst, file); err != nil {
 		logger.Log.Error("Ошибка записи файла", zap.Error(err))
@@ -122,14 +113,25 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 	}
 
 	logger.Log.Info("Сохраняем информацию о документе", zap.String("filename", handler.Filename), zap.Int("user_id", userID))
-	if err := h.service.Upload(r.Context(), doc); err != nil {
+	id, err := h.service.Upload(r.Context(), doc)
+	if err != nil {
 		logger.Log.Error("Ошибка при сохранении документа в базе", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при сохранении документа")
 		return
 	}
 
-	logger.Log.Info("Документ успешно загружен", zap.String("filename", handler.Filename), zap.Int("user_id", userID))
-	helpers.JSON(w, http.StatusCreated, "Файл загружен")
+	helpers.JSON(w, http.StatusCreated, map[string]any{
+		"id": id,
+		"item": map[string]any{
+			"id":          id,
+			"filename":    doc.Filename,
+			"description": doc.Description,
+			"category":    doc.Category,
+			"section_id":  doc.SectionID,
+			"is_public":   doc.IsPublic,
+			"uploaded_at": doc.UploadedAt,
+		},
+	})
 }
 
 // ListPublicDocuments
@@ -180,13 +182,13 @@ func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	helpers.JSON(w, http.StatusOK, map[string]interface{}{
-		"data":       docs,
+	helpers.JSON(w, http.StatusOK, map[string]any{
+		"items":      docs,
 		"total":      total,
 		"page":       page,
 		"page_size":  pageSize,
 		"category":   category,
-		"section_id": func() *int { return sectionIDPtr }(), // просто чтобы видеть в ответе
+		"section_id": sectionIDPtr,
 	})
 }
 
@@ -194,9 +196,10 @@ func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Req
 // @Summary Скачать документ по ID
 // @Tags files
 // @Security ApiKeyAuth
-// @Produce octet-stream
+// @Produce application/octet-stream
 // @Param id path int true "ID документа"
 // @Success 200 {file} file
+// @Failure 403 {string} string "Нет доступа"
 // @Failure 404 {string} string "Документ не найден"
 // @Router /api/files/{id} [get]
 func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Request) {
@@ -323,7 +326,7 @@ func (h *DocumentHandler) GetAllDocuments(w http.ResponseWriter, r *http.Request
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка получения документов")
 		return
 	}
-	helpers.JSON(w, http.StatusOK, docs)
+	helpers.JSON(w, http.StatusOK, map[string]any{"items": docs})
 }
 
 // PreviewDocument godoc
@@ -359,8 +362,8 @@ func (h *DocumentHandler) PreviewDocument(w http.ResponseWriter, r *http.Request
 		UploadedAt:  doc.UploadedAt.Format("2006-01-02"),
 		Message:     "Документ доступен только по подписке",
 	}
+	helpers.JSON(w, http.StatusOK, map[string]any{"item": resp})
 
-	helpers.JSON(w, http.StatusOK, resp)
 }
 
 // PreviewDocuments godoc
@@ -412,8 +415,8 @@ func (h *DocumentHandler) PreviewDocuments(w http.ResponseWriter, r *http.Reques
 		})
 	}
 
-	helpers.JSON(w, http.StatusOK, map[string]interface{}{
-		"data":      previews,
+	helpers.JSON(w, http.StatusOK, map[string]any{
+		"items":     previews,
 		"total":     total,
 		"page":      page,
 		"page_size": pageSize,
