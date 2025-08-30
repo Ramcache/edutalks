@@ -353,3 +353,18 @@ func (r *UserRepository) ExpireSubscriptions(ctx context.Context) error {
 	`)
 	return err
 }
+
+// ExtendSubscription — прибавляет duration к текущей дате истечения (если её нет — от NOW()).
+func (r *UserRepository) ExtendSubscription(ctx context.Context, userID int, duration time.Duration) error {
+	query := `
+		UPDATE users
+		SET has_subscription = true,
+		    subscription_expires_at = COALESCE(subscription_expires_at, NOW()) + $1 * interval '1 second'
+		WHERE id = $2;
+	`
+	_, err := r.db.Exec(ctx, query, int64(duration.Seconds()), userID)
+	if err != nil {
+		logger.Log.Error("Ошибка продления подписки (repo)", zap.Error(err), zap.Int("user_id", userID))
+	}
+	return err
+}

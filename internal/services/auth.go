@@ -38,6 +38,7 @@ type UserRepo interface {
 	DeleteUserByID(ctx context.Context, userID int) error
 	SetSubscriptionWithExpiry(ctx context.Context, userID int, duration time.Duration) error
 	ExpireSubscriptions(ctx context.Context) error
+	ExtendSubscription(ctx context.Context, userID int, duration time.Duration) error
 }
 
 func (s *AuthService) RegisterUser(ctx context.Context, input *models.User, plainPassword string) error {
@@ -233,5 +234,14 @@ func (s *AuthService) SetSubscriptionWithExpiry(ctx context.Context, userID int,
 		return err
 	}
 	logger.Log.Info("Подписка с истечением успешно установлена", zap.Int("user_id", userID))
+	return nil
+}
+
+func (s *AuthService) ExtendSubscription(ctx context.Context, userID int, duration time.Duration) error {
+	logger.Log.Info("Продление подписки (service)", zap.Int("user_id", userID), zap.Duration("duration", duration))
+	if err := s.repo.ExtendSubscription(ctx, userID, duration); err != nil {
+		logger.Log.Error("Ошибка продления подписки (service)", zap.Error(err))
+		return err
+	}
 	return nil
 }
