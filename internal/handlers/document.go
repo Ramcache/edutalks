@@ -139,29 +139,18 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 }
 
 // ListPublicDocuments
-// @Summary      Получить список публичных документов
-// @Description  Поддерживает фильтры: section_id и category
+// @Summary      Получить список публичных документов (без пагинации)
+// @Description  Поддерживает фильтры: section_id и category. Возвращает все подходящие документы.
 // @Tags         documents
 // @Produce      json
-// @Param        page        query  int     false  "Номер страницы (по умолчанию 1)"
-// @Param        page_size   query  int     false  "Размер страницы (по умолчанию 10)"
 // @Param        section_id  query  int     false  "ID раздела"
 // @Param        category    query  string  false  "Категория документа"
-// @Success      200 {object} map[string]interface{} "data, page, page_size, total"
+// @Success      200 {object} map[string]interface{} "data, total, category, section_id"
 // @Failure      500 {object} map[string]string
 // @Router       /api/files [get]
 func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Request) {
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
-	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
-	offset := (page - 1) * pageSize
-
 	category := r.URL.Query().Get("category")
+
 	var sectionIDPtr *int
 	if s := r.URL.Query().Get("section_id"); s != "" {
 		if sid, err := strconv.Atoi(s); err == nil {
@@ -169,17 +158,7 @@ func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	var (
-		docs  []*models.Document
-		total int
-		err   error
-	)
-
-	if sectionIDPtr != nil || category != "" {
-		docs, total, err = h.service.GetPublicDocumentsByFilterPaginated(r.Context(), pageSize, offset, sectionIDPtr, category)
-	} else {
-		docs, total, err = h.service.GetPublicDocumentsPaginated(r.Context(), pageSize, offset, "")
-	}
+	docs, err := h.service.GetPublicDocuments(r.Context(), sectionIDPtr, category)
 	if err != nil {
 		logger.Log.Error("Ошибка при получении документов", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при получении документов")
@@ -188,9 +167,7 @@ func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Req
 
 	helpers.JSON(w, http.StatusOK, map[string]any{
 		"data":       docs,
-		"total":      total,
-		"page":       page,
-		"page_size":  pageSize,
+		"total":      len(docs),
 		"category":   category,
 		"section_id": sectionIDPtr,
 	})
@@ -324,11 +301,27 @@ func (h *DocumentHandler) DeleteDocument(w http.ResponseWriter, r *http.Request)
 // @Tags admin-files
 // @Security ApiKeyAuth
 // @Produce json
+// @Param limit query int false "Максимальное количество документов (по умолчанию 10, 0 = все)"
 // @Success 200 {array} models.Document
 // @Failure 500 {string} string "Ошибка сервера"
 // @Router /api/admin/files [get]
 func (h *DocumentHandler) GetAllDocuments(w http.ResponseWriter, r *http.Request) {
-	docs, err := h.service.GetAllDocuments(r.Context())
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit < 0 {
+		limit = 10
+	}
+	if limit == 0 {
+		// 0 = все
+	} else if limit == 0 || limit == 1 {
+		limit = 10 // дефолт
+	}
+
+	if limit == 0 {
+		// особый случай: вернуть все
+		logger.Log.Info("Админ: вернуть все документы")
+	}
+
+	docs, err := h.service.GetAllDocuments(r.Context(), limit)
 	if err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка получения документов")
 		return

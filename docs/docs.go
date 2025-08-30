@@ -316,6 +316,14 @@ const docTemplate = `{
                     "admin-files"
                 ],
                 "summary": "Получить все документы (только для админа)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Максимальное количество документов (по умолчанию 10, 0 = все)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1442,27 +1450,15 @@ const docTemplate = `{
         },
         "/api/files": {
             "get": {
-                "description": "Поддерживает фильтры: section_id и category",
+                "description": "Поддерживает фильтры: section_id и category. Возвращает все подходящие документы.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "documents"
                 ],
-                "summary": "Получить список публичных документов",
+                "summary": "Получить список публичных документов (без пагинации)",
                 "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Номер страницы (по умолчанию 1)",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Размер страницы (по умолчанию 10)",
-                        "name": "page_size",
-                        "in": "query"
-                    },
                     {
                         "type": "integer",
                         "description": "ID раздела",
@@ -1478,7 +1474,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "data, page, page_size, total",
+                        "description": "data, total, category, section_id",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true

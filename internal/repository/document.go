@@ -4,6 +4,7 @@ import (
 	"context"
 	"edutalks/internal/logger"
 	"edutalks/internal/models"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -34,6 +35,11 @@ type DocumentRepo interface {
 		category string,
 	) ([]*models.Document, int, error)
 	UpdateDocumentSection(ctx context.Context, id int, sectionID *int) error
+	GetPublicDocuments(
+		ctx context.Context,
+		sectionID *int,
+		category string,
+	) ([]*models.Document, error)
 }
 
 // Сохранение документа и возврат ID
@@ -176,12 +182,16 @@ func (r *DocumentRepository) DeleteDocument(ctx context.Context, id int) error {
 }
 
 // Для админки — все документы
-func (r *DocumentRepository) GetAllDocuments(ctx context.Context) ([]*models.Document, error) {
+func (r *DocumentRepository) GetAllDocuments(ctx context.Context, limit int) ([]*models.Document, error) {
 	query := `
 		SELECT id, user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at
 		FROM documents
 		ORDER BY uploaded_at DESC
 	`
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
+
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
 		logger.Log.Error("Ошибка получения всех документов (repo)", zap.Error(err))
@@ -322,4 +332,61 @@ func (r *DocumentRepository) GetPublicDocumentsByFilterPaginated(
 func (r *DocumentRepository) UpdateDocumentSection(ctx context.Context, id int, sectionID *int) error {
 	_, err := r.db.Exec(ctx, `UPDATE documents SET section_id=$1, uploaded_at=uploaded_at WHERE id=$2`, sectionID, id)
 	return err
+}
+
+func (r *DocumentRepository) GetPublicDocuments(
+	ctx context.Context,
+	sectionID *int,
+	category string,
+) ([]*models.Document, error) {
+	query := `
+		SELECT id, user_id, filename, filepath, description, is_public,
+		       category, section_id, uploaded_at
+		FROM documents
+		WHERE is_public = true
+	`
+	args := []any{}
+	idx := 1
+
+	if sectionID != nil {
+		query += fmt.Sprintf(" AND section_id = $%d", idx)
+		args = append(args, *sectionID)
+		idx++
+	}
+	if category != "" {
+		query += fmt.Sprintf(" AND category = $%d", idx)
+		args = append(args, category)
+		idx++
+	}
+
+	query += " ORDER BY uploaded_at DESC"
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var docs []*models.Document
+	for rows.Next() {
+		var d models.Document
+		if err := rows.Scan(
+			&d.ID,
+			&d.UserID,
+			&d.Filename,
+			&d.Filepath,
+			&d.Description,
+			&d.IsPublic,
+			&d.Category,
+			&d.SectionID,
+			&d.UploadedAt,
+		); err != nil {
+			return nil, err
+		}
+		docs = append(docs, &d)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return docs, nil
 }
