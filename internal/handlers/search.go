@@ -29,7 +29,7 @@ func NewSearchHandler(
 // @Param query query string true "Поисковый запрос"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {string} string "Пустой запрос"
-// @Router /search [get]
+// @Router /api/search [get]
 func (h *SearchHandler) GlobalSearch(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("query")
 	if strings.TrimSpace(query) == "" {

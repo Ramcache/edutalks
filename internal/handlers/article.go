@@ -88,14 +88,13 @@ func (h *ArticleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	helpers.JSON(w, http.StatusCreated, article)
 }
 
-// GetAll
-// @Summary      Получить список статей
+// GetAll godoc
+// @Summary      Список статей
+// @Description  Возвращает список опубликованных статей (публичный доступ)
 // @Tags         articles
 // @Produce      json
-// @Param        limit     query int    false "Количество" default(20)
-// @Param        offset    query int    false "Смещение"   default(0)
-// @Param        tag       query string false "Фильтр по тегу"
-// @Param        published query bool   false "Только опубликованные"
+// @Param        page      query int    false "Номер страницы (по умолчанию 1)"
+// @Param        page_size query int    false "Размер страницы (по умолчанию 10)"
 // @Success      200 {array} models.Article
 // @Failure      500 {object} map[string]string
 // @Router       /api/articles [get]
@@ -114,13 +113,15 @@ func (h *ArticleHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	helpers.JSON(w, http.StatusOK, list)
 }
 
-// GetByID
+// GetByID godoc
 // @Summary      Получить статью по ID
+// @Description  Возвращает одну опубликованную статью по её идентификатору (публичный доступ)
 // @Tags         articles
 // @Produce      json
-// @Param        id   path int true "ID статьи"
+// @Param        id path int true "ID статьи"
 // @Success      200 {object} models.Article
-// @Failure      404 {object} map[string]string
+// @Failure      404 {object} map[string]string "Статья не найдена"
+// @Failure      500 {object} map[string]string
 // @Router       /api/articles/{id} [get]
 func (h *ArticleHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]

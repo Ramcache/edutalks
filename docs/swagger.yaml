@@ -1097,25 +1097,16 @@ paths:
       - admin-users
   /api/articles:
     get:
+      description: Возвращает список опубликованных статей (публичный доступ)
       parameters:
-      - default: 20
-        description: Количество
+      - description: Номер страницы (по умолчанию 1)
         in: query
-        name: limit
+        name: page
         type: integer
-      - default: 0
-        description: Смещение
+      - description: Размер страницы (по умолчанию 10)
         in: query
-        name: offset
+        name: page_size
         type: integer
-      - description: Фильтр по тегу
-        in: query
-        name: tag
-        type: string
-      - description: Только опубликованные
-        in: query
-        name: published
-        type: boolean
       produces:
       - application/json
       responses:
@@ -1131,11 +1122,13 @@ paths:
             additionalProperties:
               type: string
             type: object
-      summary: Получить список статей
+      summary: Список статей
       tags:
       - articles
   /api/articles/{id}:
     get:
+      description: Возвращает одну опубликованную статью по её идентификатору (публичный
+        доступ)
       parameters:
       - description: ID статьи
         in: path
@@ -1150,7 +1143,13 @@ paths:
           schema:
             $ref: '#/definitions/edutalks_internal_models.Article'
         "404":
-          description: Not Found
+          description: Статья не найдена
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
           schema:
             additionalProperties:
               type: string
@@ -1158,6 +1157,65 @@ paths:
       summary: Получить статью по ID
       tags:
       - articles
+  /api/documents/{id}/preview:
+    get:
+      description: Показывает название, описание и категорию документа. Файл не отдаётся.
+      parameters:
+      - description: ID документа
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/edutalks_internal_models.DocumentPreviewResponse'
+        "403":
+          description: Документ не публичный
+          schema:
+            type: string
+        "404":
+          description: Документ не найден
+          schema:
+            type: string
+      summary: Превью публичного документа (только метаданные)
+      tags:
+      - public-documents
+  /api/documents/preview:
+    get:
+      parameters:
+      - description: Номер страницы (по умолчанию 1)
+        in: query
+        name: page
+        type: integer
+      - description: Размер страницы (по умолчанию 10)
+        in: query
+        name: page_size
+        type: integer
+      - description: Категория
+        in: query
+        name: category
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: data, page, page_size, total, category
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Превью публичных документов (список, метаданные)
+      tags:
+      - public-documents
   /api/email-subscription:
     patch:
       consumes:
@@ -1250,6 +1308,92 @@ paths:
       summary: Скачать документ по ID
       tags:
       - files
+  /api/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Данные для входа
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.loginResponse'
+        "401":
+          description: Неверный логин или пароль
+          schema:
+            type: string
+      summary: Авторизация пользователя
+      tags:
+      - auth
+  /api/logout:
+    post:
+      responses:
+        "200":
+          description: Выход выполнен
+          schema:
+            type: string
+        "401":
+          description: Невалидный токен
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Выход (удаление refresh токена)
+      tags:
+      - auth
+  /api/news:
+    get:
+      parameters:
+      - description: Номер страницы (начиная с 1)
+        in: query
+        name: page
+        type: integer
+      - description: Размер страницы
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/edutalks_internal_models.News'
+            type: array
+      summary: Получить список новостей
+      tags:
+      - news
+  /api/news/{id}:
+    get:
+      parameters:
+      - description: ID новости
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/edutalks_internal_models.News'
+        "404":
+          description: Не найдено
+          schema:
+            type: string
+      summary: Получить новость по ID
+      tags:
+      - news
   /api/pay:
     get:
       consumes:
@@ -1327,6 +1471,117 @@ paths:
       summary: Получить данные профиля
       tags:
       - profile
+  /api/refresh:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Недействительный refresh токен
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Обновление access-токена
+      tags:
+      - auth
+  /api/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Данные регистрации
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Пользователь успешно зарегистрирован
+          schema:
+            type: string
+        "400":
+          description: Ошибка валидации
+          schema:
+            type: string
+      summary: Регистрация нового пользователя
+      tags:
+      - auth
+  /api/resend-verification:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Email пользователя
+        in: body
+        name: input
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Повторная отправка письма для подтверждения e-mail
+      tags:
+      - email
+  /api/search:
+    get:
+      parameters:
+      - description: Поисковый запрос
+        in: query
+        name: query
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Пустой запрос
+          schema:
+            type: string
+      summary: Глобальный поиск по материалам
+      tags:
+      - search
   /api/taxonomy/tree:
     get:
       description: Возвращает список вкладок с разделами и количеством документов
@@ -1389,231 +1644,7 @@ paths:
       summary: Получить дерево по конкретной вкладке
       tags:
       - taxonomy
-  /documents/{id}/preview:
-    get:
-      description: Показывает название, описание и категорию документа. Файл не отдаётся.
-      parameters:
-      - description: ID документа
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/edutalks_internal_models.DocumentPreviewResponse'
-        "403":
-          description: Документ не публичный
-          schema:
-            type: string
-        "404":
-          description: Документ не найден
-          schema:
-            type: string
-      summary: Превью публичного документа (только метаданные)
-      tags:
-      - public-documents
-  /login:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Данные для входа
-        in: body
-        name: input
-        required: true
-        schema:
-          $ref: '#/definitions/internal_handlers.loginRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/internal_handlers.loginResponse'
-        "401":
-          description: Неверный логин или пароль
-          schema:
-            type: string
-      summary: Авторизация пользователя
-      tags:
-      - auth
-  /logout:
-    post:
-      responses:
-        "200":
-          description: Выход выполнен
-          schema:
-            type: string
-        "401":
-          description: Невалидный токен
-          schema:
-            type: string
-      security:
-      - ApiKeyAuth: []
-      summary: Выход (удаление refresh токена)
-      tags:
-      - auth
-  /news:
-    get:
-      parameters:
-      - description: Номер страницы (начиная с 1)
-        in: query
-        name: page
-        type: integer
-      - description: Размер страницы
-        in: query
-        name: page_size
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/edutalks_internal_models.News'
-            type: array
-      summary: Получить список новостей
-      tags:
-      - news
-  /news/{id}:
-    get:
-      parameters:
-      - description: ID новости
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/edutalks_internal_models.News'
-        "404":
-          description: Не найдено
-          schema:
-            type: string
-      summary: Получить новость по ID
-      tags:
-      - news
-  /refresh:
-    post:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "401":
-          description: Недействительный refresh токен
-          schema:
-            type: string
-      security:
-      - ApiKeyAuth: []
-      summary: Обновление access-токена
-      tags:
-      - auth
-  /register:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Данные регистрации
-        in: body
-        name: input
-        required: true
-        schema:
-          $ref: '#/definitions/internal_handlers.registerRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Пользователь успешно зарегистрирован
-          schema:
-            type: string
-        "400":
-          description: Ошибка валидации
-          schema:
-            type: string
-      summary: Регистрация нового пользователя
-      tags:
-      - auth
-  /resend-verification:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Email пользователя
-        in: body
-        name: input
-        required: true
-        schema:
-          additionalProperties:
-            type: string
-          type: object
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Повторная отправка письма для подтверждения e-mail
-      tags:
-      - email
-  /search:
-    get:
-      parameters:
-      - description: Поисковый запрос
-        in: query
-        name: query
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Пустой запрос
-          schema:
-            type: string
-      summary: Глобальный поиск по материалам
-      tags:
-      - search
-  /verify-email:
+  /api/verify-email:
     get:
       consumes:
       - application/json

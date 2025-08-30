@@ -28,7 +28,7 @@ func NewEmailHandler(emailTokenService *services.EmailTokenService) *EmailHandle
 // @Param token query string true "Токен подтверждения"
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
-// @Router /verify-email [get]
+// @Router /api/verify-email [get]
 func (h *EmailHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token == "" {
@@ -70,7 +70,7 @@ func (h *EmailHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 // @Failure 400 {object} map[string]string
 // @Failure 404 {object} map[string]string
 // @Failure 500 {object} map[string]string
-// @Router /resend-verification [post]
+// @Router /api/resend-verification [post]
 func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Request) {
 	type request struct {
 		Email string `json:"email"`

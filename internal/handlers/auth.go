@@ -79,7 +79,7 @@ type emailSubscriptionRequest struct {
 // @Param input body registerRequest true "Данные регистрации"
 // @Success 201 {string} string "Пользователь успешно зарегистрирован"
 // @Failure 400 {string} string "Ошибка валидации"
-// @Router /register [post]
+// @Router /api/register [post]
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -123,7 +123,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 // @Param input body loginRequest true "Данные для входа"
 // @Success 200 {object} loginResponse
 // @Failure 401 {string} string "Неверный логин или пароль"
-// @Router /login [post]
+// @Router /api/login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -217,7 +217,7 @@ func (h *AuthHandler) Protected(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Success 200 {object} map[string]string
 // @Failure 401 {string} string "Недействительный refresh токен"
-// @Router /refresh [post]
+// @Router /api/refresh [post]
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
@@ -273,7 +273,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 // @Security ApiKeyAuth
 // @Success 200 {string} string "Выход выполнен"
 // @Failure 401 {string} string "Невалидный токен"
-// @Router /logout [post]
+// @Router /api/logout [post]
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
