@@ -25,6 +25,11 @@ type DocumentServiceInterface interface {
 	GetAllDocuments(ctx context.Context) ([]*models.Document, error)
 	Search(ctx context.Context, query string) ([]models.Document, error) // было []models.News
 	GetPublicDocumentsByFilterPaginated(ctx context.Context, limit, offset int, sectionID *int, category string) ([]*models.Document, int, error)
+	GetPublicDocuments(
+		ctx context.Context,
+		sectionID *int,
+		category string,
+	) ([]*models.Document, error)
 }
 
 func (s *DocumentService) Upload(ctx context.Context, doc *models.Document) (int, error) {
@@ -53,9 +58,13 @@ func (s *DocumentService) Delete(ctx context.Context, id int) error {
 	return err
 }
 
-func (s *DocumentService) GetAllDocuments(ctx context.Context) ([]*models.Document, error) {
-	logger.Log.Info("Сервис: получение всех документов")
-	return s.repo.GetAllDocuments(ctx)
+func (s *DocumentService) GetAllDocuments(ctx context.Context, limit int) ([]*models.Document, error) {
+	if limit == 0 {
+		logger.Log.Info("Сервис: получение всех документов (без лимита)")
+	} else {
+		logger.Log.Info("Сервис: получение документов с лимитом", zap.Int("limit", limit))
+	}
+	return s.repo.GetAllDocuments(ctx, limit)
 }
 
 func (s *DocumentService) Search(ctx context.Context, query string) ([]models.Document, error) {
@@ -66,4 +75,12 @@ func (s *DocumentService) GetPublicDocumentsByFilterPaginated(
 	ctx context.Context, limit, offset int, sectionID *int, category string,
 ) ([]*models.Document, int, error) {
 	return s.repo.GetPublicDocumentsByFilterPaginated(ctx, limit, offset, sectionID, category)
+}
+
+func (s *DocumentService) GetPublicDocuments(
+	ctx context.Context,
+	sectionID *int,
+	category string,
+) ([]*models.Document, error) {
+	return s.repo.GetPublicDocuments(ctx, sectionID, category)
 }

@@ -523,6 +523,11 @@ paths:
       - admin-users
   /api/admin/files:
     get:
+      parameters:
+      - description: Максимальное количество документов (по умолчанию 10, 0 = все)
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
@@ -1253,16 +1258,9 @@ paths:
       - auth
   /api/files:
     get:
-      description: 'Поддерживает фильтры: section_id и category'
+      description: 'Поддерживает фильтры: section_id и category. Возвращает все подходящие
+        документы.'
       parameters:
-      - description: Номер страницы (по умолчанию 1)
-        in: query
-        name: page
-        type: integer
-      - description: Размер страницы (по умолчанию 10)
-        in: query
-        name: page_size
-        type: integer
       - description: ID раздела
         in: query
         name: section_id
@@ -1275,7 +1273,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: data, page, page_size, total
+          description: data, total, category, section_id
           schema:
             additionalProperties: true
             type: object
@@ -1285,7 +1283,7 @@ paths:
             additionalProperties:
               type: string
             type: object
-      summary: Получить список публичных документов
+      summary: Получить список публичных документов (без пагинации)
       tags:
       - documents
   /api/files/{id}:
