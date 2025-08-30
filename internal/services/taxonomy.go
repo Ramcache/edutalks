@@ -74,10 +74,10 @@ func (s *TaxonomyService) PublicTreeFiltered(ctx context.Context, tabID *int, ta
 var nonWord = regexp.MustCompile(`[^\p{L}\p{N}]+`) // всё, что не буквы/цифры, в дефисы
 
 func slugify(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
+	s = transliterate(s)
+	s = strings.TrimSpace(s)
 	s = nonWord.ReplaceAllString(s, "-")
 	s = strings.Trim(s, "-")
-	// защитимся от пустых после очистки
 	if s == "" {
 		s = "item"
 	}
@@ -114,4 +114,27 @@ func (s *TaxonomyService) ensureUniqueSectionSlug(ctx context.Context, tabID int
 		i++
 		slug = fmt.Sprintf("%s-%d", base, i)
 	}
+}
+
+var translitMap = map[rune]string{
+	'а': "a", 'б': "b", 'в': "v", 'г': "g", 'д': "d",
+	'е': "e", 'ё': "e", 'ж': "zh", 'з': "z", 'и': "i",
+	'й': "y", 'к': "k", 'л': "l", 'м': "m", 'н': "n",
+	'о': "o", 'п': "p", 'р': "r", 'с': "s", 'т': "t",
+	'у': "u", 'ф': "f", 'х': "h", 'ц': "ts", 'ч': "ch",
+	'ш': "sh", 'щ': "sch", 'ъ': "", 'ы': "y", 'ь': "",
+	'э': "e", 'ю': "yu", 'я': "ya",
+}
+
+func transliterate(input string) string {
+	input = strings.ToLower(input)
+	var b strings.Builder
+	for _, r := range input {
+		if tr, ok := translitMap[r]; ok {
+			b.WriteString(tr)
+		} else {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
