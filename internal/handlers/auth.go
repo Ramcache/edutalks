@@ -429,12 +429,14 @@ func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 // SetSubscription godoc
-// @Summary Включение или отключение подписки у пользователя
+// @Summary Управление подпиской пользователя (выдать/продлить/отключить)
 // @Tags admin-users
 // @Security ApiKeyAuth
 // @Param id path int true "ID пользователя"
-// @Param input body subscriptionRequest true "Статус подписки"
-// @Success 200 {string} string "Статус обновлён"
+// @Accept json
+// @Produce json
+// @Param input body setSubscriptionRequest true "Действие над подпиской"
+// @Success 200 {object} map[string]interface{} "Текущее состояние подписки"
 // @Failure 400 {string} string "Ошибка запроса"
 // @Router /api/admin/users/{id}/subscription [patch]
 func (h *AuthHandler) SetSubscription(w http.ResponseWriter, r *http.Request) {
@@ -446,21 +448,96 @@ func (h *AuthHandler) SetSubscription(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req subscriptionRequest
+	var req setSubscriptionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logger.Log.Warn("Невалидный JSON при обновлении подписки", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "Невалидный JSON")
 		return
 	}
 
-	if err := h.authService.SetSubscription(r.Context(), userID, req.Active); err != nil {
-		logger.Log.Error("Ошибка обновления подписки", zap.Error(err), zap.Int("user_id", userID))
-		helpers.Error(w, http.StatusInternalServerError, "Ошибка обновления подписки")
+	action := strings.ToLower(strings.TrimSpace(req.Action))
+	if action == "" {
+		action = "grant"
+	}
+
+	switch action {
+	case "revoke":
+		if err := h.authService.SetSubscription(r.Context(), userID, false); err != nil {
+			logger.Log.Error("Ошибка отключения подписки", zap.Error(err), zap.Int("user_id", userID))
+			helpers.Error(w, http.StatusInternalServerError, "Ошибка отключения подписки")
+			return
+		}
+	case "grant", "extend":
+		dur, err := parseHumanDuration(req.Duration)
+		if err != nil {
+			helpers.Error(w, http.StatusBadRequest, "Неверный формат duration")
+			return
+		}
+		if action == "grant" {
+			if err := h.authService.SetSubscriptionWithExpiry(r.Context(), userID, dur); err != nil {
+				logger.Log.Error("Ошибка выдачи подписки", zap.Error(err), zap.Int("user_id", userID))
+				helpers.Error(w, http.StatusInternalServerError, "Ошибка выдачи подписки")
+				return
+			}
+		} else {
+			if err := h.authService.ExtendSubscription(r.Context(), userID, dur); err != nil {
+				logger.Log.Error("Ошибка продления подписки", zap.Error(err), zap.Int("user_id", userID))
+				helpers.Error(w, http.StatusInternalServerError, "Ошибка продления подписки")
+				return
+			}
+		}
+	default:
+		helpers.Error(w, http.StatusBadRequest, "action должен быть grant|extend|revoke")
 		return
 	}
 
-	logger.Log.Info("Подписка пользователя изменена", zap.Int("user_id", userID), zap.Bool("active", req.Active))
-	helpers.JSON(w, http.StatusOK, "Статус подписки обновлён")
+	// Вернём текущее состояние пользователя
+	u, err := h.authService.GetUserByID(r.Context(), userID)
+	if err != nil {
+		helpers.Error(w, http.StatusInternalServerError, "Не удалось получить пользователя")
+		return
+	}
+	now := time.Now().UTC()
+	isActive := u.HasSubscription && u.SubscriptionExpiresAt != nil && u.SubscriptionExpiresAt.After(now)
+
+	helpers.JSON(w, http.StatusOK, map[string]interface{}{
+		"user_id":                 u.ID,
+		"has_subscription":        u.HasSubscription,
+		"subscription_expires_at": u.SubscriptionExpiresAt,
+		"is_active":               isActive,
+	})
+}
+
+type setSubscriptionRequest struct {
+	// grant | extend | revoke
+	Action string `json:"action"`
+	// monthly | halfyear | yearly | "30d" | "72h" и т.п. (обязательно для grant/extend)
+	Duration string `json:"duration,omitempty"`
+}
+
+// "monthly"=30d, "halfyear"=182d, "yearly"=365d, "Nd" поддерживается.
+// Для "h/m/s" используем time.ParseDuration.
+func parseHumanDuration(s string) (time.Duration, error) {
+	s = strings.TrimSpace(strings.ToLower(s))
+	switch s {
+	case "monthly":
+		return 30 * 24 * time.Hour, nil
+	case "halfyear":
+		return 182 * 24 * time.Hour, nil
+	case "yearly":
+		return 365 * 24 * time.Hour, nil
+	}
+	// Nd -> часы
+	if strings.HasSuffix(s, "d") {
+		num := strings.TrimSuffix(s, "d")
+		n, err := strconv.Atoi(num)
+		if err != nil || n <= 0 {
+			return 0, fmt.Errorf("bad days")
+		}
+		return time.Duration(n) * 24 * time.Hour, nil
+	}
+	// попробуем стандартный формат (72h, 90m, 3600s)
+	return time.ParseDuration(s)
 }
 
 // NotifySubscribers godoc

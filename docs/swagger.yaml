@@ -311,10 +311,15 @@ definitions:
       username:
         type: string
     type: object
-  internal_handlers.subscriptionRequest:
+  internal_handlers.setSubscriptionRequest:
     properties:
-      active:
-        type: boolean
+      action:
+        description: grant | extend | revoke
+        type: string
+      duration:
+        description: monthly | halfyear | yearly | "30d" | "72h" и т.п. (обязательно
+          для grant/extend)
+        type: string
     type: object
   internal_handlers.updateNewsRequest:
     properties:
@@ -1069,30 +1074,35 @@ paths:
       - admin-users
   /api/admin/users/{id}/subscription:
     patch:
+      consumes:
+      - application/json
       parameters:
       - description: ID пользователя
         in: path
         name: id
         required: true
         type: integer
-      - description: Статус подписки
+      - description: Действие над подпиской
         in: body
         name: input
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.subscriptionRequest'
+          $ref: '#/definitions/internal_handlers.setSubscriptionRequest'
+      produces:
+      - application/json
       responses:
         "200":
-          description: Статус обновлён
+          description: Текущее состояние подписки
           schema:
-            type: string
+            additionalProperties: true
+            type: object
         "400":
           description: Ошибка запроса
           schema:
             type: string
       security:
       - ApiKeyAuth: []
-      summary: Включение или отключение подписки у пользователя
+      summary: Управление подпиской пользователя (выдать/продлить/отключить)
       tags:
       - admin-users
   /api/articles:

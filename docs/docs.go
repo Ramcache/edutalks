@@ -1168,10 +1168,16 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "admin-users"
                 ],
-                "summary": "Включение или отключение подписки у пользователя",
+                "summary": "Управление подпиской пользователя (выдать/продлить/отключить)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1181,20 +1187,21 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Статус подписки",
+                        "description": "Действие над подпиской",
                         "name": "input",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.subscriptionRequest"
+                            "$ref": "#/definitions/internal_handlers.setSubscriptionRequest"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Статус обновлён",
+                        "description": "Текущее состояние подписки",
                         "schema": {
-                            "type": "string"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "400": {
@@ -2581,11 +2588,16 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.subscriptionRequest": {
+        "internal_handlers.setSubscriptionRequest": {
             "type": "object",
             "properties": {
-                "active": {
-                    "type": "boolean"
+                "action": {
+                    "description": "grant | extend | revoke",
+                    "type": "string"
+                },
+                "duration": {
+                    "description": "monthly | halfyear | yearly | \"30d\" | \"72h\" и т.п. (обязательно для grant/extend)",
+                    "type": "string"
                 }
             }
         },
