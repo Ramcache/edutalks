@@ -38,6 +38,10 @@ func InitRoutes(
 	api.HandleFunc("/news", newsHandler.ListNews).Methods(http.MethodGet)
 	api.HandleFunc("/news/{id:[0-9]+}", newsHandler.GetNews).Methods(http.MethodGet)
 
+	// --- ДОБАВЛЕНО: публичные статьи ---
+	api.HandleFunc("/articles", articleH.GetAll).Methods(http.MethodGet)
+	api.HandleFunc("/articles/{id:[0-9]+}", articleH.GetByID).Methods(http.MethodGet)
+
 	api.HandleFunc("/verify-email", emailHandler.VerifyEmail).Methods(http.MethodGet)
 	api.HandleFunc("/resend-verification", authHandler.ResendVerificationEmail).Methods(http.MethodPost)
 

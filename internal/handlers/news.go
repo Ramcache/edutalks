@@ -92,7 +92,7 @@ func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
 // @Param page query int false "Номер страницы (начиная с 1)"
 // @Param page_size query int false "Размер страницы"
 // @Success 200 {array} models.News
-// @Router /news [get]
+// @Router /api/news [get]
 func (h *NewsHandler) ListNews(w http.ResponseWriter, r *http.Request) {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
@@ -126,7 +126,7 @@ func (h *NewsHandler) ListNews(w http.ResponseWriter, r *http.Request) {
 // @Param id path int true "ID новости"
 // @Success 200 {object} models.News
 // @Failure 404 {string} string "Не найдено"
-// @Router /news/{id} [get]
+// @Router /api/news/{id} [get]
 func (h *NewsHandler) GetNews(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(mux.Vars(r)["id"])
 	logger.Log.Info("Запрос на получение новости по ID", zap.Int("news_id", id))

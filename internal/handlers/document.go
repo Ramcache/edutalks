@@ -345,7 +345,7 @@ func (h *DocumentHandler) GetAllDocuments(w http.ResponseWriter, r *http.Request
 // @Success 200 {object} models.DocumentPreviewResponse
 // @Failure 404 {object} string "Документ не найден"
 // @Failure 403 {object} string "Документ не публичный"
-// @Router /documents/{id}/preview [get]
+// @Router /api/documents/{id}/preview [get]
 func (h *DocumentHandler) PreviewDocument(w http.ResponseWriter, r *http.Request) {
 	idStr := mux.Vars(r)["id"]
 	id, _ := strconv.Atoi(idStr)
@@ -375,6 +375,14 @@ func (h *DocumentHandler) PreviewDocument(w http.ResponseWriter, r *http.Request
 
 // PreviewDocuments godoc
 // @Summary Превью публичных документов (список, метаданные)
+// @Tags public-documents
+// @Produce json
+// @Param page query int false "Номер страницы (по умолчанию 1)"
+// @Param page_size query int false "Размер страницы (по умолчанию 10)"
+// @Param category query string false "Категория"
+// @Success 200 {object} map[string]interface{} "data, page, page_size, total, category"
+// @Failure 500 {object} map[string]string
+// @Router /api/documents/preview [get]
 func (h *DocumentHandler) PreviewDocuments(w http.ResponseWriter, r *http.Request) {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
