@@ -19,7 +19,6 @@ func InitRoutes(
 	articleH *handlers.ArticleHandler,
 	taxonomyH *handlers.TaxonomyHandler,
 ) {
-	// Логирование всех запросов
 	router.Use(middleware.Logging)
 
 	// Корневой /api

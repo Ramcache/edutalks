@@ -21,6 +21,6 @@ type CreateArticleRequest struct {
 	Summary     string   `json:"summary"  example:"Короткое описание для превью"`
 	BodyHTML    string   `json:"bodyHtml" example:"<p>Контент</p>"`
 	Tags        []string `json:"tags"     example:"go,backend,markdown"`
-	Publish     bool     `json:"publish"`               // основной вариант
-	IsPublished *bool    `json:"isPublished,omitempty"` // алиас: если пришёл, перепишем Publish
+	Publish     bool     `json:"publish"`
+	IsPublished *bool    `json:"isPublished,omitempty"`
 }

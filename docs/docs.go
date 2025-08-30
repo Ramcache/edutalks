@@ -2160,11 +2160,9 @@ const docTemplate = `{
                     "example": "\u003cp\u003eКонтент\u003c/p\u003e"
                 },
                 "isPublished": {
-                    "description": "алиас: если пришёл, перепишем Publish",
                     "type": "boolean"
                 },
                 "publish": {
-                    "description": "основной вариант",
                     "type": "boolean"
                 },
                 "summary": {

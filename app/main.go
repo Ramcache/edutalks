@@ -37,30 +37,11 @@ func main() {
 	logger.Log.Info("Сервер запущен", zap.String("port", cfg.Port))
 
 	corsMiddleware := cors.New(cors.Options{
-		// Разрешаем фронты разработки
-		AllowedOrigins: []string{
-			"http://localhost:3000",
-			"http://127.0.0.1:3000",
-			"http://localhost:5173",
-			"http://127.0.0.1:5173",
-			"https://edutalks.ru",
-		},
-		// Альтернатива — принять любой локальный origin:
-		// AllowOriginFunc: func(origin string) bool {
-		//     return strings.HasPrefix(origin, "http://localhost:") ||
-		//            strings.HasPrefix(origin, "http://127.0.0.1:") ||
-		//            origin == "https://edutalks.ru"
-		// },
-
+		AllowedOrigins:   []string{"*"},
 		AllowCredentials: true,
-		AllowedMethods:   []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"*"}, // вместо перечисления вручную
-
-		ExposedHeaders: []string{
-			// если на фронте читаете какие-то заголовки ответа — добавьте их сюда
-			// "X-Total-Count",
-		},
-		Debug: true,
+		AllowedMethods:   []string{"*"},
+		AllowedHeaders:   []string{"*"},
+		Debug:            true,
 	})
 
 	router.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
