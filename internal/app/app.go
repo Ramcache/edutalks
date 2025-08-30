@@ -36,7 +36,6 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	articleSvc := services.NewArticleService(articleRepo)
 	taxonomySvc := services.NewTaxonomyService(taxonomyRepo)
 
-	// ⬇️ Новый сервис ЮKassa
 	yookassaService := services.NewYooKassaService(
 		cfg.YooKassaShopID,
 		cfg.YooKassaSecret,
@@ -51,16 +50,13 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	articleH := handlers.NewArticleHandler(articleSvc)
 	taxonomyH := handlers.NewTaxonomyHandler(taxonomySvc)
 
-	// ⬇️ Хендлер оплаты и вебхука
 	paymentHandler := handlers.NewPaymentHandler(yookassaService)
 	webhookHandler := handlers.NewWebhookHandler(authService)
 
 	_ = userRepo.ExpireSubscriptions(context.Background())
 
-	// ▶️ Запустим периодическую чистку
 	StartSubscriptionCleaner(userRepo)
 
-	// Запуск воркера email (как было)
 	for i := 0; i < 3; i++ {
 		go services.StartEmailWorker(emaService)
 	}
