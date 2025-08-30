@@ -7,7 +7,7 @@ import (
 	"edutalks/internal/logger"
 	"net/http"
 
-	"github.com/rs/cors"
+	"github.com/go-chi/cors"
 	httpSwagger "github.com/swaggo/http-swagger"
 	"go.uber.org/zap"
 )
@@ -33,20 +33,30 @@ func main() {
 	if err != nil {
 		logger.Log.Fatal("Ошибка инициализации приложения", zap.Error(err))
 	}
-	//
-	logger.Log.Info("Сервер запущен", zap.String("port", cfg.Port))
 
-	corsMiddleware := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowCredentials: true,
-		AllowedMethods:   []string{"*"},
-		AllowedHeaders:   []string{"*"},
-		Debug:            true,
-	})
-
+	// Swagger по префиксу /swagger/
 	router.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 
-	if err := http.ListenAndServe(":"+cfg.Port, corsMiddleware.Handler(router)); err != nil {
+	// Максимально permissive CORS:
+	// - любой Origin/порт (через AllowOriginFunc)
+	// - любые методы
+	// - любые заголовки
+	// - credentials включены (cookies/Authorization)
+	corsMiddleware := cors.Handler(cors.Options{
+		// Если нужен прямой wildcard, можно оставить AllowedOrigins: []string{"*"},
+		// но для credentials это запрещено спецификацией.
+		// AllowOriginFunc вернёт true для любого Origin и библиотека подставит его в заголовок.
+		AllowOriginFunc: func(r *http.Request, origin string) bool { return true },
+
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"*"},
+		ExposedHeaders:   []string{"*"},
+		AllowCredentials: true,
+		MaxAge:           86400, // кэш preflight на сутки
+	})
+
+	logger.Log.Info("Сервер запущен", zap.String("port", cfg.Port))
+	if err := http.ListenAndServe(":"+cfg.Port, corsMiddleware(router)); err != nil {
 		logger.Log.Fatal("Ошибка запуска сервера", zap.Error(err))
 	}
 }
