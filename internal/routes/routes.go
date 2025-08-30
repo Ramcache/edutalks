@@ -19,101 +19,92 @@ func InitRoutes(
 	articleH *handlers.ArticleHandler,
 	taxonomyH *handlers.TaxonomyHandler,
 ) {
+	// Логирование всех запросов
 	router.Use(middleware.Logging)
 
-	// --- Глобальный обработчик preflight (на всякий случай) ---
-	router.Methods(http.MethodOptions).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
-
+	// Корневой /api
 	api := router.PathPrefix("/api").Subrouter()
 
-	// Тоже полезно иметь preflight на уровне подсеток
-	api.Methods(http.MethodOptions).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
+	// ---------- ПУБЛИЧНЫЕ ----------
+	api.HandleFunc("/register", authHandler.Register).Methods(http.MethodPost)
+	api.HandleFunc("/login", authHandler.Login).Methods(http.MethodPost)
+	api.HandleFunc("/refresh", authHandler.Refresh).Methods(http.MethodPost)
+	api.HandleFunc("/logout", authHandler.Logout).Methods(http.MethodPost)
 
-	// --- Публичные маршруты ---
-	api.HandleFunc("/register", authHandler.Register).Methods("POST", http.MethodOptions)
-	api.HandleFunc("/login", authHandler.Login).Methods("POST", http.MethodOptions)
-	api.HandleFunc("/refresh", authHandler.Refresh).Methods("POST", http.MethodOptions)
-	api.HandleFunc("/logout", authHandler.Logout).Methods("POST", http.MethodOptions)
+	// платежный вебхук (публичная точка приёмки от ЮKassa)
+	api.HandleFunc("/payments/webhook", webhookHandler.HandleWebhook).Methods(http.MethodPost)
 
-	api.HandleFunc("/payments/webhook", webhookHandler.HandleWebhook).Methods("POST", http.MethodOptions)
+	// контент, доступный без авторизации
+	api.HandleFunc("/news", newsHandler.ListNews).Methods(http.MethodGet)
+	api.HandleFunc("/news/{id:[0-9]+}", newsHandler.GetNews).Methods(http.MethodGet)
 
-	api.HandleFunc("/news", newsHandler.ListNews).Methods("GET", http.MethodOptions)
-	api.HandleFunc("/news/{id:[0-9]+}", newsHandler.GetNews).Methods("GET", http.MethodOptions)
+	api.HandleFunc("/verify-email", emailHandler.VerifyEmail).Methods(http.MethodGet)
+	api.HandleFunc("/resend-verification", authHandler.ResendVerificationEmail).Methods(http.MethodPost)
 
-	api.HandleFunc("/verify-email", emailHandler.VerifyEmail).Methods("GET", http.MethodOptions)
-	api.HandleFunc("/resend-verification", authHandler.ResendVerificationEmail).Methods("POST", http.MethodOptions)
-	api.HandleFunc("/documents/{id:[0-9]+}/preview", documentHandler.PreviewDocument).Methods("GET", http.MethodOptions)
-	api.HandleFunc("/documents/preview", documentHandler.PreviewDocuments).Methods("GET", http.MethodOptions)
+	// превью документов (метаданные)
+	api.HandleFunc("/documents/{id:[0-9]+}/preview", documentHandler.PreviewDocument).Methods(http.MethodGet)
+	api.HandleFunc("/documents/preview", documentHandler.PreviewDocuments).Methods(http.MethodGet)
 
-	api.HandleFunc("/search", searchHandler.GlobalSearch).Methods("GET", http.MethodOptions)
-	api.HandleFunc("/articles/{id:[0-9]+}", articleH.GetByID).Methods("GET", http.MethodOptions)
-	api.HandleFunc("/articles", articleH.GetAll).Methods("GET", http.MethodOptions)
+	// публичный таксономический лес
+	api.HandleFunc("/taxonomy/tree", taxonomyH.PublicTree).Methods(http.MethodGet)
+	api.HandleFunc("/taxonomy/tree/{tab}", taxonomyH.PublicTreeByTab).Methods(http.MethodGet)
 
-	api.HandleFunc("/taxonomy/tree", taxonomyH.PublicTree).Methods("GET", http.MethodOptions)
-	api.HandleFunc("/taxonomy/tree/{tab}", taxonomyH.PublicTreeByTab).Methods("GET", http.MethodOptions)
+	// публичный список файлов (без скачивания)
+	api.HandleFunc("/files", documentHandler.ListPublicDocuments).Methods(http.MethodGet)
 
-	// --- Защищённые JWT ---
+	// глобальный поиск
+	api.HandleFunc("/search", searchHandler.GlobalSearch).Methods(http.MethodGet)
+
+	// ---------- ПРОТЕКТИРОВАННЫЕ (JWT) ----------
 	protected := api.PathPrefix("").Subrouter()
 	protected.Use(middleware.JWTAuth)
-	protected.Use(middleware.AdminFastLane) // <<< фастлейн: админ игнорит все проверки
-	protected.Methods(http.MethodOptions).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
 
-	protected.HandleFunc("/pay", paymentHandler.CreatePayment).Methods("GET", http.MethodOptions)
-	protected.HandleFunc("/profile", authHandler.Protected).Methods("GET", http.MethodOptions)
-	protected.HandleFunc("/email-subscription", authHandler.EmailSubscribe).Methods("PATCH", http.MethodOptions)
+	// профиль, платеж и пр.
+	protected.HandleFunc("/pay", paymentHandler.CreatePayment).Methods(http.MethodGet)
+	protected.HandleFunc("/profile", authHandler.Protected).Methods(http.MethodGet)
+	protected.HandleFunc("/email-subscription", authHandler.EmailSubscribe).Methods(http.MethodPatch)
 
-	fileRoutes := protected.PathPrefix("/files").Subrouter()
-	fileRoutes.Methods(http.MethodOptions).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
-	fileRoutes.HandleFunc("", documentHandler.ListPublicDocuments).Methods("GET", http.MethodOptions)
-	fileRoutes.HandleFunc("/{id:[0-9]+}", documentHandler.DownloadDocument).Methods("GET", http.MethodOptions)
+	// скачивание файла (нужен user из контекста и проверка подписки)
+	protected.HandleFunc("/files/{id:[0-9]+}", documentHandler.DownloadDocument).Methods(http.MethodGet)
 
-	// --- Админ (требует роль admin) ---
+	// ---------- АДМИН ----------
 	admin := protected.PathPrefix("/admin").Subrouter()
 	admin.Use(middleware.OnlyRole("admin"))
-	admin.Methods(http.MethodOptions).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
 
-	admin.HandleFunc("/files", documentHandler.GetAllDocuments).Methods("GET", http.MethodOptions)
-	admin.HandleFunc("/files/upload", documentHandler.UploadDocument).Methods("POST", http.MethodOptions)
-	admin.HandleFunc("/files/{id:[0-9]+}", documentHandler.DeleteDocument).Methods("DELETE", http.MethodOptions)
+	// файлы (админ)
+	admin.HandleFunc("/files", documentHandler.GetAllDocuments).Methods(http.MethodGet)
+	admin.HandleFunc("/files/upload", documentHandler.UploadDocument).Methods(http.MethodPost)
+	admin.HandleFunc("/files/{id:[0-9]+}", documentHandler.DeleteDocument).Methods(http.MethodDelete)
 
-	admin.HandleFunc("/dashboard", authHandler.AdminOnly).Methods("GET", http.MethodOptions)
-	admin.HandleFunc("/users", authHandler.GetUsers).Methods("GET", http.MethodOptions)
-	admin.HandleFunc("/users/{id}", authHandler.GetUserByID).Methods("GET", http.MethodOptions)
-	admin.HandleFunc("/users/{id}", authHandler.UpdateUser).Methods("PATCH", http.MethodOptions)
-	admin.HandleFunc("/users/{id}/subscription", authHandler.SetSubscription).Methods("PATCH", http.MethodOptions)
-	admin.HandleFunc("/users/{id}", authHandler.DeleteUser).Methods("DELETE", http.MethodOptions)
+	// админ-панель / пользователи
+	admin.HandleFunc("/dashboard", authHandler.AdminOnly).Methods(http.MethodGet)
+	admin.HandleFunc("/users", authHandler.GetUsers).Methods(http.MethodGet)
+	admin.HandleFunc("/users/{id}", authHandler.GetUserByID).Methods(http.MethodGet)
+	admin.HandleFunc("/users/{id}", authHandler.UpdateUser).Methods(http.MethodPatch)
+	admin.HandleFunc("/users/{id}/subscription", authHandler.SetSubscription).Methods(http.MethodPatch)
+	admin.HandleFunc("/users/{id}", authHandler.DeleteUser).Methods(http.MethodDelete)
 
-	admin.HandleFunc("/news", newsHandler.CreateNews).Methods("POST", http.MethodOptions)
-	admin.HandleFunc("/news/{id:[0-9]+}", newsHandler.UpdateNews).Methods("PATCH", http.MethodOptions)
-	admin.HandleFunc("/news/{id:[0-9]+}", newsHandler.DeleteNews).Methods("DELETE", http.MethodOptions)
-	admin.HandleFunc("/news/upload", newsHandler.UploadNewsImage).Methods("POST", http.MethodOptions)
+	// новости (админ)
+	admin.HandleFunc("/news", newsHandler.CreateNews).Methods(http.MethodPost)
+	admin.HandleFunc("/news/{id:[0-9]+}", newsHandler.UpdateNews).Methods(http.MethodPatch)
+	admin.HandleFunc("/news/{id:[0-9]+}", newsHandler.DeleteNews).Methods(http.MethodDelete)
+	admin.HandleFunc("/news/upload", newsHandler.UploadNewsImage).Methods(http.MethodPost)
 
-	admin.HandleFunc("/notify", authHandler.NotifySubscribers).Methods("POST", http.MethodOptions)
+	// рассылка
+	admin.HandleFunc("/notify", authHandler.NotifySubscribers).Methods(http.MethodPost)
 
-	admin.HandleFunc("/articles/preview", articleH.Preview).Methods("POST", http.MethodOptions)
-	admin.HandleFunc("/articles", articleH.Create).Methods("POST", http.MethodOptions)
-	admin.HandleFunc("/articles/{id:[0-9]+}", articleH.Update).Methods("PATCH", http.MethodOptions)
-	admin.HandleFunc("/articles/{id:[0-9]+}", articleH.Delete).Methods("DELETE", http.MethodOptions)
-	admin.HandleFunc("/articles/{id:[0-9]+}/publish", articleH.SetPublish).Methods(http.MethodPatch, http.MethodOptions)
+	// статьи (админ)
+	admin.HandleFunc("/articles/preview", articleH.Preview).Methods(http.MethodPost)
+	admin.HandleFunc("/articles", articleH.Create).Methods(http.MethodPost)
+	admin.HandleFunc("/articles/{id:[0-9]+}", articleH.Update).Methods(http.MethodPatch)
+	admin.HandleFunc("/articles/{id:[0-9]+}", articleH.Delete).Methods(http.MethodDelete)
+	admin.HandleFunc("/articles/{id:[0-9]+}/publish", articleH.SetPublish).Methods(http.MethodPatch)
 
-	// Tabs
-	admin.HandleFunc("/tabs", taxonomyH.CreateTab).Methods("POST", http.MethodOptions)
-	admin.HandleFunc("/tabs/{id:[0-9]+}", taxonomyH.UpdateTab).Methods("PATCH", http.MethodOptions)
-	admin.HandleFunc("/tabs/{id:[0-9]+}", taxonomyH.DeleteTab).Methods("DELETE", http.MethodOptions)
-
-	// Sections
-	admin.HandleFunc("/sections", taxonomyH.CreateSection).Methods("POST", http.MethodOptions)
-	admin.HandleFunc("/sections/{id:[0-9]+}", taxonomyH.UpdateSection).Methods("PATCH", http.MethodOptions)
-	admin.HandleFunc("/sections/{id:[0-9]+}", taxonomyH.DeleteSection).Methods("DELETE", http.MethodOptions)
-
+	// таксономия (админ)
+	admin.HandleFunc("/tabs", taxonomyH.CreateTab).Methods(http.MethodPost)
+	admin.HandleFunc("/tabs/{id:[0-9]+}", taxonomyH.UpdateTab).Methods(http.MethodPatch)
+	admin.HandleFunc("/tabs/{id:[0-9]+}", taxonomyH.DeleteTab).Methods(http.MethodDelete)
+	admin.HandleFunc("/sections", taxonomyH.CreateSection).Methods(http.MethodPost)
+	admin.HandleFunc("/sections/{id:[0-9]+}", taxonomyH.UpdateSection).Methods(http.MethodPatch)
+	admin.HandleFunc("/sections/{id:[0-9]+}", taxonomyH.DeleteSection).Methods(http.MethodDelete)
 }
