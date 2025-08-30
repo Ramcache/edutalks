@@ -259,3 +259,16 @@ WHERE t.is_active = true
 
 // простой хелпер без strconv импортов
 func itoa(i int) string { return fmt.Sprintf("%d", i) }
+
+func (r *TaxonomyRepo) TabSlugExists(ctx context.Context, slug string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM tabs WHERE slug=$1)`, slug).Scan(&exists)
+	return exists, err
+}
+
+// Для секций — проверяем уникальность в рамках конкретной вкладки
+func (r *TaxonomyRepo) SectionSlugExists(ctx context.Context, tabID int, slug string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM sections WHERE tab_id=$1 AND slug=$2)`, tabID, slug).Scan(&exists)
+	return exists, err
+}
