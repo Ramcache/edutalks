@@ -228,12 +228,15 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 	}
 
 	// --- доступ как у тебя сейчас ---
-	now := time.Now().UTC()
-	if !(user.HasSubscription && user.SubscriptionExpiresAt != nil && user.SubscriptionExpiresAt.After(now)) {
-		logger.Log.Warn("Подписка неактивна", zap.Int("user_id", userID), zap.Timep("expires_at", user.SubscriptionExpiresAt))
-		helpers.Error(w, http.StatusForbidden, "Нет доступа — купите подписку")
-		return
+	if user.Role != "admin" {
+		now := time.Now().UTC()
+		if !(user.HasSubscription && user.SubscriptionExpiresAt != nil && user.SubscriptionExpiresAt.After(now)) {
+			logger.Log.Warn("Подписка неактивна", zap.Int("user_id", userID), zap.Timep("expires_at", user.SubscriptionExpiresAt))
+			helpers.Error(w, http.StatusForbidden, "Нет доступа — купите подписку")
+			return
+		}
 	}
+
 	if !doc.IsPublic {
 		logger.Log.Warn("Попытка доступа к закрытому документу", zap.Int("user_id", userID), zap.Int("doc_id", id))
 		helpers.Error(w, http.StatusForbidden, "Этот документ закрыт")
