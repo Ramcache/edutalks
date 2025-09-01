@@ -13,13 +13,19 @@ import (
 
 type Notifier struct {
 	subsRepo *repository.SubscriptionRepository
-	baseURL  string // например: https://edutalks.ru
-	fromName string // например: "Edutalks"
+	taxRepo  *repository.TaxonomyRepo
+	baseURL  string
+	fromName string
 }
 
-func NewNotifier(subsRepo *repository.SubscriptionRepository, baseURL, fromName string) *Notifier {
+func NewNotifier(
+	subsRepo *repository.SubscriptionRepository,
+	taxRepo *repository.TaxonomyRepo,
+	baseURL, fromName string,
+) *Notifier {
 	return &Notifier{
 		subsRepo: subsRepo,
+		taxRepo:  taxRepo,
 		baseURL:  strings.TrimRight(baseURL, "/"),
 		fromName: fromName,
 	}
@@ -62,11 +68,17 @@ func (n *Notifier) sendToAll(ctx context.Context, subject, htmlBody string) {
 // ==== ПИСЬМА ====
 
 // Новый документ
-func (n *Notifier) NotifyNewDocument(ctx context.Context, docID int, title string) {
-	link := fmt.Sprintf("%s/documents/preview?id=%d", n.baseURL, docID)
-	subject := "Новый документ на Edutalks"
+func (n *Notifier) NotifyNewDocument(ctx context.Context, docID int, title string, sectionID *int) {
+	ctx = context.WithoutCancel(ctx)
 
-	// Соберём простой CTA-блок и обернём в BuildSimpleHTML
+	link := fmt.Sprintf("%s/documents/preview?id=%d", n.baseURL, docID) // fallback
+	if sectionID != nil {
+		if slug, err := n.taxRepo.GetSectionSlugByID(ctx, *sectionID); err == nil && slug != "" {
+			link = fmt.Sprintf("%s/%s", n.baseURL, slug)
+		}
+	}
+
+	subject := "Новый документ на Edutalks"
 	body := fmt.Sprintf(`
       <p style="font-size:16px;color:#222;margin:0 0 16px 0;"><strong>%s</strong></p>
       <p><a href="%s" style="display:inline-block;padding:12px 24px;background:#2d74da;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">Открыть документ</a></p>
@@ -79,7 +91,7 @@ func (n *Notifier) NotifyNewDocument(ctx context.Context, docID int, title strin
 
 // Новость опубликована
 func (n *Notifier) NotifyNewsPublished(ctx context.Context, newsID int, title string) {
-	link := fmt.Sprintf("%s/news/%d", n.baseURL, newsID)
+	link := fmt.Sprintf("%s/recomm/%d", n.baseURL, newsID)
 	subject := "Новая новость на Edutalks"
 
 	// Можно передать краткий контент вместо "" если он у тебя есть
@@ -90,7 +102,7 @@ func (n *Notifier) NotifyNewsPublished(ctx context.Context, newsID int, title st
 
 // Статья опубликована
 func (n *Notifier) NotifyArticlePublished(ctx context.Context, articleID int, title string) {
-	link := fmt.Sprintf("%s/articles/%d", n.baseURL, articleID)
+	link := fmt.Sprintf("%s/zavuch/%d", n.baseURL, articleID)
 	subject := "Новая статья на Edutalks"
 
 	body := fmt.Sprintf(`

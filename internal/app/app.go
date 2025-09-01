@@ -36,7 +36,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	emaService := services.NewEmailService(cfg)
 	articleSvc := services.NewArticleService(articleRepo)
 	taxonomySvc := services.NewTaxonomyService(taxonomyRepo)
-	notifier := services.NewNotifier(subsRepo, cfg.SiteURL, "Edutalks")
+	notifier := services.NewNotifier(subsRepo, taxonomyRepo, cfg.SiteURL, "Edutalks")
 
 	yookassaService := services.NewYooKassaService(
 		cfg.YooKassaShopID,
