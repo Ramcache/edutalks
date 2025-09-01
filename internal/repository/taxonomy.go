@@ -272,3 +272,9 @@ func (r *TaxonomyRepo) SectionSlugExists(ctx context.Context, tabID int, slug st
 	err := r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM sections WHERE tab_id=$1 AND slug=$2)`, tabID, slug).Scan(&exists)
 	return exists, err
 }
+
+func (r *TaxonomyRepo) GetSectionSlugByID(ctx context.Context, id int) (string, error) {
+	var slug string
+	err := r.db.QueryRow(ctx, `SELECT slug FROM sections WHERE id=$1`, id).Scan(&slug)
+	return slug, err
+}

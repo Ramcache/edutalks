@@ -128,7 +128,7 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 
 	// Фоново уведомляем подписчиков о новом документе
 	ctx := context.WithoutCancel(r.Context())
-	go h.notifier.NotifyNewDocument(ctx, id, doc.Title)
+	go h.notifier.NotifyNewDocument(ctx, id, doc.Title, doc.SectionID)
 
 	helpers.JSON(w, http.StatusCreated, map[string]any{
 		"id": id,
