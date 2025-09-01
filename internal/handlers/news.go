@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rand"
 	"edutalks/internal/logger"
 	"edutalks/internal/models"
@@ -23,10 +24,11 @@ import (
 
 type NewsHandler struct {
 	newsService *services.NewsService
+	notifier    *services.Notifier
 }
 
-func NewNewsHandler(newsService *services.NewsService) *NewsHandler {
-	return &NewsHandler{newsService: newsService}
+func NewNewsHandler(newsService *services.NewsService, notifier *services.Notifier) *NewsHandler {
+	return &NewsHandler{newsService: newsService, notifier: notifier}
 }
 
 type createNewsRequest struct {
@@ -73,16 +75,20 @@ func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: time.Now(),
 	}
 
-	sentEmails, err := h.newsService.Create(r.Context(), news)
+	id, err := h.newsService.Create(r.Context(), news)
 	if err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "Не удалось создать новость")
 		return
 	}
 
-	helpers.JSON(w, http.StatusOK, map[string]interface{}{
-		"message": "Новость создана и отправлена подписчикам",
-		"sent_to": sentEmails,
+	ctx := context.WithoutCancel(r.Context())
+	go h.notifier.NotifyNewsPublished(ctx, id, news.Title)
+
+	helpers.JSON(w, http.StatusCreated, map[string]any{
+		"message": "Новость создана",
+		"id":      id,
 	})
+
 }
 
 // ListNews godoc

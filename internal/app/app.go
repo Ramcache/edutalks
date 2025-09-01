@@ -25,6 +25,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	emailTokenRepo := repository.NewEmailTokenRepository(conn)
 	articleRepo := repository.NewArticleRepo(conn)
 	taxonomyRepo := repository.NewTaxonomyRepo(conn)
+	subsRepo := repository.NewSubscriptionRepository(conn)
 
 	// Сервисы
 	authService := services.NewAuthService(userRepo)
@@ -35,6 +36,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	emaService := services.NewEmailService(cfg)
 	articleSvc := services.NewArticleService(articleRepo)
 	taxonomySvc := services.NewTaxonomyService(taxonomyRepo)
+	notifier := services.NewNotifier(subsRepo, cfg.SiteURL, "Edutalks")
 
 	yookassaService := services.NewYooKassaService(
 		cfg.YooKassaShopID,
@@ -43,11 +45,11 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	)
 	// Хендлеры
 	authHandler := handlers.NewAuthHandler(authService, emailService, emailTokenService)
-	docHandler := handlers.NewDocumentHandler(docService, authService)
-	newsHandler := handlers.NewNewsHandler(newsService)
+	docHandler := handlers.NewDocumentHandler(docService, authService, notifier)
+	newsHandler := handlers.NewNewsHandler(newsService, notifier)
 	emailHandler := handlers.NewEmailHandler(emailTokenService)
 	searchHandler := handlers.NewSearchHandler(newsService, docService)
-	articleH := handlers.NewArticleHandler(articleSvc)
+	articleH := handlers.NewArticleHandler(articleSvc, notifier)
 	taxonomyH := handlers.NewTaxonomyHandler(taxonomySvc)
 
 	paymentHandler := handlers.NewPaymentHandler(yookassaService)

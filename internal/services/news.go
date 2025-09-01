@@ -6,8 +6,6 @@ import (
 	"edutalks/internal/logger"
 	"edutalks/internal/models"
 	"edutalks/internal/repository"
-	helpers "edutalks/internal/utils/helpers"
-
 	"go.uber.org/zap"
 )
 
@@ -32,37 +30,15 @@ func NewNewsService(
 	}
 }
 
-func (s *NewsService) Create(ctx context.Context, news *models.News) ([]string, error) {
+func (s *NewsService) Create(ctx context.Context, news *models.News) (int, error) {
 	logger.Log.Info("Сервис: создание новости", zap.String("title", news.Title))
 
-	err := s.repo.Create(ctx, news)
+	id, err := s.repo.Create(ctx, news)
 	if err != nil {
 		logger.Log.Error("Ошибка создания новости (service)", zap.Error(err))
-		return nil, err
+		return 0, err
 	}
-
-	subscribers, err := s.userRepo.GetSubscribedEmails(ctx)
-	if err != nil {
-		logger.Log.Warn("Ошибка получения подписчиков", zap.Error(err))
-		return nil, nil
-	}
-
-	subject := "Новая новость: " + news.Title
-	url := s.siteURL + "/news" // Или "/news/" + strconv.Itoa(news.ID)
-	htmlBody := helpers.BuildNewsHTML(news.Title, news.Content, url)
-
-	var sentEmails []string
-	for _, email := range subscribers {
-		EmailQueue <- EmailJob{
-			To:      []string{email},
-			Subject: subject,
-			Body:    htmlBody,
-			IsHTML:  true,
-		}
-		sentEmails = append(sentEmails, email)
-	}
-
-	return sentEmails, nil
+	return id, nil
 }
 
 func (s *NewsService) ListPaginated(ctx context.Context, limit, offset int) ([]*models.News, int, error) {
