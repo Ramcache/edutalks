@@ -77,8 +77,16 @@ func StartEmailWorker(emailService *EmailService) {
 				err = emailService.Send(job.To, job.Subject, job.Body)
 			}
 			if err != nil {
-				// Используй свой логгер!
-				logger.Log.Error("Не удалось отправить письмо", zap.Error(err))
+				logger.Log.Error("Не удалось отправить письмо",
+					zap.Strings("to", job.To),
+					zap.String("subject", job.Subject),
+					zap.Error(err),
+				)
+			} else {
+				logger.Log.Info("Письмо отправлено (SMTP accepted)",
+					zap.Strings("to", job.To),
+					zap.String("subject", job.Subject),
+				)
 			}
 		}
 	}()

@@ -18,7 +18,7 @@ func NewNewsRepository(db *pgxpool.Pool) *NewsRepository {
 }
 
 type NewsRepo interface {
-	Create(ctx context.Context, news *models.News) error
+	Create(ctx context.Context, news *models.News) (int, error)
 	ListPaginated(ctx context.Context, limit, offset int) ([]*models.News, int, error)
 	GetByID(ctx context.Context, id int) (*models.News, error)
 	Update(ctx context.Context, id int, title, content, imageURL, color, sticker string) error
@@ -26,17 +26,27 @@ type NewsRepo interface {
 	Search(ctx context.Context, query string) ([]models.News, error)
 }
 
-func (r *NewsRepository) Create(ctx context.Context, news *models.News) error {
+func (r *NewsRepository) Create(ctx context.Context, news *models.News) (int, error) {
 	logger.Log.Info("Репозиторий: создание новости", zap.String("title", news.Title))
-	query := `
-		INSERT INTO news (title, content, image_url, color, sticker) 
-		VALUES ($1, $2, $3, $4, $5)
+
+	const q = `
+		INSERT INTO news (title, content, image_url, color, sticker, created_at)
+		VALUES ($1, $2, $3, $4, $5, NOW())
+		RETURNING id
 	`
-	_, err := r.db.Exec(ctx, query, news.Title, news.Content, news.ImageURL, news.Color, news.Sticker)
-	if err != nil {
+
+	var id int
+	if err := r.db.QueryRow(ctx, q,
+		news.Title,
+		news.Content,
+		news.ImageURL,
+		news.Color,
+		news.Sticker,
+	).Scan(&id); err != nil {
 		logger.Log.Error("Ошибка создания новости (repo)", zap.Error(err))
+		return 0, err
 	}
-	return err
+	return id, nil
 }
 
 func (r *NewsRepository) ListPaginated(ctx context.Context, limit, offset int) ([]*models.News, int, error) {

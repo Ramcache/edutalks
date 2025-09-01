@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"edutalks/internal/logger"
 	"edutalks/internal/middleware"
 	"edutalks/internal/models"
@@ -24,12 +25,14 @@ import (
 type DocumentHandler struct {
 	service     *services.DocumentService
 	userService *services.AuthService
+	notifier    *services.Notifier
 }
 
-func NewDocumentHandler(docService *services.DocumentService, userService *services.AuthService) *DocumentHandler {
+func NewDocumentHandler(docService *services.DocumentService, userService *services.AuthService, notifier *services.Notifier) *DocumentHandler {
 	return &DocumentHandler{
 		service:     docService,
 		userService: userService,
+		notifier:    notifier,
 	}
 }
 
@@ -68,6 +71,7 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 	description := r.FormValue("description")
 	isPublic := strings.ToLower(r.FormValue("is_public")) == "true"
 	category := r.FormValue("category")
+	title := r.FormValue("title")
 
 	var sectionIDPtr *int
 	if s := r.FormValue("section_id"); s != "" {
@@ -101,7 +105,6 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при сохранении файла")
 		return
 	}
-	title := r.FormValue("title")
 
 	doc := &models.Document{
 		UserID:      userID,
@@ -122,6 +125,10 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при сохранении документа")
 		return
 	}
+
+	// Фоново уведомляем подписчиков о новом документе
+	ctx := context.WithoutCancel(r.Context())
+	go h.notifier.NotifyNewDocument(ctx, id, doc.Title)
 
 	helpers.JSON(w, http.StatusCreated, map[string]any{
 		"id": id,

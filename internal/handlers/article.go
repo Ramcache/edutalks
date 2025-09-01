@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -17,11 +18,12 @@ import (
 )
 
 type ArticleHandler struct {
-	svc services.ArticleService
+	svc      services.ArticleService
+	notifier *services.Notifier
 }
 
-func NewArticleHandler(svc services.ArticleService) *ArticleHandler {
-	return &ArticleHandler{svc: svc}
+func NewArticleHandler(svc services.ArticleService, notifier *services.Notifier) *ArticleHandler {
+	return &ArticleHandler{svc: svc, notifier: notifier}
 }
 
 // Preview
@@ -83,7 +85,12 @@ func (h *ArticleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	logger.Log.Info("статья успешно создана",
 		zap.Int64("id", article.ID),
 		zap.String("title", article.Title),
+		zap.Bool("published", article.IsPublished),
 	)
+
+	// Если уже опубликована — уведомляем
+	ctx := context.WithoutCancel(r.Context())
+	go h.notifier.NotifyArticlePublished(ctx, int(article.ID), article.Title)
 
 	helpers.JSON(w, http.StatusCreated, article)
 }
