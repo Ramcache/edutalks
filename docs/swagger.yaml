@@ -247,6 +247,13 @@ definitions:
         example: true
         type: boolean
     type: object
+  internal_handlers.changeReq:
+    properties:
+      new_password:
+        type: string
+      old_password:
+        type: string
+    type: object
   internal_handlers.createNewsRequest:
     properties:
       color:
@@ -264,6 +271,11 @@ definitions:
     properties:
       subscribe:
         type: boolean
+    type: object
+  internal_handlers.forgotReq:
+    properties:
+      email:
+        type: string
     type: object
   internal_handlers.loginRequest:
     properties:
@@ -307,6 +319,13 @@ definitions:
       phone:
         type: string
       username:
+        type: string
+    type: object
+  internal_handlers.resetReq:
+    properties:
+      new_password:
+        type: string
+      token:
         type: string
     type: object
   internal_handlers.setSubscriptionRequest:
@@ -1400,6 +1419,105 @@ paths:
       summary: Получить новость по ID
       tags:
       - news
+  /api/password/change:
+    post:
+      consumes:
+      - application/json
+      description: Смена пароля по старому паролю. Требуется JWT-токен.
+      parameters:
+      - description: Старый и новый пароль
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.changeReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Смена пароля (авторизованный пользователь)
+      tags:
+      - password
+  /api/password/forgot:
+    post:
+      consumes:
+      - application/json
+      description: Отправляет письмо со ссылкой для сброса пароля. Ответ всегда одинаковый,
+        даже если e-mail не найден.
+      parameters:
+      - description: Email пользователя
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.forgotReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Запрос восстановления пароля
+      tags:
+      - password
+  /api/password/reset:
+    post:
+      consumes:
+      - application/json
+      description: Устанавливает новый пароль по токену из письма.
+      parameters:
+      - description: Токен и новый пароль
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.resetReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Сброс пароля по токену
+      tags:
+      - password
   /api/pay:
     get:
       consumes:

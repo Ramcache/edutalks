@@ -22,3 +22,23 @@ func SkipGuards(ctx context.Context) bool {
 	b, _ := v.(bool)
 	return b
 }
+
+const userIDKey ctxKey = "user_id"
+
+func UserIDFromContext(ctx context.Context) (int, bool) {
+	v := ctx.Value(ContextUserID)
+	if v == nil {
+		return 0, false
+	}
+	id, ok := v.(int)
+	return id, ok
+}
+
+func RoleFromContext(ctx context.Context) (string, bool) {
+	v := ctx.Value(ContextRole)
+	if v == nil {
+		return "", false
+	}
+	role, ok := v.(string)
+	return role, ok
+}

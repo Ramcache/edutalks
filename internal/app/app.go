@@ -18,6 +18,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// Репозитории
 	userRepo := repository.NewUserRepository(conn)
 	docRepo := repository.NewDocumentRepository(conn)
@@ -26,23 +27,30 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	articleRepo := repository.NewArticleRepo(conn)
 	taxonomyRepo := repository.NewTaxonomyRepo(conn)
 	subsRepo := repository.NewSubscriptionRepository(conn)
+	pwdResetRepo := repository.NewPasswordResetRepository(conn)
 
 	// Сервисы
+	emailService := services.NewEmailService(cfg) // единый email-сервис
+
 	authService := services.NewAuthService(userRepo)
 	docService := services.NewDocumentService(docRepo)
-	emailService := services.NewEmailService(cfg)
 	newsService := services.NewNewsService(newsRepo, userRepo, emailService, cfg)
 	emailTokenService := services.NewEmailTokenService(emailTokenRepo, userRepo)
-	emaService := services.NewEmailService(cfg)
 	articleSvc := services.NewArticleService(articleRepo)
 	taxonomySvc := services.NewTaxonomyService(taxonomyRepo)
 	notifier := services.NewNotifier(subsRepo, taxonomyRepo, cfg.SiteURL, "Edutalks")
+
+	// Password reset / change
+	passwordSvc := services.NewPasswordService(pwdResetRepo, emailService, cfg.FrontendURL)
+	// если добавлял TTL в конфиг, можно так:
+	// if cfg.PasswordResetTTLMin > 0 { passwordSvc.SetTTL(time.Duration(cfg.PasswordResetTTLMin) * time.Minute) }
 
 	yookassaService := services.NewYooKassaService(
 		cfg.YooKassaShopID,
 		cfg.YooKassaSecret,
 		cfg.YooKassaReturnURL,
 	)
+
 	// Хендлеры
 	authHandler := handlers.NewAuthHandler(authService, emailService, emailTokenService)
 	docHandler := handlers.NewDocumentHandler(docService, authService, notifier)
@@ -51,21 +59,28 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	searchHandler := handlers.NewSearchHandler(newsService, docService)
 	articleH := handlers.NewArticleHandler(articleSvc, notifier)
 	taxonomyH := handlers.NewTaxonomyHandler(taxonomySvc)
-
 	paymentHandler := handlers.NewPaymentHandler(yookassaService)
 	webhookHandler := handlers.NewWebhookHandler(authService)
 
-	_ = userRepo.ExpireSubscriptions(context.Background())
+	passwordHandler := handlers.NewPasswordHandler(passwordSvc, userRepo)
 
+	_ = userRepo.ExpireSubscriptions(context.Background())
 	StartSubscriptionCleaner(userRepo)
 
+	// email worker(ы)
 	for i := 0; i < 3; i++ {
-		go services.StartEmailWorker(emaService)
+		go services.StartEmailWorker(emailService)
 	}
 
 	// Маршруты
 	router := mux.NewRouter()
-	routes.InitRoutes(router, authHandler, docHandler, newsHandler, emailHandler, searchHandler, paymentHandler, webhookHandler, articleH, taxonomyH)
+	routes.InitRoutes(
+		router,
+		authHandler, docHandler, newsHandler, emailHandler,
+		searchHandler, paymentHandler, webhookHandler,
+		articleH, taxonomyH,
+		passwordHandler, // <-- НОВОЕ: прокидываем в роутер
+	)
 
 	return router, nil
 }

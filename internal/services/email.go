@@ -1,7 +1,9 @@
 package services
 
 import (
+	"context"
 	"edutalks/internal/config"
+	"edutalks/internal/utils/helpers"
 	"fmt"
 	"net/smtp"
 )
@@ -58,4 +60,11 @@ func (s *EmailService) SendHTML(to []string, subject, htmlBody string) error {
 		}
 	}
 	return nil
+}
+
+func (s *EmailService) SendPasswordReset(ctx context.Context, to, resetLink string) error {
+	subject := "Восстановление пароля"
+	htmlBody := helpers.BuildPasswordResetHTML(resetLink)
+	// отправляем как HTML
+	return s.SendHTML([]string{to}, subject, htmlBody)
 }

@@ -49,7 +49,7 @@ func JWTAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		// Добавим в контекст
+		// Кладём в контекст
 		ctx := context.WithValue(r.Context(), ContextUserID, int(userID))
 		ctx = context.WithValue(ctx, ContextRole, role)
 

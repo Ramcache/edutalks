@@ -125,6 +125,38 @@ func BuildVerifySuccessHTML() string {
 `
 }
 
+func BuildPasswordResetHTML(resetLink string) string {
+	return fmt.Sprintf(`
+<html>
+  <body style="font-family:Arial,sans-serif; background:#f9f9f9;">
+    <table width="100%%" cellpadding="0" cellspacing="0" bgcolor="#f9f9f9">
+      <tr>
+        <td align="center" style="padding:32px 0;">
+          <table width="500" bgcolor="#fff" cellpadding="24" cellspacing="0" style="border-radius:8px; box-shadow:0 1px 6px #eee;">
+            <tr>
+              <td>
+                <h2 style="color:#2d74da; margin-top:0;">Восстановление пароля</h2>
+                <p style="font-size:16px; color:#222;">Вы запросили восстановление пароля для своей учетной записи.</p>
+                <p>Чтобы установить новый пароль, перейдите по ссылке ниже:</p>
+                <p>
+                  <a href="%s" style="display:inline-block;padding:12px 24px;background:#2d74da;color:#fff;text-decoration:none;border-radius:5px;font-weight:bold;">
+                    Сбросить пароль
+                  </a>
+                </p>
+                <p style="font-size:14px; color:#666;">Ссылка действительна 30 минут.</p>
+                <hr style="margin:32px 0 16px 0; border:0; border-top:1px solid #eee;">
+                <div style="font-size:12px; color:#999;">Если вы не запрашивали восстановление пароля, просто проигнорируйте это письмо.</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+`, resetLink)
+}
+
 // Ошибка подтверждения email
 func BuildVerifyErrorHTML(errorMsg string) string {
 	return fmt.Sprintf(`
