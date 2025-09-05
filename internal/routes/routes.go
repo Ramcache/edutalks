@@ -18,6 +18,7 @@ func InitRoutes(
 	webhookHandler *handlers.WebhookHandler,
 	articleH *handlers.ArticleHandler,
 	taxonomyH *handlers.TaxonomyHandler,
+	passwordH *handlers.PasswordHandler,
 ) {
 	router.Use(middleware.Logging)
 
@@ -58,6 +59,10 @@ func InitRoutes(
 	// глобальный поиск
 	api.HandleFunc("/search", searchHandler.GlobalSearch).Methods(http.MethodGet)
 
+	// восстановление пароля (публичные)
+	api.HandleFunc("/password/forgot", passwordH.Forgot).Methods(http.MethodPost)
+	api.HandleFunc("/password/reset", passwordH.Reset).Methods(http.MethodPost)
+
 	// ---------- ПРОТЕКТИРОВАННЫЕ (JWT) ----------
 	protected := api.PathPrefix("").Subrouter()
 	protected.Use(middleware.JWTAuth)
@@ -69,6 +74,9 @@ func InitRoutes(
 
 	// скачивание файла (нужен user из контекста и проверка подписки)
 	protected.HandleFunc("/files/{id:[0-9]+}", documentHandler.DownloadDocument).Methods(http.MethodGet)
+
+	// смена пароля (нужен JWT)
+	protected.HandleFunc("/password/change", passwordH.Change).Methods(http.MethodPost)
 
 	// ---------- АДМИН ----------
 	admin := protected.PathPrefix("/admin").Subrouter()
