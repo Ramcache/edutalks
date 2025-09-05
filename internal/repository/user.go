@@ -171,7 +171,11 @@ func (r *UserRepository) GetAllUsersPaginated(ctx context.Context, limit, offset
 func (r *UserRepository) GetUserByID(ctx context.Context, id int) (*models.User, error) {
 	logger.Log.Debug("Получение пользователя по ID (repo)", zap.Int("user_id", id))
 	query := `
-		SELECT id, username, full_name, phone, email, address, role, created_at, updated_at, has_subscription, subscription_expires_at, email_subscription, email_verified
+		SELECT id, username, full_name, phone, email, address,
+		       password_hash,            
+		       role, created_at, updated_at,
+		       has_subscription, subscription_expires_at,
+		       email_subscription, email_verified
 		FROM users
 		WHERE id = $1
 	`
@@ -184,6 +188,7 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id int) (*models.User,
 		&u.Phone,
 		&u.Email,
 		&u.Address,
+		&u.PasswordHash,
 		&u.Role,
 		&u.CreatedAt,
 		&u.UpdatedAt,
