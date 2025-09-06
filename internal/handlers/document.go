@@ -7,6 +7,7 @@ import (
 	"edutalks/internal/models"
 	"edutalks/internal/services"
 	helpers "edutalks/internal/utils/helpers"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -48,6 +49,7 @@ func NewDocumentHandler(docService *services.DocumentService, userService *servi
 // @Param        is_public   formData  bool    true   "Публичный документ?"
 // @Param        category    formData  string  false  "Категория"
 // @Param        section_id  formData  int     false  "ID раздела"
+// @Param allow_free_download formData bool false "Можно скачивать без подписки?"
 // @Success      201 {object} map[string]int
 // @Failure      400 {object} map[string]string
 // @Failure      500 {object} map[string]string
@@ -106,16 +108,19 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	allowFreeDownload := strings.ToLower(r.FormValue("allow_free_download")) == "true"
+
 	doc := &models.Document{
-		UserID:      userID,
-		Title:       title,
-		Filename:    handler.Filename,
-		Filepath:    fullPath,
-		Description: description,
-		IsPublic:    isPublic,
-		Category:    category,
-		SectionID:   sectionIDPtr,
-		UploadedAt:  time.Now(),
+		UserID:            userID,
+		Title:             title,
+		Filename:          handler.Filename,
+		Filepath:          fullPath,
+		Description:       description,
+		IsPublic:          isPublic,
+		Category:          category,
+		SectionID:         sectionIDPtr,
+		UploadedAt:        time.Now(),
+		AllowFreeDownload: allowFreeDownload,
 	}
 
 	logger.Log.Info("Сохраняем информацию о документе", zap.String("filename", handler.Filename), zap.Int("user_id", userID))
@@ -133,14 +138,15 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 	helpers.JSON(w, http.StatusCreated, map[string]any{
 		"id": id,
 		"data": map[string]any{
-			"id":          id,
-			"title":       doc.Title,
-			"filename":    doc.Filename,
-			"description": doc.Description,
-			"category":    doc.Category,
-			"section_id":  doc.SectionID,
-			"is_public":   doc.IsPublic,
-			"uploaded_at": doc.UploadedAt,
+			"id":                  id,
+			"title":               doc.Title,
+			"filename":            doc.Filename,
+			"description":         doc.Description,
+			"category":            doc.Category,
+			"section_id":          doc.SectionID,
+			"is_public":           doc.IsPublic,
+			"uploaded_at":         doc.UploadedAt,
+			"allow_free_download": doc.AllowFreeDownload,
 		},
 	})
 }
@@ -212,12 +218,15 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 	}
 
 	// --- доступ как у тебя сейчас ---
+	// --- доступ ---
 	if user.Role != "admin" {
 		now := time.Now().UTC()
 		if !(user.HasSubscription && user.SubscriptionExpiresAt != nil && user.SubscriptionExpiresAt.After(now)) {
-			logger.Log.Warn("Подписка неактивна", zap.Int("user_id", userID), zap.Timep("expires_at", user.SubscriptionExpiresAt))
-			helpers.Error(w, http.StatusForbidden, "Нет доступа — купите подписку")
-			return
+			if !doc.AllowFreeDownload {
+				logger.Log.Warn("Нет подписки и документ не free", zap.Int("user_id", userID), zap.Int("doc_id", id))
+				helpers.Error(w, http.StatusForbidden, "Нет доступа — купите подписку")
+				return
+			}
 		}
 	}
 
@@ -424,4 +433,41 @@ func (h *DocumentHandler) PreviewDocuments(w http.ResponseWriter, r *http.Reques
 		"page_size": pageSize,
 		"category":  category,
 	})
+}
+
+// UpdateMyProfile godoc
+// @Summary Обновить свои данные
+// @Tags profile
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Param input body models.UpdateUserRequest true "Данные для обновления"
+// @Success 200 {string} string "Профиль обновлён"
+// @Failure 400 {string} string "Ошибка запроса"
+// @Failure 401 {string} string "Нет доступа"
+// @Router /api/profile [patch]
+func (h *AuthHandler) UpdateMyProfile(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.ContextUserID).(int)
+	if !ok || userID == 0 {
+		helpers.Error(w, http.StatusUnauthorized, "Нет доступа")
+		return
+	}
+
+	var input models.UpdateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		logger.Log.Warn("Невалидный JSON при обновлении профиля", zap.Error(err))
+		helpers.Error(w, http.StatusBadRequest, "Невалидный JSON")
+		return
+	}
+
+	// защита: обычный пользователь не может менять роль
+	input.Role = nil
+
+	if err := h.authService.UpdateUser(r.Context(), userID, &input); err != nil {
+		logger.Log.Error("Ошибка обновления профиля", zap.Error(err), zap.Int("user_id", userID))
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка обновления профиля")
+		return
+	}
+
+	helpers.JSON(w, http.StatusOK, map[string]string{"message": "Профиль обновлён"})
 }

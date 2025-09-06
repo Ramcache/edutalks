@@ -46,9 +46,10 @@ type DocumentRepo interface {
 func (r *DocumentRepository) SaveDocument(ctx context.Context, doc *models.Document) (int, error) {
 	logger.Log.Info("Репозиторий: сохранение документа", zap.String("filename", doc.Filename), zap.Int("user_id", doc.UserID))
 	query := `
-    INSERT INTO documents (user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    RETURNING id`
+    INSERT INTO documents (user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at, allow_free_download)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+RETURNING id
+`
 	var id int
 
 	err := r.db.QueryRow(ctx, query,
@@ -61,6 +62,7 @@ func (r *DocumentRepository) SaveDocument(ctx context.Context, doc *models.Docum
 		doc.Category,
 		doc.SectionID,
 		doc.UploadedAt,
+		doc.AllowFreeDownload,
 	).Scan(&id)
 
 	if err != nil {
@@ -83,7 +85,7 @@ func (r *DocumentRepository) GetPublicDocumentsPaginated(ctx context.Context, li
 
 	if category != "" {
 		query = `
-			SELECT id, user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at
+			SELECT id, user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at, allow_free_download
 			FROM documents
 			WHERE is_public = true AND category = $1
 			ORDER BY uploaded_at DESC
@@ -93,7 +95,7 @@ func (r *DocumentRepository) GetPublicDocumentsPaginated(ctx context.Context, li
 		rows, err = r.db.Query(ctx, query, args...)
 	} else {
 		query = `
-			SELECT id, user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at
+			SELECT id, user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at, allow_free_download
 			FROM documents
 			WHERE is_public = true
 			ORDER BY uploaded_at DESC
@@ -121,6 +123,7 @@ func (r *DocumentRepository) GetPublicDocumentsPaginated(ctx context.Context, li
 			&d.Category,
 			&d.SectionID,
 			&d.UploadedAt,
+			&d.AllowFreeDownload,
 		)
 		if err != nil {
 			logger.Log.Error("Ошибка сканирования документа (repo)", zap.Error(err))
@@ -147,7 +150,7 @@ func (r *DocumentRepository) GetPublicDocumentsPaginated(ctx context.Context, li
 func (r *DocumentRepository) GetDocumentByID(ctx context.Context, id int) (*models.Document, error) {
 	logger.Log.Info("Репозиторий: получение документа по ID", zap.Int("doc_id", id))
 	query := `
-		SELECT id, user_id,title, filename, filepath, description, is_public, category, section_id, uploaded_at
+		SELECT id, user_id,title, filename, filepath, description, is_public, category, section_id, uploaded_at, allow_free_download
 		FROM documents WHERE id = $1
 	`
 	var d models.Document
@@ -162,6 +165,7 @@ func (r *DocumentRepository) GetDocumentByID(ctx context.Context, id int) (*mode
 		&d.Category,
 		&d.SectionID,
 		&d.UploadedAt,
+		&d.AllowFreeDownload,
 	)
 	if err != nil {
 		logger.Log.Error("Ошибка получения документа по ID (repo)", zap.Int("doc_id", id), zap.Error(err))
@@ -184,7 +188,7 @@ func (r *DocumentRepository) DeleteDocument(ctx context.Context, id int) error {
 // Для админки — все документы
 func (r *DocumentRepository) GetAllDocuments(ctx context.Context, limit int) ([]*models.Document, error) {
 	query := `
-		SELECT id, user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at
+		SELECT id, user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at, allow_free_download
 		FROM documents
 		ORDER BY uploaded_at DESC
 	`
@@ -213,6 +217,7 @@ func (r *DocumentRepository) GetAllDocuments(ctx context.Context, limit int) ([]
 			&d.Category,
 			&d.SectionID,
 			&d.UploadedAt,
+			&d.AllowFreeDownload,
 		); err != nil {
 			logger.Log.Error("Ошибка сканирования документа (repo)", zap.Error(err))
 			return nil, err
@@ -225,7 +230,7 @@ func (r *DocumentRepository) GetAllDocuments(ctx context.Context, limit int) ([]
 func (r *DocumentRepository) Search(ctx context.Context, query string) ([]models.Document, error) {
 	q := "%" + query + "%"
 	rows, err := r.db.Query(ctx, `
-		SELECT id, user_id, title, filename, description, is_public, category, section_id, uploaded_at
+		SELECT id, user_id, title, filename, description, is_public, category, section_id, uploaded_at, allow_free_download
 		FROM documents
 		WHERE title ILIKE $1 OR filename ILIKE $1 OR description ILIKE $1 OR category ILIKE $1
 	`, q)
@@ -247,6 +252,7 @@ func (r *DocumentRepository) Search(ctx context.Context, query string) ([]models
 			&doc.Category,
 			&doc.SectionID,
 			&doc.UploadedAt,
+			&doc.AllowFreeDownload,
 		); err != nil {
 			return nil, err
 		}
@@ -272,7 +278,7 @@ func (r *DocumentRepository) GetPublicDocumentsByFilterPaginated(
 		total int
 	)
 
-	queryBase := `SELECT id, user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at
+	queryBase := `SELECT id, user_id, title, filename, filepath, description, is_public, category, section_id, uploaded_at, allow_free_download
 	              FROM documents WHERE is_public = true`
 
 	if sectionID != nil {
@@ -310,6 +316,7 @@ func (r *DocumentRepository) GetPublicDocumentsByFilterPaginated(
 			&d.Category,
 			&d.SectionID,
 			&d.UploadedAt,
+			&d.AllowFreeDownload,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -341,7 +348,7 @@ func (r *DocumentRepository) GetPublicDocuments(
 ) ([]*models.Document, error) {
 	query := `
 		SELECT id, user_id, COALESCE(title, '') AS title, filename, filepath, description, is_public,
-		       category, section_id, uploaded_at
+		       category, section_id, uploaded_at, allow_free_download
 		FROM documents
 		WHERE is_public = true
 	`
@@ -373,7 +380,7 @@ func (r *DocumentRepository) GetPublicDocuments(
 		if err := rows.Scan(
 			&d.ID,
 			&d.UserID,
-			&d.Title, // ⬅️ добавили
+			&d.Title,
 			&d.Filename,
 			&d.Filepath,
 			&d.Description,
@@ -381,6 +388,7 @@ func (r *DocumentRepository) GetPublicDocuments(
 			&d.Category,
 			&d.SectionID,
 			&d.UploadedAt,
+			&d.AllowFreeDownload,
 		); err != nil {
 			return nil, err
 		}
