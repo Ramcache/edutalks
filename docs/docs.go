@@ -2748,7 +2748,7 @@ const docTemplate = `{
         "internal_handlers.loginRequest": {
             "type": "object",
             "properties": {
-                "full_name": {
+                "login": {
                     "type": "string"
                 },
                 "password": {

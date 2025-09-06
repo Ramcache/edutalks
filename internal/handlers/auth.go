@@ -45,9 +45,10 @@ type registerRequest struct {
 }
 
 type loginRequest struct {
-	Username string `json:"username"`
-	FullName string `json:"full_name"`
+	Login    string `json:"login"`
 	Password string `json:"password"`
+
+	Username string `json:"username,omitempty"`
 }
 
 type loginResponse struct {
@@ -127,31 +128,37 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.Log.Warn("Ошибка декодирования JSON в Login", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "Невалидный JSON")
 		return
 	}
-	logger.Log.Info("Попытка входа", zap.String("username", req.Username))
+
+	// обратная совместимость
+	identifier := strings.TrimSpace(req.Login)
+	if identifier == "" {
+		identifier = strings.TrimSpace(req.Username)
+	}
+	if identifier == "" || req.Password == "" {
+		helpers.Error(w, http.StatusBadRequest, "Требуются поля login/username и password")
+		return
+	}
 
 	cfg, _ := config.LoadConfig()
 	accessTTL, _ := time.ParseDuration(cfg.AccessTokenTTL)
 	refreshTTL, _ := time.ParseDuration(cfg.RefreshTokenTTL)
 
-	access, refresh, user, err := h.authService.LoginUserWithUser(
-		context.Background(),
-		req.Username,
+	access, refresh, user, err := h.authService.LoginUserByIdentifier(
+		r.Context(),
+		identifier,
 		req.Password,
 		cfg.JWTSecret,
 		accessTTL,
 		refreshTTL,
 	)
 	if err != nil {
-		logger.Log.Warn("Ошибка входа пользователя", zap.String("username", req.Username), zap.Error(err))
 		helpers.Error(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 
-	logger.Log.Info("Вход выполнен", zap.String("username", req.Username), zap.String("role", user.Role))
 	resp := loginResponse{
 		AccessToken:  access,
 		RefreshToken: refresh,
@@ -159,7 +166,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		FullName:     user.FullName,
 		Role:         user.Role,
 	}
-
 	helpers.JSON(w, http.StatusOK, resp)
 }
 

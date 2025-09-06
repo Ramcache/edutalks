@@ -373,3 +373,37 @@ func (r *UserRepository) ExtendSubscription(ctx context.Context, userID int, dur
 	}
 	return err
 }
+
+func (r *UserRepository) GetUserByPhone(ctx context.Context, phoneDigits string) (*models.User, error) {
+	// Сравниваем по цифрам: regexp_replace(phone, '\D', '', 'g')
+	query := `
+        SELECT id, username, full_name, phone, email, address, password_hash, role, 
+               created_at, updated_at, has_subscription, subscription_expires_at, 
+               email_subscription, email_verified
+        FROM users
+        WHERE regexp_replace(phone, '\D', '', 'g') = $1
+        LIMIT 1
+    `
+	var user models.User
+	err := r.db.QueryRow(ctx, query, phoneDigits).Scan(
+		&user.ID,
+		&user.Username,
+		&user.FullName,
+		&user.Phone,
+		&user.Email,
+		&user.Address,
+		&user.PasswordHash,
+		&user.Role,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&user.HasSubscription,
+		&user.SubscriptionExpiresAt,
+		&user.EmailSubscription,
+		&user.EmailVerified,
+	)
+	if err != nil {
+		logger.Log.Error("Ошибка получения пользователя по телефону (repo)", zap.Error(err))
+		return nil, err
+	}
+	return &user, nil
+}
