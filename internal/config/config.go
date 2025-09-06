@@ -29,6 +29,7 @@ type Config struct {
 	SMTPPassword string
 
 	SiteURL           string
+	SiteURLNews       string
 	YooKassaShopID    string
 	YooKassaSecret    string
 	YooKassaReturnURL string
@@ -64,6 +65,7 @@ func LoadConfig() (*Config, error) {
 		YooKassaShopID:      os.Getenv("YOOKASSA_SHOP_ID"),
 		FrontendURL:         os.Getenv("FRONTEND_URL"),
 		PasswordResetTTLMin: os.Getenv("PASSWORD_RESET_TTL_MIN"),
+		SiteURLNews:         os.Getenv("SITEURLNEWS"),
 	}
 	return cfg, nil
 }

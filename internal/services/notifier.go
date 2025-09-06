@@ -8,6 +8,7 @@ import (
 	helpers "edutalks/internal/utils/helpers"
 	"fmt"
 	"go.uber.org/zap"
+	"net/url"
 	"strings"
 )
 
@@ -67,14 +68,15 @@ func (n *Notifier) sendToAll(ctx context.Context, subject, htmlBody string) {
 
 // ==== ПИСЬМА ====
 
-// Новый документ
-func (n *Notifier) NotifyNewDocument(ctx context.Context, docID int, title string, sectionID *int) {
+func (n *Notifier) NotifyNewDocument(ctx context.Context, title string, tabsID *int) {
 	ctx = context.WithoutCancel(ctx)
 
-	link := fmt.Sprintf("%s/documents/preview?id=%d", n.baseURL, docID) // fallback
-	if sectionID != nil {
-		if slug, err := n.taxRepo.GetSectionSlugByID(ctx, *sectionID); err == nil && slug != "" {
-			link = fmt.Sprintf("%s/%s", n.baseURL, slug)
+	base := strings.TrimRight(n.baseURL, "/")
+	link := base + "/documents" // fallback
+
+	if tabsID != nil {
+		if slug, err := n.taxRepo.GetTabSlugByID(ctx, *tabsID); err == nil && slug != "" {
+			link = base + "/" + url.PathEscape(slug) // https://edutalks.ru/<slug>
 		}
 	}
 

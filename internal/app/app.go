@@ -38,7 +38,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	emailTokenService := services.NewEmailTokenService(emailTokenRepo, userRepo)
 	articleSvc := services.NewArticleService(articleRepo)
 	taxonomySvc := services.NewTaxonomyService(taxonomyRepo)
-	notifier := services.NewNotifier(subsRepo, taxonomyRepo, cfg.SiteURL, "Edutalks")
+	notifier := services.NewNotifier(subsRepo, taxonomyRepo, cfg.SiteURLNews, "Edutalks")
 
 	// Password reset / change
 	passwordSvc := services.NewPasswordService(pwdResetRepo, emailService, cfg.FrontendURL)
@@ -53,7 +53,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 
 	// Хендлеры
 	authHandler := handlers.NewAuthHandler(authService, emailService, emailTokenService)
-	docHandler := handlers.NewDocumentHandler(docService, authService, notifier)
+	docHandler := handlers.NewDocumentHandler(docService, authService, notifier, taxonomyRepo)
 	newsHandler := handlers.NewNewsHandler(newsService, notifier)
 	emailHandler := handlers.NewEmailHandler(emailTokenService)
 	searchHandler := handlers.NewSearchHandler(newsService, docService)

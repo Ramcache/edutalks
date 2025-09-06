@@ -278,3 +278,18 @@ func (r *TaxonomyRepo) GetSectionSlugByID(ctx context.Context, id int) (string, 
 	err := r.db.QueryRow(ctx, `SELECT slug FROM sections WHERE id=$1`, id).Scan(&slug)
 	return slug, err
 }
+
+func (r *TaxonomyRepo) GetTabSlugByID(ctx context.Context, id int) (string, error) {
+	var slug string
+	err := r.db.QueryRow(ctx, `SELECT slug FROM tabs WHERE id = $1`, id).Scan(&slug)
+	if err != nil {
+		return "", err
+	}
+	return slug, nil
+}
+
+func (r *TaxonomyRepo) GetTabIDBySectionID(ctx context.Context, sectionID int) (int, error) {
+	var id int
+	err := r.db.QueryRow(ctx, `SELECT tab_id FROM sections WHERE id = $1`, sectionID).Scan(&id)
+	return id, err
+}
