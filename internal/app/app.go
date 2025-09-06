@@ -79,7 +79,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 		authHandler, docHandler, newsHandler, emailHandler,
 		searchHandler, paymentHandler, webhookHandler,
 		articleH, taxonomyH,
-		passwordHandler, // <-- НОВОЕ: прокидываем в роутер
+		passwordHandler,
 	)
 
 	return router, nil

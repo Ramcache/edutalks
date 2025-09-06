@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"fmt"
+	"time"
 )
 
 func BuildNewsHTML(title, content, url string) string {
@@ -183,4 +184,66 @@ func BuildVerifyErrorHTML(errorMsg string) string {
   </body>
 </html>
 `, errorMsg)
+}
+
+// BuildSubscriptionGrantedHTML — письмо о выдаче/продлении подписки
+func BuildSubscriptionGrantedHTML(name, planLabel, expiresAt string) string {
+	return fmt.Sprintf(`
+<html>
+  <body style="font-family:Arial,sans-serif; background:#f9f9f9;">
+    <table width="100%%" cellpadding="0" cellspacing="0" bgcolor="#f9f9f9">
+      <tr>
+        <td align="center" style="padding:32px 0;">
+          <table width="520" bgcolor="#fff" cellpadding="24" cellspacing="0" style="border-radius:10px; box-shadow:0 1px 8px #eee;">
+            <tr>
+              <td>
+                <h2 style="color:#2d74da; margin-top:0;">Подписка активирована 🎉</h2>
+                <p style="font-size:16px; color:#222;">%s, ваша подписка <b>%s</b> активирована/продлена.</p>
+                <p style="font-size:16px; color:#222;">Дата окончания: <b>%s</b></p>
+                <p style="font-size:14px; color:#666;">Спасибо, что пользуетесь Edutalks.</p>
+                <hr style="margin:24px 0; border:0; border-top:1px solid #eee;">
+                <div style="font-size:12px; color:#999;">Письмо отправлено автоматически. Не отвечайте на него.</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+`, name, planLabel, expiresAt)
+}
+
+// BuildSubscriptionRevokedHTML — письмо об отключении подписки
+func BuildSubscriptionRevokedHTML(name string, revokedAt time.Time, prevExpiresAt *time.Time) string {
+	prev := ""
+	if prevExpiresAt != nil {
+		prev = fmt.Sprintf(`<p style="font-size:14px; color:#666;">Ранее дата окончания была: <b>%s</b></p>`,
+			prevExpiresAt.Format("02.01.2006 15:04"))
+	}
+
+	return fmt.Sprintf(`
+<html>
+  <body style="font-family:Arial,sans-serif; background:#f9f9f9;">
+    <table width="100%%" cellpadding="0" cellspacing="0" bgcolor="#f9f9f9">
+      <tr>
+        <td align="center" style="padding:32px 0;">
+          <table width="520" bgcolor="#fff" cellpadding="24" cellspacing="0" style="border-radius:10px; box-shadow:0 1px 8px #eee;">
+            <tr>
+              <td>
+                <h2 style="color:#d63636; margin-top:0;">Подписка отключена</h2>
+                <p style="font-size:16px; color:#222;">%s, ваша подписка была отключена: <b>%s</b>.</p>
+                %s
+                <p style="font-size:14px; color:#666;">Если вы не ожидали это письмо, свяжитесь с поддержкой.</p>
+                <hr style="margin:24px 0; border:0; border-top:1px solid #eee;">
+                <div style="font-size:12px; color:#999;">Письмо отправлено автоматически. Не отвечайте на него.</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+`, name, revokedAt.Format("02.01.2006 15:04"), prev)
 }

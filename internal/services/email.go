@@ -6,6 +6,7 @@ import (
 	"edutalks/internal/utils/helpers"
 	"fmt"
 	"net/smtp"
+	"time"
 )
 
 type EmailService struct {
@@ -67,4 +68,16 @@ func (s *EmailService) SendPasswordReset(ctx context.Context, to, resetLink stri
 	htmlBody := helpers.BuildPasswordResetHTML(resetLink)
 	// отправляем как HTML
 	return s.SendHTML([]string{to}, subject, htmlBody)
+}
+
+func (s *EmailService) SendSubscriptionGranted(ctx context.Context, to, name, planLabel string, expiresAt time.Time) error {
+	subject := "Подписка активирована"
+	body := helpers.BuildSubscriptionGrantedHTML(name, planLabel, expiresAt.Format("02.01.2006 15:04"))
+	return s.SendHTML([]string{to}, subject, body)
+}
+
+func (s *EmailService) SendSubscriptionRevoked(ctx context.Context, to, name string, revokedAt time.Time, prevExpiresAt *time.Time) error {
+	subject := "Подписка отключена"
+	body := helpers.BuildSubscriptionRevokedHTML(name, revokedAt, prevExpiresAt)
+	return s.SendHTML([]string{to}, subject, body)
 }
