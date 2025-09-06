@@ -72,11 +72,11 @@ func (n *Notifier) NotifyNewDocument(ctx context.Context, title string, tabsID *
 	ctx = context.WithoutCancel(ctx)
 
 	base := strings.TrimRight(n.baseURL, "/")
-	link := base + "/documents"
+	link := base + "/documents" // fallback
 
 	if tabsID != nil {
 		if slug, err := n.taxRepo.GetTabSlugByID(ctx, *tabsID); err == nil && slug != "" {
-			link = base + "/" + url.PathEscape(slug)
+			link = base + "/" + url.PathEscape(slug) // https://edutalks.ru/<slug>
 		}
 	}
 

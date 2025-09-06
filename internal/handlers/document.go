@@ -5,6 +5,7 @@ import (
 	"edutalks/internal/logger"
 	"edutalks/internal/middleware"
 	"edutalks/internal/models"
+	"edutalks/internal/repository"
 	"edutalks/internal/services"
 	helpers "edutalks/internal/utils/helpers"
 	"encoding/json"
@@ -24,16 +25,18 @@ import (
 )
 
 type DocumentHandler struct {
-	service     *services.DocumentService
-	userService *services.AuthService
-	notifier    *services.Notifier
+	service      *services.DocumentService
+	userService  *services.AuthService
+	notifier     *services.Notifier
+	taxonomyRepo *repository.TaxonomyRepo
 }
 
-func NewDocumentHandler(docService *services.DocumentService, userService *services.AuthService, notifier *services.Notifier) *DocumentHandler {
+func NewDocumentHandler(docService *services.DocumentService, userService *services.AuthService, notifier *services.Notifier, taxonomyRepo *repository.TaxonomyRepo) *DocumentHandler {
 	return &DocumentHandler{
-		service:     docService,
-		userService: userService,
-		notifier:    notifier,
+		service:      docService,
+		userService:  userService,
+		notifier:     notifier,
+		taxonomyRepo: taxonomyRepo,
 	}
 }
 
@@ -133,7 +136,13 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 
 	// Фоново уведомляем подписчиков о новом документе
 	ctx := context.WithoutCancel(r.Context())
-	go h.notifier.NotifyNewDocument(ctx, id, doc.Title, doc.SectionID)
+	var tabsID *int
+	if doc.SectionID != nil {
+		if tid, err := h.taxonomyRepo.GetTabIDBySectionID(ctx, *doc.SectionID); err == nil {
+			tabsID = &tid
+		}
+	}
+	go h.notifier.NotifyNewDocument(ctx, doc.Title, tabsID)
 
 	helpers.JSON(w, http.StatusCreated, map[string]any{
 		"id": id,
