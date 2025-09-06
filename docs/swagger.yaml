@@ -283,7 +283,7 @@ definitions:
     type: object
   internal_handlers.loginRequest:
     properties:
-      full_name:
+      login:
         type: string
       password:
         type: string

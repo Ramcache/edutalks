@@ -6,6 +6,7 @@ import (
 	"edutalks/internal/models"
 	"edutalks/internal/utils"
 	"errors"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -39,6 +40,7 @@ type UserRepo interface {
 	SetSubscriptionWithExpiry(ctx context.Context, userID int, duration time.Duration) error
 	ExpireSubscriptions(ctx context.Context) error
 	ExtendSubscription(ctx context.Context, userID int, duration time.Duration) error
+	GetUserByPhone(ctx context.Context, phoneDigits string) (*models.User, error)
 }
 
 func (s *AuthService) RegisterUser(ctx context.Context, input *models.User, plainPassword string) error {
@@ -244,4 +246,76 @@ func (s *AuthService) ExtendSubscription(ctx context.Context, userID int, durati
 		return err
 	}
 	return nil
+}
+
+func normalizePhoneDigits(s string) string {
+	// оставляем только цифры
+	b := make([]rune, 0, len(s))
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			b = append(b, r)
+		}
+	}
+	digits := string(b)
+
+	// Приводим к формату 7XXXXXXXXXX (Россия)
+	if len(digits) == 11 {
+		if digits[0] == '8' {
+			digits = "7" + digits[1:]
+		}
+	}
+	return digits
+}
+
+func (s *AuthService) findUserByIdentifier(ctx context.Context, identifier string) (*models.User, error) {
+	id := strings.TrimSpace(identifier)
+	if id == "" {
+		return nil, errors.New("пустой логин")
+	}
+
+	// очень простая эвристика:
+	// 1) email: есть '@'
+	if strings.Contains(id, "@") {
+		return s.repo.GetUserByEmail(ctx, id)
+	}
+
+	// 2) телефон: если после нормализации есть 10+ цифр
+	digits := normalizePhoneDigits(id)
+	if len(digits) >= 10 {
+		return s.repo.GetUserByPhone(ctx, digits)
+	}
+
+	// 3) иначе считаем username
+	return s.repo.GetByUsername(ctx, id)
+}
+
+func (s *AuthService) LoginUserByIdentifier(
+	ctx context.Context,
+	identifier, password, jwtSecret string,
+	accessTTL, refreshTTL time.Duration,
+) (string, string, *models.User, error) {
+	user, err := s.findUserByIdentifier(ctx, identifier)
+	if err != nil {
+		logger.Log.Warn("Пользователь не найден (service)", zap.String("identifier", identifier), zap.Error(err))
+		return "", "", nil, errors.New("пользователь не найден")
+	}
+
+	if !utils.CheckPasswordHash(password, user.PasswordHash) {
+		logger.Log.Warn("Неверный пароль (service)", zap.Int("user_id", user.ID))
+		return "", "", nil, errors.New("неверный пароль")
+	}
+
+	accessToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, accessTTL, "access")
+	if err != nil {
+		return "", "", nil, err
+	}
+	refreshToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, refreshTTL, "refresh")
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	if err := s.repo.SaveRefreshToken(ctx, user.ID, refreshToken); err != nil {
+		return "", "", nil, err
+	}
+	return accessToken, refreshToken, user, nil
 }
