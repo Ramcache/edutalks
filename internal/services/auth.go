@@ -5,7 +5,9 @@ import (
 	"edutalks/internal/logger"
 	"edutalks/internal/models"
 	"edutalks/internal/utils"
+	"edutalks/internal/utils/helpers"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -185,12 +187,42 @@ func (s *AuthService) UpdateUser(ctx context.Context, id int, input *models.Upda
 }
 
 func (s *AuthService) SetSubscription(ctx context.Context, userID int, status bool) error {
-	logger.Log.Info("Изменение подписки пользователя (service)", zap.Int("user_id", userID), zap.Bool("status", status))
+	logger.Log.Info("Изменение подписки (service)", zap.Int("user_id", userID), zap.Bool("status", status))
+
+	// Получим пользователя ДО изменения — чтобы знать прежнюю дату окончания
+	uBefore, _ := s.repo.GetUserByID(ctx, userID)
+	var prevExpiresAt *time.Time
+	if uBefore != nil && uBefore.SubscriptionExpiresAt != nil {
+		prevExpiresAt = uBefore.SubscriptionExpiresAt
+	}
+
 	if err := s.repo.UpdateSubscriptionStatus(ctx, userID, status); err != nil {
-		logger.Log.Error("Ошибка обновления подписки (service)", zap.Error(err), zap.Int("user_id", userID))
+		logger.Log.Error("Ошибка изменения подписки (service)", zap.Error(err))
 		return err
 	}
-	logger.Log.Info("Статус подписки обновлён (service)", zap.Int("user_id", userID), zap.Bool("status", status))
+
+	// Если отключили подписку — отправим письмо
+	if !status {
+		u, err := s.repo.GetUserByID(ctx, userID)
+		if err != nil {
+			logger.Log.Warn("Не удалось получить пользователя после revoke", zap.Error(err), zap.Int("user_id", userID))
+			return nil
+		}
+		if u != nil && u.Email != "" {
+			// A) асинхронно через очередь (не блокируем запрос):
+			html := helpers.BuildSubscriptionRevokedHTML(u.FullName, time.Now().UTC(), prevExpiresAt)
+			EmailQueue <- EmailJob{
+				To:      []string{u.Email},
+				Subject: "Подписка отключена",
+				Body:    html,
+				IsHTML:  true,
+			}
+
+			// B) либо синхронно, если инжектируете EmailService в AuthService:
+			// _ = s.emailService.SendSubscriptionRevoked(ctx, u.Email, u.FullName, time.Now().UTC(), prevExpiresAt)
+		}
+	}
+
 	return nil
 }
 
@@ -226,25 +258,67 @@ func (s *AuthService) SetSubscriptionTrue(userID int) error {
 }
 
 func (s *AuthService) SetSubscriptionWithExpiry(ctx context.Context, userID int, duration time.Duration) error {
-	logger.Log.Info("Установка подписки с истечением (service)",
-		zap.Int("user_id", userID),
-		zap.Duration("duration", duration),
-	)
+	logger.Log.Info("Выдача подписки с истечением (service)", zap.Int("user_id", userID), zap.Duration("duration", duration))
 
 	if err := s.repo.SetSubscriptionWithExpiry(ctx, userID, duration); err != nil {
-		logger.Log.Error("Ошибка установки подписки с истечением (service)", zap.Error(err))
+		logger.Log.Error("Ошибка выдачи подписки (service)", zap.Error(err))
 		return err
 	}
+
+	// Получим пользователя, чтобы взять email/ФИО/дату истечения
+	u, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		logger.Log.Error("Не удалось получить пользователя после выдачи подписки", zap.Error(err), zap.Int("user_id", userID))
+		return nil // подписку уже выдали — письмо не критично
+	}
+
+	// Если email есть — отправим уведомление
+	if u != nil && u.Email != "" && u.SubscriptionExpiresAt != nil {
+		plan := humanizeDuration(duration)
+
+		// Вариант A: через очередь (не блокируем запрос)
+		html := helpers.BuildSubscriptionGrantedHTML(u.FullName, plan, u.SubscriptionExpiresAt.Format("02.01.2006 15:04"))
+		EmailQueue <- EmailJob{
+			To:      []string{u.Email},
+			Subject: "Подписка активирована",
+			Body:    html,
+			IsHTML:  true,
+		}
+
+		// Вариант B (синхронно): если вы инжектируете EmailService в AuthService
+		// _ = s.emailService.SendSubscriptionGranted(ctx, u.Email, u.FullName, plan, *u.SubscriptionExpiresAt)
+	}
+
 	logger.Log.Info("Подписка с истечением успешно установлена", zap.Int("user_id", userID))
 	return nil
 }
 
 func (s *AuthService) ExtendSubscription(ctx context.Context, userID int, duration time.Duration) error {
 	logger.Log.Info("Продление подписки (service)", zap.Int("user_id", userID), zap.Duration("duration", duration))
+
 	if err := s.repo.ExtendSubscription(ctx, userID, duration); err != nil {
 		logger.Log.Error("Ошибка продления подписки (service)", zap.Error(err))
 		return err
 	}
+
+	u, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		logger.Log.Error("Не удалось получить пользователя после продления", zap.Error(err), zap.Int("user_id", userID))
+		return nil
+	}
+
+	if u != nil && u.Email != "" && u.SubscriptionExpiresAt != nil {
+		plan := humanizeDuration(duration)
+		html := helpers.BuildSubscriptionGrantedHTML(u.FullName, plan, u.SubscriptionExpiresAt.Format("02.01.2006 15:04"))
+		EmailQueue <- EmailJob{
+			To:      []string{u.Email},
+			Subject: "Подписка продлена",
+			Body:    html,
+			IsHTML:  true,
+		}
+		// или синхронно через emailService, как выше
+	}
+
 	return nil
 }
 
@@ -318,4 +392,15 @@ func (s *AuthService) LoginUserByIdentifier(
 		return "", "", nil, err
 	}
 	return accessToken, refreshToken, user, nil
+}
+func humanizeDuration(d time.Duration) string {
+	days := int(d.Hours() / 24)
+	switch {
+	case days%365 == 0 && days >= 365:
+		return fmt.Sprintf("%d год(а)", days/365)
+	case days%30 == 0 && days >= 30:
+		return fmt.Sprintf("%d мес.", days/30)
+	default:
+		return fmt.Sprintf("%d дней", days)
+	}
 }
