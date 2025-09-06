@@ -71,6 +71,7 @@ func InitRoutes(
 	protected.HandleFunc("/pay", paymentHandler.CreatePayment).Methods(http.MethodGet)
 	protected.HandleFunc("/profile", authHandler.Protected).Methods(http.MethodGet)
 	protected.HandleFunc("/email-subscription", authHandler.EmailSubscribe).Methods(http.MethodPatch)
+	protected.HandleFunc("/profile", authHandler.UpdateMyProfile).Methods(http.MethodPatch)
 
 	// скачивание файла (нужен user из контекста и проверка подписки)
 	protected.HandleFunc("/files/{id:[0-9]+}", documentHandler.DownloadDocument).Methods(http.MethodGet)

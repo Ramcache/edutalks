@@ -394,6 +394,12 @@ const docTemplate = `{
                         "description": "ID раздела",
                         "name": "section_id",
                         "in": "formData"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Можно скачивать без подписки?",
+                        "name": "allow_free_download",
+                        "in": "formData"
                     }
                 ],
                 "responses": {
@@ -1950,6 +1956,54 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profile"
+                ],
+                "summary": "Обновить свои данные",
+                "parameters": [
+                    {
+                        "description": "Данные для обновления",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/edutalks_internal_models.UpdateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Профиль обновлён",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Ошибка запроса",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет доступа",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
             }
         },
         "/api/refresh": {
@@ -2337,6 +2391,9 @@ const docTemplate = `{
         "edutalks_internal_models.Document": {
             "type": "object",
             "properties": {
+                "allow_free_download": {
+                    "type": "boolean"
+                },
                 "category": {
                     "type": "string"
                 },
@@ -2369,6 +2426,9 @@ const docTemplate = `{
         "edutalks_internal_models.DocumentPreviewResponse": {
             "type": "object",
             "properties": {
+                "allow_free_download": {
+                    "type": "boolean"
+                },
                 "category": {
                     "type": "string"
                 },
