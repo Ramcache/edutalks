@@ -381,7 +381,7 @@ func (r *UserRepository) GetUserByPhone(ctx context.Context, phoneDigits string)
                created_at, updated_at, has_subscription, subscription_expires_at, 
                email_subscription, email_verified
         FROM users
-        WHERE regexp_replace(phone, '\D', '', 'g') = $1
+		WHERE right(regexp_replace(phone, '\D', '', 'g'), 10) = right($1, 10)
         LIMIT 1
     `
 	var user models.User
