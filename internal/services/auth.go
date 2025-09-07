@@ -322,25 +322,6 @@ func (s *AuthService) ExtendSubscription(ctx context.Context, userID int, durati
 	return nil
 }
 
-func normalizePhoneDigits(s string) string {
-	// оставляем только цифры
-	b := make([]rune, 0, len(s))
-	for _, r := range s {
-		if r >= '0' && r <= '9' {
-			b = append(b, r)
-		}
-	}
-	digits := string(b)
-
-	// Приводим к формату 7XXXXXXXXXX (Россия)
-	if len(digits) == 11 {
-		if digits[0] == '8' {
-			digits = "7" + digits[1:]
-		}
-	}
-	return digits
-}
-
 func (s *AuthService) findUserByIdentifier(ctx context.Context, identifier string) (*models.User, error) {
 	id := strings.TrimSpace(identifier)
 	if id == "" {
@@ -403,4 +384,15 @@ func humanizeDuration(d time.Duration) string {
 	default:
 		return fmt.Sprintf("%d дней", days)
 	}
+}
+
+func normalizePhoneDigits(s string) string {
+	// оставить только цифры, без какой-либо нормализации
+	b := make([]rune, 0, len(s))
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			b = append(b, r)
+		}
+	}
+	return string(b)
 }
