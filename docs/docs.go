@@ -831,6 +831,30 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/admin/stats": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-users"
+                ],
+                "summary": "Системная статистика для админ-дашборда",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/edutalks_internal_models.SystemStats"
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/tabs": {
             "post": {
                 "description": "Доступно только администратору",
@@ -991,7 +1015,7 @@ const docTemplate = `{
                 "tags": [
                     "admin-users"
                 ],
-                "summary": "Получить всех пользователей",
+                "summary": "Получить пользователей (с фильтрами)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1004,22 +1028,32 @@ const docTemplate = `{
                         "description": "Размер страницы",
                         "name": "page_size",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Поиск по ФИО или email",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Фильтр по роли (admin/user/...)",
+                        "name": "role",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "true|false — фильтр по подписке",
+                        "name": "has_subscription",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/edutalks_internal_models.User"
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Доступ запрещён",
-                        "schema": {
-                            "type": "string"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -2518,6 +2552,35 @@ const docTemplate = `{
                 },
                 "section": {
                     "$ref": "#/definitions/edutalks_internal_models.Section"
+                }
+            }
+        },
+        "edutalks_internal_models.SystemStats": {
+            "type": "object",
+            "properties": {
+                "admins": {
+                    "type": "integer"
+                },
+                "news_count": {
+                    "type": "integer"
+                },
+                "regular_users": {
+                    "type": "integer"
+                },
+                "total_users": {
+                    "type": "integer"
+                },
+                "with_subscription": {
+                    "type": "integer"
+                },
+                "with_subscription_pct": {
+                    "type": "integer"
+                },
+                "without_subscription": {
+                    "type": "integer"
+                },
+                "without_subscription_pct": {
+                    "type": "integer"
                 }
             }
         },

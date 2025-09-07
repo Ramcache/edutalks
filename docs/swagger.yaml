@@ -135,6 +135,25 @@ definitions:
       section:
         $ref: '#/definitions/edutalks_internal_models.Section'
     type: object
+  edutalks_internal_models.SystemStats:
+    properties:
+      admins:
+        type: integer
+      news_count:
+        type: integer
+      regular_users:
+        type: integer
+      total_users:
+        type: integer
+      with_subscription:
+        type: integer
+      with_subscription_pct:
+        type: integer
+      without_subscription:
+        type: integer
+      without_subscription_pct:
+        type: integer
+    type: object
   edutalks_internal_models.Tab:
     properties:
       created_at:
@@ -881,6 +900,20 @@ paths:
       summary: Обновить раздел
       tags:
       - taxonomy
+  /api/admin/stats:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/edutalks_internal_models.SystemStats'
+      security:
+      - ApiKeyAuth: []
+      summary: Системная статистика для админ-дашборда
+      tags:
+      - admin-users
   /api/admin/tabs:
     post:
       consumes:
@@ -989,22 +1022,29 @@ paths:
         in: query
         name: page_size
         type: integer
+      - description: Поиск по ФИО или email
+        in: query
+        name: q
+        type: string
+      - description: Фильтр по роли (admin/user/...)
+        in: query
+        name: role
+        type: string
+      - description: true|false — фильтр по подписке
+        in: query
+        name: has_subscription
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/edutalks_internal_models.User'
-            type: array
-        "403":
-          description: Доступ запрещён
-          schema:
-            type: string
+            additionalProperties: true
+            type: object
       security:
       - ApiKeyAuth: []
-      summary: Получить всех пользователей
+      summary: Получить пользователей (с фильтрами)
       tags:
       - admin-users
   /api/admin/users/{id}:

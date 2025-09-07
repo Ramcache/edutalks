@@ -407,3 +407,115 @@ func (r *UserRepository) GetUserByPhone(ctx context.Context, phoneDigits string)
 	}
 	return &user, nil
 }
+
+func (r *UserRepository) GetSystemStats(ctx context.Context) (*models.SystemStats, error) {
+	// одним запросом через подзапросы
+	const q = `
+SELECT
+  (SELECT COUNT(*) FROM users)                                                   AS total_users,
+  (SELECT COUNT(*) FROM users WHERE role = 'admin')                              AS admins,
+  (SELECT COUNT(*) FROM users WHERE role <> 'admin' OR role IS NULL)             AS regular_users,
+  (SELECT COUNT(*) FROM users
+     WHERE has_subscription = true
+       AND (subscription_expires_at IS NULL OR subscription_expires_at > NOW())
+  )                                                                              AS with_subscription,
+  (SELECT COUNT(*) FROM users
+     WHERE has_subscription = false
+        OR (subscription_expires_at IS NOT NULL AND subscription_expires_at <= NOW())
+  )                                                                              AS without_subscription,
+  (SELECT COUNT(*) FROM news)                                                    AS news_count
+`
+	var s models.SystemStats
+	if err := r.db.QueryRow(ctx, q).Scan(
+		&s.TotalUsers,
+		&s.Admins,
+		&s.RegularUsers,
+		&s.WithSubscription,
+		&s.WithoutSubscription,
+		&s.NewsCount,
+	); err != nil {
+		logger.Log.Error("Ошибка получения системной статистики (repo)", zap.Error(err))
+		return nil, err
+	}
+	// проценты посчитаем здесь же для удобства
+	if s.TotalUsers > 0 {
+		s.WithSubscriptionPct = int(float64(s.WithSubscription)*100.0/float64(s.TotalUsers) + 0.5)
+		s.WithoutSubscriptionPct = 100 - s.WithSubscriptionPct
+	}
+	return &s, nil
+}
+
+// GetUsersFiltered возвращает пользователей постранично с фильтрами:
+// q — поиск по full_name ILIKE '%q%' ИЛИ lower(email) ILIKE '%q%'
+// role — точное совпадение по роли (admin/user/...)
+// hasSubscription — true/false; если nil, то без фильтра
+func (r *UserRepository) GetUsersFiltered(
+	ctx context.Context,
+	limit, offset int,
+	q string,
+	role *string,
+	hasSubscription *bool,
+) ([]*models.User, int, error) {
+
+	base := `
+		SELECT id, username, full_name, phone, email, address, role,
+		       created_at, updated_at, has_subscription, subscription_expires_at,
+		       email_subscription, email_verified
+		FROM users
+	`
+	where := " WHERE 1=1"
+	args := []interface{}{}
+	argn := 1
+
+	if q = strings.TrimSpace(q); q != "" {
+		where += fmt.Sprintf(" AND (full_name ILIKE $%d OR lower(email) ILIKE $%d)", argn, argn+1)
+		args = append(args, "%"+q+"%", "%"+strings.ToLower(q)+"%")
+		argn += 2
+	}
+	if role != nil && strings.TrimSpace(*role) != "" {
+		where += fmt.Sprintf(" AND role = $%d", argn)
+		args = append(args, strings.TrimSpace(*role))
+		argn++
+	}
+	if hasSubscription != nil {
+		where += fmt.Sprintf(" AND has_subscription = $%d", argn)
+		args = append(args, *hasSubscription)
+		argn++
+	}
+
+	orderPage := fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", argn, argn+1)
+	args = append(args, limit, offset)
+
+	// сами данные
+	rows, err := r.db.Query(ctx, base+where+orderPage, args...)
+	if err != nil {
+		logger.Log.Error("Ошибка получения пользователей (repo/filtered)", zap.Error(err))
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var users []*models.User
+	for rows.Next() {
+		var u models.User
+		err := rows.Scan(
+			&u.ID, &u.Username, &u.FullName, &u.Phone, &u.Email, &u.Address, &u.Role,
+			&u.CreatedAt, &u.UpdatedAt, &u.HasSubscription, &u.SubscriptionExpiresAt,
+			&u.EmailSubscription, &u.EmailVerified,
+		)
+		if err != nil {
+			logger.Log.Error("Ошибка сканирования пользователя (repo/filtered)", zap.Error(err))
+			return nil, 0, err
+		}
+		users = append(users, &u)
+	}
+
+	// total — с теми же фильтрами
+	countSQL := "SELECT COUNT(*) FROM users" + where
+	var total int
+	if err := r.db.QueryRow(ctx, countSQL, args[:argn-2]...).Scan(&total); err != nil {
+		logger.Log.Error("Ошибка подсчёта пользователей (repo/filtered)", zap.Error(err))
+		return nil, 0, err
+	}
+
+	return users, total, nil
+}

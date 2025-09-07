@@ -331,16 +331,19 @@ func (h *AuthHandler) AdminOnly(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetUsers godoc
-// @Summary Получить всех пользователей
+// @Summary Получить пользователей (с фильтрами)
 // @Tags admin-users
 // @Security ApiKeyAuth
 // @Produce json
 // @Param page query int false "Номер страницы (начиная с 1)"
 // @Param page_size query int false "Размер страницы"
-// @Success 200 {array} models.User
-// @Failure 403 {string} string "Доступ запрещён"
+// @Param q query string false "Поиск по ФИО или email"
+// @Param role query string false "Фильтр по роли (admin/user/...)"
+// @Param has_subscription query string false "true|false — фильтр по подписке"
+// @Success 200 {object} map[string]interface{}
 // @Router /api/admin/users [get]
 func (h *AuthHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
+	// пагинация
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
 		page = 1
@@ -351,17 +354,46 @@ func (h *AuthHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	offset := (page - 1) * pageSize
 
-	users, total, err := h.authService.GetUsersPaginated(r.Context(), pageSize, offset)
+	// фильтры
+	q := r.URL.Query().Get("q")
+
+	var rolePtr *string
+	if role := strings.TrimSpace(r.URL.Query().Get("role")); role != "" {
+		rolePtr = &role
+	}
+
+	var hasSubPtr *bool
+	if hs := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("has_subscription"))); hs != "" {
+		switch hs {
+		case "true", "1", "t", "yes", "y":
+			v := true
+			hasSubPtr = &v
+		case "false", "0", "f", "no", "n":
+			v := false
+			hasSubPtr = &v
+		default:
+			helpers.Error(w, http.StatusBadRequest, "has_subscription должен быть true|false")
+			return
+		}
+	}
+
+	users, total, err := h.authService.GetUsersFiltered(r.Context(), pageSize, offset, q, rolePtr, hasSubPtr)
 	if err != nil {
-		logger.Log.Error("Ошибка получения пользователей", zap.Error(err))
+		logger.Log.Error("Ошибка получения пользователей (handler)", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка получения пользователей")
 		return
 	}
+
 	helpers.JSON(w, http.StatusOK, map[string]interface{}{
 		"data":      users,
 		"total":     total,
 		"page":      page,
 		"page_size": pageSize,
+		"q":         q,
+		"role":      rolePtr,
+		"has_subscription": func() *bool {
+			return hasSubPtr
+		}(),
 	})
 }
 
@@ -686,4 +718,21 @@ func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	logger.Log.Info("Пользователь успешно удалён", zap.Int("user_id", id))
 	helpers.JSON(w, http.StatusOK, map[string]string{"message": "Пользователь удалён"})
+}
+
+// GetSystemStats godoc
+// @Summary Системная статистика для админ-дашборда
+// @Tags admin-users
+// @Security ApiKeyAuth
+// @Produce json
+// @Success 200 {object} models.SystemStats
+// @Router /api/admin/stats [get]
+func (h *AuthHandler) GetSystemStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := h.authService.GetSystemStats(r.Context())
+	if err != nil {
+		logger.Log.Error("Ошибка получения статистики (handler)", zap.Error(err))
+		helpers.Error(w, http.StatusInternalServerError, "Не удалось получить статистику")
+		return
+	}
+	helpers.JSON(w, http.StatusOK, stats)
 }
