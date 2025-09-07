@@ -331,16 +331,6 @@ func (h *AuthHandler) AdminOnly(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetUsers godoc
-// @Summary Получить всех пользователей
-// @Tags admin-users
-// @Security ApiKeyAuth
-// @Produce json
-// @Param page query int false "Номер страницы (начиная с 1)"
-// @Param page_size query int false "Размер страницы"
-// @Success 200 {array} models.User
-// @Failure 403 {string} string "Доступ запрещён"
-// @Router /api/admin/users [get]
-// GetUsers godoc
 // @Summary Получить пользователей (с фильтрами)
 // @Tags admin-users
 // @Security ApiKeyAuth

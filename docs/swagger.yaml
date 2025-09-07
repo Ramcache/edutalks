@@ -1022,14 +1022,6 @@ paths:
         in: query
         name: page_size
         type: integer
-      - description: Номер страницы (начиная с 1)
-        in: query
-        name: page
-        type: integer
-      - description: Размер страницы
-        in: query
-        name: page_size
-        type: integer
       - description: Поиск по ФИО или email
         in: query
         name: q
@@ -1044,23 +1036,16 @@ paths:
         type: string
       produces:
       - application/json
-      - application/json
       responses:
         "200":
           description: OK
           schema:
             additionalProperties: true
             type: object
-        "403":
-          description: Доступ запрещён
-          schema:
-            type: string
       security:
-      - ApiKeyAuth: []
       - ApiKeyAuth: []
       summary: Получить пользователей (с фильтрами)
       tags:
-      - admin-users
       - admin-users
   /api/admin/users/{id}:
     delete:

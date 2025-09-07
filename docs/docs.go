@@ -1007,33 +1007,16 @@ const docTemplate = `{
                 "security": [
                     {
                         "ApiKeyAuth": []
-                    },
-                    {
-                        "ApiKeyAuth": []
                     }
                 ],
                 "produces": [
-                    "application/json",
                     "application/json"
                 ],
                 "tags": [
-                    "admin-users",
                     "admin-users"
                 ],
                 "summary": "Получить пользователей (с фильтрами)",
                 "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Номер страницы (начиная с 1)",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Размер страницы",
-                        "name": "page_size",
-                        "in": "query"
-                    },
                     {
                         "type": "integer",
                         "description": "Номер страницы (начиная с 1)",
@@ -1071,12 +1054,6 @@ const docTemplate = `{
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
-                        }
-                    },
-                    "403": {
-                        "description": "Доступ запрещён",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 }
