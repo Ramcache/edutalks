@@ -50,7 +50,7 @@ func (r *UserRepository) IsUsernameTaken(ctx context.Context, username string) (
 
 func (r *UserRepository) IsEmailTaken(ctx context.Context, email string) (bool, error) {
 	logger.Log.Debug("Проверка email на уникальность (repo)", zap.String("email", email))
-	query := `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`
+	query := `SELECT EXISTS(SELECT 1 FROM users WHERE lower(email) = lower($1))`
 	var exists bool
 	err := r.db.QueryRow(ctx, query, email).Scan(&exists)
 	if err != nil {
@@ -298,8 +298,8 @@ func (r *UserRepository) SetEmailVerified(ctx context.Context, userID int, verif
 func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	logger.Log.Debug("Получение пользователя по email (repo)", zap.String("email", email))
 	query := `SELECT id, username, full_name, phone, email, address, password_hash, role, created_at, updated_at, has_subscription, subscription_expires_at, email_subscription, email_verified
-	FROM users 
-	WHERE email = $1`
+	          FROM users
+	          WHERE lower(email) = lower($1)`
 
 	var user models.User
 	err := r.db.QueryRow(ctx, query, email).Scan(
