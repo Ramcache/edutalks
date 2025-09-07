@@ -997,15 +997,20 @@
                 "security": [
                     {
                         "ApiKeyAuth": []
+                    },
+                    {
+                        "ApiKeyAuth": []
                     }
                 ],
                 "produces": [
+                    "application/json",
                     "application/json"
                 ],
                 "tags": [
+                    "admin-users",
                     "admin-users"
                 ],
-                "summary": "Получить всех пользователей",
+                "summary": "Получить пользователей (с фильтрами)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1018,16 +1023,44 @@
                         "description": "Размер страницы",
                         "name": "page_size",
                         "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Номер страницы (начиная с 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Размер страницы",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Поиск по ФИО или email",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Фильтр по роли (admin/user/...)",
+                        "name": "role",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "true|false — фильтр по подписке",
+                        "name": "has_subscription",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/edutalks_internal_models.User"
-                            }
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "403": {

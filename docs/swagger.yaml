@@ -1022,23 +1022,45 @@ paths:
         in: query
         name: page_size
         type: integer
+      - description: Номер страницы (начиная с 1)
+        in: query
+        name: page
+        type: integer
+      - description: Размер страницы
+        in: query
+        name: page_size
+        type: integer
+      - description: Поиск по ФИО или email
+        in: query
+        name: q
+        type: string
+      - description: Фильтр по роли (admin/user/...)
+        in: query
+        name: role
+        type: string
+      - description: true|false — фильтр по подписке
+        in: query
+        name: has_subscription
+        type: string
       produces:
+      - application/json
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/edutalks_internal_models.User'
-            type: array
+            additionalProperties: true
+            type: object
         "403":
           description: Доступ запрещён
           schema:
             type: string
       security:
       - ApiKeyAuth: []
-      summary: Получить всех пользователей
+      - ApiKeyAuth: []
+      summary: Получить пользователей (с фильтрами)
       tags:
+      - admin-users
       - admin-users
   /api/admin/users/{id}:
     delete:
