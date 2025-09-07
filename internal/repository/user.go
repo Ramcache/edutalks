@@ -464,30 +464,32 @@ func (r *UserRepository) GetUsersFiltered(
 		FROM users
 	`
 	where := " WHERE 1=1"
-	args := []interface{}{}
+	whereArgs := []interface{}{}
 	argn := 1
 
-	if q = strings.TrimSpace(q); q != "" {
+	q = strings.TrimSpace(q)
+	if q != "" {
 		where += fmt.Sprintf(" AND (full_name ILIKE $%d OR lower(email) ILIKE $%d)", argn, argn+1)
-		args = append(args, "%"+q+"%", "%"+strings.ToLower(q)+"%")
+		whereArgs = append(whereArgs, "%"+q+"%", "%"+strings.ToLower(q)+"%")
 		argn += 2
 	}
 	if role != nil && strings.TrimSpace(*role) != "" {
 		where += fmt.Sprintf(" AND role = $%d", argn)
-		args = append(args, strings.TrimSpace(*role))
+		whereArgs = append(whereArgs, strings.TrimSpace(*role))
 		argn++
 	}
 	if hasSubscription != nil {
 		where += fmt.Sprintf(" AND has_subscription = $%d", argn)
-		args = append(args, *hasSubscription)
+		whereArgs = append(whereArgs, *hasSubscription)
 		argn++
 	}
 
-	orderPage := fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", argn, argn+1)
-	args = append(args, limit, offset)
+	orderPage := " ORDER BY created_at DESC LIMIT $%d OFFSET $%d"
+	orderPage = fmt.Sprintf(orderPage, argn, argn+1)
 
-	// сами данные
-	rows, err := r.db.Query(ctx, base+where+orderPage, args...)
+	selectArgs := append(append([]interface{}{}, whereArgs...), limit, offset)
+
+	rows, err := r.db.Query(ctx, base+where+orderPage, selectArgs...)
 	if err != nil {
 		logger.Log.Error("Ошибка получения пользователей (repo/filtered)", zap.Error(err))
 		return nil, 0, err
@@ -497,22 +499,21 @@ func (r *UserRepository) GetUsersFiltered(
 	var users []*models.User
 	for rows.Next() {
 		var u models.User
-		err := rows.Scan(
+		if err := rows.Scan(
 			&u.ID, &u.Username, &u.FullName, &u.Phone, &u.Email, &u.Address, &u.Role,
 			&u.CreatedAt, &u.UpdatedAt, &u.HasSubscription, &u.SubscriptionExpiresAt,
 			&u.EmailSubscription, &u.EmailVerified,
-		)
-		if err != nil {
+		); err != nil {
 			logger.Log.Error("Ошибка сканирования пользователя (repo/filtered)", zap.Error(err))
 			return nil, 0, err
 		}
 		users = append(users, &u)
 	}
 
-	// total — с теми же фильтрами
+	// total — теми же WHERE и ТЕМИ ЖЕ аргументами, без LIMIT/OFFSET
 	countSQL := "SELECT COUNT(*) FROM users" + where
 	var total int
-	if err := r.db.QueryRow(ctx, countSQL, args[:argn-2]...).Scan(&total); err != nil {
+	if err := r.db.QueryRow(ctx, countSQL, whereArgs...).Scan(&total); err != nil {
 		logger.Log.Error("Ошибка подсчёта пользователей (repo/filtered)", zap.Error(err))
 		return nil, 0, err
 	}
