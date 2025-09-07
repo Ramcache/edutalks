@@ -217,7 +217,11 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 	}
 
 	idStr := mux.Vars(r)["id"]
-	id, _ := strconv.Atoi(idStr)
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		helpers.Error(w, http.StatusBadRequest, "Некорректный идентификатор документа")
+		return
+	}
 
 	doc, err := h.service.GetDocumentByID(r.Context(), id)
 	if err != nil {
@@ -226,25 +230,25 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// --- доступ как у тебя сейчас ---
 	// --- доступ ---
 	if user.Role != "admin" {
-		now := time.Now().UTC()
-		if !(user.HasSubscription && user.SubscriptionExpiresAt != nil && user.SubscriptionExpiresAt.After(now)) {
-			if !doc.AllowFreeDownload {
-				logger.Log.Warn("Нет подписки и документ не free", zap.Int("user_id", userID), zap.Int("doc_id", id))
-				helpers.Error(w, http.StatusForbidden, "Нет доступа — купите подписку")
-				return
-			}
+		// закрытые документы недоступны
+		if !doc.IsPublic {
+			logger.Log.Warn("Попытка доступа к закрытому документу",
+				zap.Int("user_id", userID), zap.Int("doc_id", id))
+			helpers.Error(w, http.StatusForbidden, "Этот документ закрыт")
+			return
+		}
+
+		// нужна активная подписка или free
+		if !isActiveSub(user) && !doc.AllowFreeDownload {
+			logger.Log.Warn("Нет подписки и документ не free",
+				zap.Int("user_id", userID), zap.Int("doc_id", id))
+			helpers.Error(w, http.StatusForbidden, "Нет доступа — купите подписку")
+			return
 		}
 	}
-
-	if !doc.IsPublic {
-		logger.Log.Warn("Попытка доступа к закрытому документу", zap.Int("user_id", userID), zap.Int("doc_id", id))
-		helpers.Error(w, http.StatusForbidden, "Этот документ закрыт")
-		return
-	}
-	// ---------------------------------
+	// --- конец доступа ---
 
 	// Открываем файл и определяем корректный Content-Type
 	f, err := os.Open(doc.Filepath)
@@ -255,10 +259,9 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 	}
 	defer f.Close()
 
-	// 1) по расширению
+	// Определяем тип
 	ctype := mime.TypeByExtension(strings.ToLower(filepath.Ext(doc.Filename)))
 	if ctype == "" {
-		// 2) по содержимому (первые 512 байт)
 		buf := make([]byte, 512)
 		n, _ := f.Read(buf)
 		ctype = http.DetectContentType(buf[:n])
@@ -268,20 +271,29 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 		ctype = "application/octet-stream"
 	}
 
-	// Безопасное имя файла (UTF-8, пробелы/кириллица ок)
+	// Заголовки
 	encoded := url.PathEscape(doc.Filename)
 	w.Header().Set("Content-Type", ctype)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename*=UTF-8''%s", encoded))
-
-	// (необязательно) длина файла
 	if fi, err := f.Stat(); err == nil {
 		w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
+		// необязательно, но полезно: публичные free можно кэшировать браузером
+		if doc.IsPublic && (doc.AllowFreeDownload || user.Role == "admin") {
+			w.Header().Set("Cache-Control", "private, max-age=3600")
+		}
 	}
 
-	// Эффективная отдача с поддержкой Range/кэша
+	// Отдача с поддержкой Range/кэша
 	http.ServeContent(w, r, doc.Filename, doc.UploadedAt, f)
 
-	logger.Log.Info("Документ успешно скачан", zap.String("filename", doc.Filename), zap.Int("user_id", userID))
+	logger.Log.Info("Документ успешно скачан",
+		zap.Int("user_id", userID),
+		zap.Int("doc_id", id),
+		zap.String("role", user.Role),
+		zap.Bool("active_sub", isActiveSub(user)),
+		zap.Bool("is_public", doc.IsPublic),
+		zap.Bool("free", doc.AllowFreeDownload),
+	)
 }
 
 // DeleteDocument godoc
@@ -479,4 +491,12 @@ func (h *AuthHandler) UpdateMyProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	helpers.JSON(w, http.StatusOK, map[string]string{"message": "Профиль обновлён"})
+}
+
+func isActiveSub(u *models.User) bool {
+	if u == nil || !u.HasSubscription || u.SubscriptionExpiresAt == nil {
+		return false
+	}
+	// предполагаем, что SubscriptionExpiresAt в UTC
+	return u.SubscriptionExpiresAt.After(time.Now().UTC())
 }

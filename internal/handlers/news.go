@@ -199,7 +199,7 @@ func uploadsRoot() string {
 	if v := os.Getenv("UPLOADS_DIR"); strings.TrimSpace(v) != "" {
 		return v // например: /edu-talks/uploads
 	}
-	return "/edu-talks/uploads"
+	return "/edutalks/uploads"
 }
 
 // helper для мапы allowed
