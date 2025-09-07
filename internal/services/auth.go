@@ -43,6 +43,7 @@ type UserRepo interface {
 	ExpireSubscriptions(ctx context.Context) error
 	ExtendSubscription(ctx context.Context, userID int, duration time.Duration) error
 	GetUserByPhone(ctx context.Context, phoneDigits string) (*models.User, error)
+	GetSystemStats(ctx context.Context) (*models.SystemStats, error)
 }
 
 func (s *AuthService) RegisterUser(ctx context.Context, input *models.User, plainPassword string) error {
@@ -395,4 +396,8 @@ func normalizePhoneDigits(s string) string {
 		}
 	}
 	return string(b)
+}
+
+func (s *AuthService) GetSystemStats(ctx context.Context) (*models.SystemStats, error) {
+	return s.repo.GetSystemStats(ctx)
 }

@@ -831,6 +831,30 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/admin/stats": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-users"
+                ],
+                "summary": "Системная статистика для админ-дашборда",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/edutalks_internal_models.SystemStats"
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/tabs": {
             "post": {
                 "description": "Доступно только администратору",
@@ -2518,6 +2542,35 @@ const docTemplate = `{
                 },
                 "section": {
                     "$ref": "#/definitions/edutalks_internal_models.Section"
+                }
+            }
+        },
+        "edutalks_internal_models.SystemStats": {
+            "type": "object",
+            "properties": {
+                "admins": {
+                    "type": "integer"
+                },
+                "news_count": {
+                    "type": "integer"
+                },
+                "regular_users": {
+                    "type": "integer"
+                },
+                "total_users": {
+                    "type": "integer"
+                },
+                "with_subscription": {
+                    "type": "integer"
+                },
+                "with_subscription_pct": {
+                    "type": "integer"
+                },
+                "without_subscription": {
+                    "type": "integer"
+                },
+                "without_subscription_pct": {
+                    "type": "integer"
                 }
             }
         },

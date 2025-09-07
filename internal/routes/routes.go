@@ -83,6 +83,8 @@ func InitRoutes(
 	admin := protected.PathPrefix("/admin").Subrouter()
 	admin.Use(middleware.OnlyRole("admin"))
 
+	admin.HandleFunc("/stats", authHandler.GetSystemStats).Methods(http.MethodGet)
+
 	// файлы (админ)
 	admin.HandleFunc("/files", documentHandler.GetAllDocuments).Methods(http.MethodGet)
 	admin.HandleFunc("/files/upload", documentHandler.UploadDocument).Methods(http.MethodPost)

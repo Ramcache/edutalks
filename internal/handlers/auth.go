@@ -687,3 +687,20 @@ func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	logger.Log.Info("Пользователь успешно удалён", zap.Int("user_id", id))
 	helpers.JSON(w, http.StatusOK, map[string]string{"message": "Пользователь удалён"})
 }
+
+// GetSystemStats godoc
+// @Summary Системная статистика для админ-дашборда
+// @Tags admin-users
+// @Security ApiKeyAuth
+// @Produce json
+// @Success 200 {object} models.SystemStats
+// @Router /api/admin/stats [get]
+func (h *AuthHandler) GetSystemStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := h.authService.GetSystemStats(r.Context())
+	if err != nil {
+		logger.Log.Error("Ошибка получения статистики (handler)", zap.Error(err))
+		helpers.Error(w, http.StatusInternalServerError, "Не удалось получить статистику")
+		return
+	}
+	helpers.JSON(w, http.StatusOK, stats)
+}
