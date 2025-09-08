@@ -409,7 +409,6 @@ func (r *UserRepository) GetUserByPhone(ctx context.Context, phoneDigits string)
 }
 
 func (r *UserRepository) GetSystemStats(ctx context.Context) (*models.SystemStats, error) {
-	// одним запросом через подзапросы
 	const q = `
 SELECT
   (SELECT COUNT(*) FROM users)                                                   AS total_users,
@@ -423,7 +422,9 @@ SELECT
      WHERE has_subscription = false
         OR (subscription_expires_at IS NOT NULL AND subscription_expires_at <= NOW())
   )                                                                              AS without_subscription,
-  (SELECT COUNT(*) FROM news)                                                    AS news_count
+  (SELECT COUNT(*) FROM news)                                                    AS news_count,
+  (SELECT COUNT(*) FROM documents)                                               AS documents_count,
+  (SELECT COUNT(*) FROM articles)                                                AS articles_count
 `
 	var s models.SystemStats
 	if err := r.db.QueryRow(ctx, q).Scan(
@@ -433,11 +434,12 @@ SELECT
 		&s.WithSubscription,
 		&s.WithoutSubscription,
 		&s.NewsCount,
+		&s.DocumentsCount,
+		&s.ArticlesCount,
 	); err != nil {
 		logger.Log.Error("Ошибка получения системной статистики (repo)", zap.Error(err))
 		return nil, err
 	}
-	// проценты посчитаем здесь же для удобства
 	if s.TotalUsers > 0 {
 		s.WithSubscriptionPct = int(float64(s.WithSubscription)*100.0/float64(s.TotalUsers) + 0.5)
 		s.WithoutSubscriptionPct = 100 - s.WithSubscriptionPct

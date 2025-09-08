@@ -2561,6 +2561,12 @@ const docTemplate = `{
                 "admins": {
                     "type": "integer"
                 },
+                "articles_count": {
+                    "type": "integer"
+                },
+                "documents_count": {
+                    "type": "integer"
+                },
                 "news_count": {
                     "type": "integer"
                 },
