@@ -1,11 +1,13 @@
+// internal/logger/logger.go
 package logger
 
 import (
 	"edutalks/internal/config"
 	"os"
 	"path/filepath"
+	"time"
 
-	"github.com/natefinch/lumberjack"
+	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -14,50 +16,45 @@ var Log *zap.Logger
 
 func InitLogger() {
 	cfg, err := config.LoadConfig()
-
 	if err != nil {
 		panic("не удалось загрузить конфиг: " + err.Error())
 	}
-	logDir := "logs"
-	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
+
+	logLevel := parseLevel(cfg.LogLevel) // выстави "debug" на проде, если хочешь видеть всё
+	retentionDays := 14                  // держим 14 дней
+
+	if err := os.MkdirAll("logs", os.ModePerm); err != nil {
 		panic("не удалось создать папку для логов: " + err.Error())
 	}
 
-	logLevel := parseLevel(cfg.LogLevel)
-
-	if cfg.Log == "dev" {
-		devCfg := zap.NewDevelopmentConfig()
-		devCfg.Level = zap.NewAtomicLevelAt(logLevel)
-		logger, _ := devCfg.Build()
-		Log = logger
-		return
+	encCfg := zapcore.EncoderConfig{
+		TimeKey:       "time",
+		LevelKey:      "level",
+		MessageKey:    "message",
+		CallerKey:     "caller",
+		StacktraceKey: "stack",
+		EncodeTime:    zapcore.ISO8601TimeEncoder,
+		EncodeLevel:   zapcore.CapitalLevelEncoder, // INFO/WARN/ERROR...
+		EncodeCaller:  zapcore.ShortCallerEncoder,
 	}
 
-	encoderCfg := zapcore.EncoderConfig{
-		TimeKey:      "time",
-		LevelKey:     "level",
-		MessageKey:   "message",
-		EncodeTime:   zapcore.ISO8601TimeEncoder,
-		EncodeLevel:  zapcore.CapitalLevelEncoder,
-		EncodeCaller: zapcore.ShortCallerEncoder,
-	}
+	jsonEnc := zapcore.NewJSONEncoder(encCfg)
 
-	writer := zapcore.AddSync(&lumberjack.Logger{
-		Filename:   filepath.Join(logDir, "app.log"),
-		MaxSize:    10,
-		MaxBackups: 5,
-		MaxAge:     7,
-		Compress:   true,
-	})
-
-	console := zapcore.Lock(os.Stdout)
-
-	core := zapcore.NewTee(
-		zapcore.NewCore(zapcore.NewJSONEncoder(encoderCfg), writer, logLevel),
-		zapcore.NewCore(zapcore.NewConsoleEncoder(encoderCfg), console, logLevel),
+	// Ротация по дням + линк на актуальный файл logs/app.log
+	rotate, err := rotatelogs.New(
+		filepath.Join("logs", "app.%Y-%m-%d.log"),
+		rotatelogs.WithLinkName(filepath.Join("logs", "app.log")),
+		rotatelogs.WithRotationTime(24*time.Hour),
+		rotatelogs.WithMaxAge(time.Duration(retentionDays)*24*time.Hour),
+		rotatelogs.WithClock(rotatelogs.Local),
 	)
+	if err != nil {
+		panic("rotatelogs init error: " + err.Error())
+	}
 
+	core := zapcore.NewCore(jsonEnc, zapcore.AddSync(rotate), logLevel)
 	Log = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+	zap.ReplaceGlobals(Log)
 }
 
 func parseLevel(level string) zapcore.Level {
@@ -66,8 +63,16 @@ func parseLevel(level string) zapcore.Level {
 		return zapcore.DebugLevel
 	case "info":
 		return zapcore.InfoLevel
+	case "warn":
+		return zapcore.WarnLevel
 	case "error":
 		return zapcore.ErrorLevel
+	case "dpanic":
+		return zapcore.DPanicLevel
+	case "panic":
+		return zapcore.PanicLevel
+	case "fatal":
+		return zapcore.FatalLevel
 	default:
 		return zapcore.InfoLevel
 	}

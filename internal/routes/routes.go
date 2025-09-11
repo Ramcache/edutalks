@@ -19,6 +19,7 @@ func InitRoutes(
 	articleH *handlers.ArticleHandler,
 	taxonomyH *handlers.TaxonomyHandler,
 	passwordH *handlers.PasswordHandler,
+	logsAdminH *handlers.AdminLogsHandler,
 ) {
 	router.Use(middleware.Logging)
 
@@ -121,4 +122,12 @@ func InitRoutes(
 	admin.HandleFunc("/sections", taxonomyH.CreateSection).Methods(http.MethodPost)
 	admin.HandleFunc("/sections/{id:[0-9]+}", taxonomyH.UpdateSection).Methods(http.MethodPatch)
 	admin.HandleFunc("/sections/{id:[0-9]+}", taxonomyH.DeleteSection).Methods(http.MethodDelete)
+
+	// --- ЛОГИ (админ) ---
+	admin.HandleFunc("/logs/days", logsAdminH.ListDays).Methods(http.MethodGet)
+	admin.HandleFunc("/logs", logsAdminH.GetLogs).Methods(http.MethodGet)
+	admin.HandleFunc("/logs/stats", logsAdminH.Stats).Methods(http.MethodGet)
+	admin.HandleFunc("/logs/download", logsAdminH.DownloadRaw).Methods(http.MethodGet)
+	admin.HandleFunc("/logs/summary", logsAdminH.StatsSummary).Methods(http.MethodGet)
+
 }
