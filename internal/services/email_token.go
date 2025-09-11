@@ -33,6 +33,7 @@ func (s *EmailTokenService) GenerateToken(ctx context.Context, userID int) (*mod
 		UserID:    userID,
 		Token:     token,
 		ExpiresAt: expires,
+		CreatedAt: time.Now(),
 	}
 	err := s.repo.SaveToken(ctx, t)
 	return t, err

@@ -16,8 +16,16 @@ func NewEmailTokenRepository(db *pgxpool.Pool) *EmailTokenRepository {
 }
 
 func (r *EmailTokenRepository) SaveToken(ctx context.Context, token *models.EmailVerificationToken) error {
-	_, err := r.db.Exec(ctx, `INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`,
-		token.UserID, token.Token, token.ExpiresAt)
+	_, err := r.db.Exec(ctx, `DELETE FROM email_verification_tokens WHERE user_id = $1`, token.UserID)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.Exec(ctx, `
+		INSERT INTO email_verification_tokens (user_id, token, expires_at, confirmed, created_at)
+		VALUES ($1, $2, $3, false, NOW())
+	`, token.UserID, token.Token, token.ExpiresAt)
+
 	return err
 }
 
