@@ -106,6 +106,9 @@ func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Req
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка генерации токена")
 		return
 	}
+	logger.Log.Info("DEBUG: LastToken",
+		zap.Time("created_at", lastToken.CreatedAt),
+		zap.Duration("since", time.Since(lastToken.CreatedAt)))
 
 	// Отправляем письмо
 	if err := h.SendVerificationEmail(r.Context(), user, emailToken.Token); err != nil {
@@ -117,4 +120,5 @@ func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Req
 	helpers.JSON(w, http.StatusOK, map[string]string{
 		"message": "Письмо с подтверждением отправлено повторно",
 	})
+
 }
