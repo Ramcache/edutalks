@@ -70,6 +70,7 @@ func (h *EmailHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Failure 404 {object} map[string]string
+// @Failure 429 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/resend-verification [post]
 func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Request) {
@@ -92,20 +93,23 @@ func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Req
 
 	// Проверяем лимит по последнему токену
 	lastToken, err := h.emailTokenService.GetLastTokenByUserID(r.Context(), user.ID)
-	logger.Log.Info("DEBUG: LastToken",
-		zap.Time("created_at", lastToken.CreatedAt),
-		zap.Duration("since", time.Since(lastToken.CreatedAt)))
-
-	if err == nil && time.Since(lastToken.CreatedAt) < 5*time.Minute {
-		remaining := int((5*time.Minute - time.Since(lastToken.CreatedAt)).Seconds())
-		helpers.Error(w, http.StatusTooManyRequests,
-			fmt.Sprintf("Вы можете повторно запросить письмо через %d секунд", remaining))
-		return
+	if err == nil {
+		nextAllowed := lastToken.CreatedAt.Add(5 * time.Minute)
+		if nextAllowed.After(time.Now()) {
+			remaining := int(time.Until(nextAllowed).Seconds())
+			logger.Log.Info("DEBUG resend-verification limit",
+				zap.Time("created_at", lastToken.CreatedAt),
+				zap.Time("next_allowed", nextAllowed),
+				zap.Int("remaining_sec", remaining),
+			)
+			helpers.Error(w, http.StatusTooManyRequests,
+				fmt.Sprintf("Вы можете повторно запросить письмо через %d секунд", remaining))
+			return
+		}
 	}
 
 	// Создаём новый токен
 	emailToken, err := h.emailTokenService.GenerateToken(r.Context(), user.ID)
-
 	if err != nil {
 		logger.Log.Error("Ошибка генерации токена при ResendVerificationEmail", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка генерации токена")
@@ -122,5 +126,4 @@ func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Req
 	helpers.JSON(w, http.StatusOK, map[string]string{
 		"message": "Письмо с подтверждением отправлено повторно",
 	})
-
 }
