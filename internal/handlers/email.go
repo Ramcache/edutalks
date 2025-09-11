@@ -5,6 +5,7 @@ import (
 	"edutalks/internal/services"
 	helpers "edutalks/internal/utils/helpers"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -84,19 +85,31 @@ func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Req
 
 	user, err := h.authService.GetUserByEmail(r.Context(), req.Email)
 	if err != nil {
-		logger.Log.Warn("Пользователь не найден", zap.String("email", req.Email))
+		logger.Log.Warn("Пользователь не найден при ResendVerificationEmail", zap.String("email", req.Email))
 		helpers.Error(w, http.StatusNotFound, "Пользователь не найден")
 		return
 	}
 
-	token, err := h.emailTokenService.GetLastTokenByUserID(r.Context(), user.ID)
-	if err == nil && time.Since(token.CreatedAt) < 5*time.Minute {
-		helpers.Error(w, http.StatusTooManyRequests, "Вы можете повторно запросить письмо через 5 минут")
+	// Проверяем лимит по последнему токену
+	lastToken, err := h.emailTokenService.GetLastTokenByUserID(r.Context(), user.ID)
+	if err == nil && time.Since(lastToken.CreatedAt) < 5*time.Minute {
+		remaining := int((5*time.Minute - time.Since(lastToken.CreatedAt)).Seconds())
+		helpers.Error(w, http.StatusTooManyRequests,
+			fmt.Sprintf("Вы можете повторно запросить письмо через %d секунд", remaining))
 		return
 	}
 
-	err = h.SendVerificationEmail(r.Context(), user)
+	// Создаём новый токен
+	emailToken, err := h.emailTokenService.GenerateToken(r.Context(), user.ID)
 	if err != nil {
+		logger.Log.Error("Ошибка генерации токена при ResendVerificationEmail", zap.Error(err))
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка генерации токена")
+		return
+	}
+
+	// Отправляем письмо
+	if err := h.SendVerificationEmail(r.Context(), user, emailToken.Token); err != nil {
+		logger.Log.Error("Ошибка при отправке письма в ResendVerificationEmail", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при отправке письма")
 		return
 	}

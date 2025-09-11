@@ -98,20 +98,33 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		Address:  req.Address,
 	}
 
-	err := h.authService.RegisterUser(context.Background(), user, req.Password)
-	if err != nil {
+	if err := h.authService.RegisterUser(r.Context(), user, req.Password); err != nil {
 		logger.Log.Error("Ошибка регистрации пользователя", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	token, err := h.emailTokenService.GetLastTokenByUserID(r.Context(), user.ID)
-	if err == nil && time.Since(token.CreatedAt) < 5*time.Minute {
+	// Проверка лимита перед генерацией токена
+	lastToken, err := h.emailTokenService.GetLastTokenByUserID(r.Context(), user.ID)
+	if err == nil && time.Since(lastToken.CreatedAt) < 5*time.Minute {
 		helpers.Error(w, http.StatusTooManyRequests, "Повторная отправка письма возможна через 5 минут")
 		return
 	}
 
-	_ = h.SendVerificationEmail(context.Background(), user)
+	// Генерация токена
+	emailToken, err := h.emailTokenService.GenerateToken(r.Context(), user.ID)
+	if err != nil {
+		logger.Log.Error("Ошибка генерации токена", zap.Error(err))
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка генерации токена")
+		return
+	}
+
+	// Отправка письма с токеном
+	if err := h.SendVerificationEmail(r.Context(), user, emailToken.Token); err != nil {
+		logger.Log.Error("Ошибка отправки письма", zap.Error(err))
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка при отправке письма")
+		return
+	}
 
 	helpers.JSON(w, http.StatusCreated, "Пользователь успешно зарегистрирован. Проверьте вашу почту для подтверждения.")
 }
@@ -658,15 +671,9 @@ func (h *AuthHandler) EmailSubscribe(w http.ResponseWriter, r *http.Request) {
 	helpers.JSON(w, http.StatusOK, map[string]string{"message": "Статус подписки обновлён"})
 }
 
-func (h *AuthHandler) SendVerificationEmail(ctx context.Context, user *models.User) error {
-	emailToken, err := h.emailTokenService.GenerateToken(ctx, user.ID)
-	if err != nil {
-		logger.Log.Error("Ошибка генерации email токена", zap.Error(err))
-		return err
-	}
-
+func (h *AuthHandler) SendVerificationEmail(ctx context.Context, user *models.User, token string) error {
 	cfg, _ := config.LoadConfig()
-	verifyLink := fmt.Sprintf("%s/verify-email?token=%s", cfg.SiteURL, emailToken.Token)
+	verifyLink := fmt.Sprintf("%s/verify-email?token=%s", cfg.SiteURL, token)
 	htmlBody := helpers.BuildVerificationHTML(user.FullName, verifyLink)
 
 	services.EmailQueue <- services.EmailJob{
