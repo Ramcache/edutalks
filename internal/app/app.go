@@ -61,8 +61,8 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	taxonomyH := handlers.NewTaxonomyHandler(taxonomySvc)
 	paymentHandler := handlers.NewPaymentHandler(yookassaService)
 	webhookHandler := handlers.NewWebhookHandler(authService)
-
 	passwordHandler := handlers.NewPasswordHandler(passwordSvc, userRepo)
+	logsAdminH := handlers.NewAdminLogsHandler()
 
 	_ = userRepo.ExpireSubscriptions(context.Background())
 	StartSubscriptionCleaner(userRepo)
@@ -80,6 +80,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 		searchHandler, paymentHandler, webhookHandler,
 		articleH, taxonomyH,
 		passwordHandler,
+		logsAdminH,
 	)
 
 	return router, nil

@@ -382,6 +382,177 @@ info:
   contact: {}
   title: Edutalks API
 paths:
+  /admin/logs:
+    get:
+      description: Возвращает массив логов (JSON-строки) за указанный день. Поддерживает
+        фильтрацию по уровню, часу и строке поиска.
+      parameters:
+      - description: Дата (YYYY-MM-DD)
+        in: query
+        name: day
+        required: true
+        type: string
+      - description: 'CSV уровней: debug,info,warn,error,panic,fatal'
+        in: query
+        name: level
+        type: string
+      - description: Час (0-23)
+        in: query
+        name: hour
+        type: integer
+      - description: Поиск по подстроке
+        in: query
+        name: q
+        type: string
+      - description: Лимит (по умолч. 200, макс. 1000)
+        in: query
+        name: limit
+        type: integer
+      - description: Номер строки для пагинации (по умолч. 0)
+        in: query
+        name: cursor
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: day not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Логи за день
+      tags:
+      - admin-logs
+  /admin/logs/days:
+    get:
+      description: Возвращает список дат (YYYY-MM-DD), за которые доступны файлы логов
+        (до {{Retention}} дней).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: days
+          schema:
+            additionalProperties:
+              items:
+                type: string
+              type: array
+            type: object
+        "401":
+          description: unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Доступные дни логов
+      tags:
+      - admin-logs
+  /admin/logs/download:
+    get:
+      description: Отдаёт лог-файл за день (gzip если есть).
+      parameters:
+      - description: Дата (YYYY-MM-DD)
+        in: query
+        name: day
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: gzip/text файл логов
+          schema:
+            type: file
+        "404":
+          description: file not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Скачать лог-файл целиком
+      tags:
+      - admin-logs
+  /admin/logs/stats:
+    get:
+      description: Агрегированное количество логов за день по уровням (DEBUG/INFO/WARN/ERROR/PANIC/FATAL)
+        для каждого часа.
+      parameters:
+      - description: Дата (YYYY-MM-DD)
+        in: query
+        name: day
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: day not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Статистика логов по часам
+      tags:
+      - admin-logs
+  /admin/logs/summary:
+    get:
+      description: Возвращает агрегаты по уровням логов за последние N дней (по умолчанию
+        7).
+      parameters:
+      - description: Количество дней (по умолчанию 7)
+        in: query
+        name: days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Краткая статистика по логам
+      tags:
+      - admin-logs
   /api/admin/articles:
     post:
       consumes:
