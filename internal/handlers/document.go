@@ -134,7 +134,7 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Фоново уведомляем подписчиков о новом документе
+	// --- Вместо мгновенной рассылки кладём в батч-уведомитель ---
 	ctx := context.WithoutCancel(r.Context())
 	var tabsID *int
 	if doc.SectionID != nil {
@@ -142,7 +142,8 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 			tabsID = &tid
 		}
 	}
-	go h.notifier.NotifyNewDocument(ctx, doc.Title, tabsID)
+	// теперь вызываем batchedNotifier, который сам раз в 10 минут отправляет одно письмо
+	h.notifier.AddDocumentForBatch(ctx, doc.Title, tabsID)
 
 	helpers.JSON(w, http.StatusCreated, map[string]any{
 		"id": id,

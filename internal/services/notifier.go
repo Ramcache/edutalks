@@ -10,6 +10,8 @@ import (
 	"go.uber.org/zap"
 	"net/url"
 	"strings"
+	"sync"
+	"time"
 )
 
 type Notifier struct {
@@ -17,6 +19,11 @@ type Notifier struct {
 	taxRepo  *repository.TaxonomyRepo
 	baseURL  string
 	fromName string
+
+	// === новые поля для батч-уведомлений ===
+	mu     sync.Mutex
+	buffer []string
+	once   sync.Once
 }
 
 func NewNotifier(
@@ -115,4 +122,48 @@ func (n *Notifier) NotifyArticlePublished(ctx context.Context, articleID int, ti
 	html := helpers.BuildSimpleHTML("Новая статья", body)
 
 	n.sendToAll(ctx, subject, html)
+}
+
+// AddDocumentForBatch — складываем документы во временный буфер
+func (n *Notifier) AddDocumentForBatch(ctx context.Context, title string, tabsID *int) {
+	base := strings.TrimRight(n.baseURL, "/")
+	link := base + "/documents"
+	if tabsID != nil {
+		if slug, err := n.taxRepo.GetTabSlugByID(ctx, *tabsID); err == nil && slug != "" {
+			link = base + "/" + url.PathEscape(slug)
+		}
+	}
+
+	item := fmt.Sprintf(`<li><a href="%s">%s</a></li>`, link, title)
+
+	n.mu.Lock()
+	n.buffer = append(n.buffer, item)
+	n.mu.Unlock()
+
+	// запускаем воркер только один раз
+	n.once.Do(func() { go n.startBatchWorker() })
+}
+
+func (n *Notifier) startBatchWorker() {
+	ticker := time.NewTicker(10 * time.Minute) // период можно вынести в конфиг
+	defer ticker.Stop()
+
+	for range ticker.C {
+		n.mu.Lock()
+		if len(n.buffer) == 0 {
+			n.mu.Unlock()
+			continue
+		}
+
+		body := "<p>За последние 10 минут добавлены документы:</p><ul>"
+		body += strings.Join(n.buffer, "")
+		body += "</ul>"
+
+		html := helpers.BuildSimpleHTML("Новые документы на сайте", body)
+		n.sendToAll(context.Background(), "Новые документы на Edutalks", html)
+
+		// очищаем буфер
+		n.buffer = nil
+		n.mu.Unlock()
+	}
 }
