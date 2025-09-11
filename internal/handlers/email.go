@@ -92,6 +92,10 @@ func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Req
 
 	// Проверяем лимит по последнему токену
 	lastToken, err := h.emailTokenService.GetLastTokenByUserID(r.Context(), user.ID)
+	logger.Log.Info("DEBUG: LastToken",
+		zap.Time("created_at", lastToken.CreatedAt),
+		zap.Duration("since", time.Since(lastToken.CreatedAt)))
+
 	if err == nil && time.Since(lastToken.CreatedAt) < 5*time.Minute {
 		remaining := int((5*time.Minute - time.Since(lastToken.CreatedAt)).Seconds())
 		helpers.Error(w, http.StatusTooManyRequests,
@@ -101,14 +105,12 @@ func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Req
 
 	// Создаём новый токен
 	emailToken, err := h.emailTokenService.GenerateToken(r.Context(), user.ID)
+
 	if err != nil {
 		logger.Log.Error("Ошибка генерации токена при ResendVerificationEmail", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка генерации токена")
 		return
 	}
-	logger.Log.Info("DEBUG: LastToken",
-		zap.Time("created_at", lastToken.CreatedAt),
-		zap.Duration("since", time.Since(lastToken.CreatedAt)))
 
 	// Отправляем письмо
 	if err := h.SendVerificationEmail(r.Context(), user, emailToken.Token); err != nil {

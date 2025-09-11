@@ -30,9 +30,9 @@ func (r *EmailTokenRepository) SaveToken(ctx context.Context, token *models.Emai
 }
 
 func (r *EmailTokenRepository) VerifyToken(ctx context.Context, token string) (*models.EmailVerificationToken, error) {
-	row := r.db.QueryRow(ctx, `SELECT user_id, token, expires_at, confirmed FROM email_verification_tokens WHERE token = $1`, token)
+	row := r.db.QueryRow(ctx, `SELECT user_id, token, expires_at, confirmed, created_at FROM email_verification_tokens WHERE token = $1`, token)
 	var t models.EmailVerificationToken
-	if err := row.Scan(&t.UserID, &t.Token, &t.ExpiresAt, &t.Confirmed); err != nil {
+	if err := row.Scan(&t.UserID, &t.Token, &t.ExpiresAt, &t.Confirmed, &t.CreatedAt); err != nil {
 		return nil, err
 	}
 	return &t, nil
