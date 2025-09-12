@@ -211,7 +211,7 @@ func (h *AdminLogsHandler) Stats(w http.ResponseWriter, r *http.Request) {
 // @Param        day query string true "Дата (YYYY-MM-DD)"
 // @Success      200 {file} file "Лог-файл"
 // @Failure      404 {object} map[string]string "file not found"
-// @Router       /admin/logs/download [get]
+// @Router       /api/admin/logs/download [get]
 func (h *AdminLogsHandler) DownloadLog(w http.ResponseWriter, r *http.Request) {
 	day := r.URL.Query().Get("day")
 	files, err := h.listFilesForDay(day)
