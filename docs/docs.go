@@ -138,145 +138,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/logs/download": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Отдаёт лог-файл за день (gzip если есть).",
-                "produces": [
-                    "text/plain"
-                ],
-                "tags": [
-                    "admin-logs"
-                ],
-                "summary": "Скачать лог-файл целиком",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Дата (YYYY-MM-DD)",
-                        "name": "day",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "gzip/text файл логов",
-                        "schema": {
-                            "type": "file"
-                        }
-                    },
-                    "404": {
-                        "description": "file not found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/admin/logs/stats": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Агрегированное количество логов за день по уровням (DEBUG/INFO/WARN/ERROR/PANIC/FATAL) для каждого часа.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "admin-logs"
-                ],
-                "summary": "Статистика логов по часам",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Дата (YYYY-MM-DD)",
-                        "name": "day",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "401": {
-                        "description": "unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "day not found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/admin/logs/summary": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Возвращает агрегаты по уровням логов за последние N дней (по умолчанию 7).",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "admin-logs"
-                ],
-                "summary": "Краткая статистика по логам",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Количество дней (по умолчанию 7)",
-                        "name": "days",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "401": {
-                        "description": "unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/api/admin/articles": {
             "post": {
                 "security": [
@@ -726,6 +587,145 @@ const docTemplate = `{
                         "description": "Документ не найден",
                         "schema": {
                             "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/logs/download": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Отдаёт лог-файл за день (gzip если есть).",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "admin-logs"
+                ],
+                "summary": "Скачать лог-файл целиком",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Дата (YYYY-MM-DD)",
+                        "name": "day",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "gzip/text файл логов",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "file not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/logs/stats": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Агрегированное количество логов за день по уровням (DEBUG/INFO/WARN/ERROR/PANIC/FATAL) для каждого часа.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-logs"
+                ],
+                "summary": "Статистика логов по часам",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Дата (YYYY-MM-DD)",
+                        "name": "day",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "day not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/logs/summary": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Возвращает агрегаты по уровням логов за последние N дней (по умолчанию 7).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-logs"
+                ],
+                "summary": "Краткая статистика по логам",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Количество дней (по умолчанию 7)",
+                        "name": "days",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }

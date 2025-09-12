@@ -167,7 +167,7 @@ func (h *AdminLogsHandler) GetLogs(w http.ResponseWriter, r *http.Request) {
 // @Success      200 {object} map[string]interface{}
 // @Failure      401 {object} map[string]string "unauthorized"
 // @Failure      404 {object} map[string]string "day not found"
-// @Router       /admin/logs/stats [get]
+// @Router       /api/admin/logs/stats [get]
 func (h *AdminLogsHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	day := r.URL.Query().Get("day")
 	if !reDay.MatchString(day) {
@@ -212,7 +212,7 @@ func (h *AdminLogsHandler) Stats(w http.ResponseWriter, r *http.Request) {
 // @Param        day query string true "Дата (YYYY-MM-DD)"
 // @Success      200 {file} file "gzip/text файл логов"
 // @Failure      404 {object} map[string]string "file not found"
-// @Router       /admin/logs/download [get]
+// @Router       /api/admin/logs/download [get]
 func (h *AdminLogsHandler) DownloadRaw(w http.ResponseWriter, r *http.Request) {
 	day := r.URL.Query().Get("day")
 	if !reDay.MatchString(day) {
@@ -239,7 +239,7 @@ func (h *AdminLogsHandler) DownloadRaw(w http.ResponseWriter, r *http.Request) {
 // @Param        days query int false "Количество дней (по умолчанию 7)"
 // @Success      200 {object} map[string]interface{}
 // @Failure      401 {object} map[string]string "unauthorized"
-// @Router       /admin/logs/summary [get]
+// @Router       /api/admin/logs/summary [get]
 func (h *AdminLogsHandler) StatsSummary(w http.ResponseWriter, r *http.Request) {
 	days := clampAtoi(r.URL.Query().Get("days"), 7, 1, h.Retention)
 
