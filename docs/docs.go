@@ -9,135 +9,16 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "contact": {},
+        "contact": {
+            "name": "EduTalks Support",
+            "url": "https://edutalks.ru",
+            "email": "support@edutalks.ru"
+        },
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/admin/logs": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Возвращает массив логов (JSON-строки) за указанный день. Поддерживает фильтрацию по уровню, часу и строке поиска.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "admin-logs"
-                ],
-                "summary": "Логи за день",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Дата (YYYY-MM-DD)",
-                        "name": "day",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "CSV уровней: debug,info,warn,error,panic,fatal",
-                        "name": "level",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Час (0-23)",
-                        "name": "hour",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Поиск по подстроке",
-                        "name": "q",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Лимит (по умолч. 200, макс. 1000)",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Номер строки для пагинации (по умолч. 0)",
-                        "name": "cursor",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "401": {
-                        "description": "unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "day not found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/admin/logs/days": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Возвращает список дат (YYYY-MM-DD), за которые доступны файлы логов (до {{Retention}} дней).",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "admin-logs"
-                ],
-                "summary": "Доступные дни логов",
-                "responses": {
-                    "200": {
-                        "description": "days",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "array",
-                                "items": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/api/admin/articles": {
             "post": {
                 "security": [
@@ -587,6 +468,129 @@ const docTemplate = `{
                         "description": "Документ не найден",
                         "schema": {
                             "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/logs": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Возвращает массив логов (JSON-строки) за указанный день. Поддерживает фильтрацию по уровню, часу и строке поиска.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-logs"
+                ],
+                "summary": "Логи за день",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Дата (YYYY-MM-DD)",
+                        "name": "day",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "CSV уровней: debug,info,warn,error,panic,fatal",
+                        "name": "level",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Час (0-23)",
+                        "name": "hour",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Поиск по подстроке",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Лимит (по умолч. 200, макс. 1000)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Номер строки для пагинации (по умолч. 0)",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "day not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/logs/days": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Возвращает список дат (YYYY-MM-DD), за которые доступны файлы логов (до {{Retention}} дней).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-logs"
+                ],
+                "summary": "Доступные дни логов",
+                "responses": {
+                    "200": {
+                        "description": "days",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
@@ -3200,7 +3204,6 @@ const docTemplate = `{
     },
     "securityDefinitions": {
         "ApiKeyAuth": {
-            "description": "Документация API Edutalks (регистрация, логин, токены и т.д.).",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
@@ -3210,12 +3213,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "",
-	Host:             "",
-	BasePath:         "",
-	Schemes:          []string{},
+	Version:          "1.0",
+	Host:             "edutalks.ru",
+	BasePath:         "/",
+	Schemes:          []string{"https"},
 	Title:            "Edutalks API",
-	Description:      "",
+	Description:      "Документация API Edutalks (регистрация, логин, токены, статьи, логи и т.д.).",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

@@ -42,7 +42,7 @@ func NewAdminLogsHandler() *AdminLogsHandler {
 // @Produce      json
 // @Success      200 {object} map[string][]string "days"
 // @Failure      401 {object} map[string]string "unauthorized"
-// @Router       /admin/logs/days [get]
+// @Router       /api/admin/logs/days [get]
 func (h *AdminLogsHandler) ListDays(w http.ResponseWriter, r *http.Request) {
 	today := time.Now().Local()
 	var days []string
@@ -71,7 +71,7 @@ func (h *AdminLogsHandler) ListDays(w http.ResponseWriter, r *http.Request) {
 // @Success      200 {object} map[string]interface{}
 // @Failure      401 {object} map[string]string "unauthorized"
 // @Failure      404 {object} map[string]string "day not found"
-// @Router       /admin/logs [get]
+// @Router       /api/admin/logs [get]
 func (h *AdminLogsHandler) GetLogs(w http.ResponseWriter, r *http.Request) {
 	day := r.URL.Query().Get("day")
 	if !reDay.MatchString(day) {
