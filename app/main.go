@@ -12,13 +12,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// main
 // @title Edutalks API
 // @securityDefinitions.apikey ApiKeyAuth
 // @in header
 // @name Authorization
 // @version 1.0
 // @description Документация API Edutalks (регистрация, логин, токены и т.д.).
-// @host http://85.143.175.100:8080
+// @host edutalks.ru
 // @BasePath /
 func main() {
 	cfg, err := config.LoadConfig()
