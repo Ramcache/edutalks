@@ -203,30 +203,28 @@ func (h *AdminLogsHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// DownloadRaw
-// @Summary      Скачать лог-файл целиком
-// @Description  Отдаёт лог-файл за день (gzip если есть).
+// DownloadLog
+// @Summary      Скачать лог за день
 // @Tags         admin-logs
 // @Security     ApiKeyAuth
 // @Produce      text/plain
 // @Param        day query string true "Дата (YYYY-MM-DD)"
-// @Success      200 {file} file "gzip/text файл логов"
+// @Success      200 {file} file "Лог-файл"
 // @Failure      404 {object} map[string]string "file not found"
-// @Router       /api/admin/logs/download [get]
-func (h *AdminLogsHandler) DownloadRaw(w http.ResponseWriter, r *http.Request) {
+// @Router       /admin/logs/download [get]
+func (h *AdminLogsHandler) DownloadLog(w http.ResponseWriter, r *http.Request) {
 	day := r.URL.Query().Get("day")
-	if !reDay.MatchString(day) {
-		http.Error(w, "bad day", http.StatusBadRequest)
-		return
-	}
 	files, err := h.listFilesForDay(day)
 	if err != nil || len(files) == 0 {
 		http.Error(w, "file not found", http.StatusNotFound)
 		return
 	}
-	// Берём первый файл (или объединяем — по желанию)
-	fpath := files[0]
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filepath.Base(fpath)))
+
+	fpath := files[0] // если файлов несколько — можно выбрать последний или первый
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Disposition",
+		"attachment; filename=\""+filepath.Base(fpath)+"\"")
+
 	http.ServeFile(w, r, fpath)
 }
 

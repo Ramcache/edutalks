@@ -1,4 +1,4 @@
-basePath: /
+basePath: /api
 definitions:
   edutalks_internal_models.Article:
     properties:
@@ -379,7 +379,7 @@ definitions:
       title:
         type: string
     type: object
-host: edutalks.ru
+host: https://edutalks.ru
 info:
   contact:
     email: support@edutalks.ru
@@ -390,6 +390,32 @@ info:
   title: Edutalks API
   version: "1.0"
 paths:
+  /admin/logs/download:
+    get:
+      parameters:
+      - description: Дата (YYYY-MM-DD)
+        in: query
+        name: day
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Лог-файл
+          schema:
+            type: file
+        "404":
+          description: file not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Скачать лог за день
+      tags:
+      - admin-logs
   /api/admin/articles:
     post:
       consumes:
@@ -761,33 +787,6 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Доступные дни логов
-      tags:
-      - admin-logs
-  /api/admin/logs/download:
-    get:
-      description: Отдаёт лог-файл за день (gzip если есть).
-      parameters:
-      - description: Дата (YYYY-MM-DD)
-        in: query
-        name: day
-        required: true
-        type: string
-      produces:
-      - text/plain
-      responses:
-        "200":
-          description: gzip/text файл логов
-          schema:
-            type: file
-        "404":
-          description: file not found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - ApiKeyAuth: []
-      summary: Скачать лог-файл целиком
       tags:
       - admin-logs
   /api/admin/logs/stats:

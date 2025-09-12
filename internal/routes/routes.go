@@ -127,7 +127,7 @@ func InitRoutes(
 	admin.HandleFunc("/logs/days", logsAdminH.ListDays).Methods(http.MethodGet)
 	admin.HandleFunc("/logs", logsAdminH.GetLogs).Methods(http.MethodGet)
 	admin.HandleFunc("/logs/stats", logsAdminH.Stats).Methods(http.MethodGet)
-	admin.HandleFunc("/logs/download", logsAdminH.DownloadRaw).Methods(http.MethodGet)
+	admin.HandleFunc("/logs/download", logsAdminH.DownloadLog).Methods(http.MethodGet)
 	admin.HandleFunc("/logs/summary", logsAdminH.StatsSummary).Methods(http.MethodGet)
 
 }

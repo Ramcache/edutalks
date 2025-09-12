@@ -1,3 +1,18 @@
+// @title          Edutalks API
+// @version        1.0
+// @description    Документация API Edutalks (регистрация, логин, токены, статьи, логи и т.д.).
+
+// @contact.name   EduTalks Support
+// @contact.url    https://edutalks.ru
+// @contact.email  support@edutalks.ru
+
+// @host      https://edutalks.ru
+// @BasePath  /api
+// @schemes   https
+
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
 package main
 
 import (
@@ -12,21 +27,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// @title          Edutalks API
-// @version        1.0
-// @description    Документация API Edutalks (регистрация, логин, токены, статьи, логи и т.д.).
-
-// @contact.name   EduTalks Support
-// @contact.url    https://edutalks.ru
-// @contact.email  support@edutalks.ru
-
-// @host      edutalks.ru
-// @BasePath  /
-// @schemes   https
-
-// @securityDefinitions.apikey ApiKeyAuth
-// @in header
-// @name Authorization
 func main() {
 	cfg, err := config.LoadConfig()
 	logger.InitLogger()
