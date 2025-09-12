@@ -1,3 +1,4 @@
+basePath: /
 definitions:
   edutalks_internal_models.Article:
     properties:
@@ -378,91 +379,17 @@ definitions:
       title:
         type: string
     type: object
+host: edutalks.ru
 info:
-  contact: {}
+  contact:
+    email: support@edutalks.ru
+    name: EduTalks Support
+    url: https://edutalks.ru
+  description: Документация API Edutalks (регистрация, логин, токены, статьи, логи
+    и т.д.).
   title: Edutalks API
+  version: "1.0"
 paths:
-  /admin/logs:
-    get:
-      description: Возвращает массив логов (JSON-строки) за указанный день. Поддерживает
-        фильтрацию по уровню, часу и строке поиска.
-      parameters:
-      - description: Дата (YYYY-MM-DD)
-        in: query
-        name: day
-        required: true
-        type: string
-      - description: 'CSV уровней: debug,info,warn,error,panic,fatal'
-        in: query
-        name: level
-        type: string
-      - description: Час (0-23)
-        in: query
-        name: hour
-        type: integer
-      - description: Поиск по подстроке
-        in: query
-        name: q
-        type: string
-      - description: Лимит (по умолч. 200, макс. 1000)
-        in: query
-        name: limit
-        type: integer
-      - description: Номер строки для пагинации (по умолч. 0)
-        in: query
-        name: cursor
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-        "401":
-          description: unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "404":
-          description: day not found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - ApiKeyAuth: []
-      summary: Логи за день
-      tags:
-      - admin-logs
-  /admin/logs/days:
-    get:
-      description: Возвращает список дат (YYYY-MM-DD), за которые доступны файлы логов
-        (до {{Retention}} дней).
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: days
-          schema:
-            additionalProperties:
-              items:
-                type: string
-              type: array
-            type: object
-        "401":
-          description: unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - ApiKeyAuth: []
-      summary: Доступные дни логов
-      tags:
-      - admin-logs
   /api/admin/articles:
     post:
       consumes:
@@ -755,6 +682,87 @@ paths:
       summary: Загрузить документ
       tags:
       - documents
+  /api/admin/logs:
+    get:
+      description: Возвращает массив логов (JSON-строки) за указанный день. Поддерживает
+        фильтрацию по уровню, часу и строке поиска.
+      parameters:
+      - description: Дата (YYYY-MM-DD)
+        in: query
+        name: day
+        required: true
+        type: string
+      - description: 'CSV уровней: debug,info,warn,error,panic,fatal'
+        in: query
+        name: level
+        type: string
+      - description: Час (0-23)
+        in: query
+        name: hour
+        type: integer
+      - description: Поиск по подстроке
+        in: query
+        name: q
+        type: string
+      - description: Лимит (по умолч. 200, макс. 1000)
+        in: query
+        name: limit
+        type: integer
+      - description: Номер строки для пагинации (по умолч. 0)
+        in: query
+        name: cursor
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: day not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Логи за день
+      tags:
+      - admin-logs
+  /api/admin/logs/days:
+    get:
+      description: Возвращает список дат (YYYY-MM-DD), за которые доступны файлы логов
+        (до {{Retention}} дней).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: days
+          schema:
+            additionalProperties:
+              items:
+                type: string
+              type: array
+            type: object
+        "401":
+          description: unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Доступные дни логов
+      tags:
+      - admin-logs
   /api/admin/logs/download:
     get:
       description: Отдаёт лог-файл за день (gzip если есть).
@@ -2056,9 +2064,10 @@ paths:
       summary: Подтвердить email
       tags:
       - email
+schemes:
+- https
 securityDefinitions:
   ApiKeyAuth:
-    description: Документация API Edutalks (регистрация, логин, токены и т.д.).
     in: header
     name: Authorization
     type: apiKey
