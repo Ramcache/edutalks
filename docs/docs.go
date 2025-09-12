@@ -19,6 +19,48 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/logs/download": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "admin-logs"
+                ],
+                "summary": "Скачать лог за день",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Дата (YYYY-MM-DD)",
+                        "name": "day",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Лог-файл",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "file not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/articles": {
             "post": {
                 "security": [
@@ -586,49 +628,6 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/admin/logs/download": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Отдаёт лог-файл за день (gzip если есть).",
-                "produces": [
-                    "text/plain"
-                ],
-                "tags": [
-                    "admin-logs"
-                ],
-                "summary": "Скачать лог-файл целиком",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Дата (YYYY-MM-DD)",
-                        "name": "day",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "gzip/text файл логов",
-                        "schema": {
-                            "type": "file"
-                        }
-                    },
-                    "404": {
-                        "description": "file not found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -3214,8 +3213,8 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "edutalks.ru",
-	BasePath:         "/",
+	Host:             "https://edutalks.ru",
+	BasePath:         "/api",
 	Schemes:          []string{"https"},
 	Title:            "Edutalks API",
 	Description:      "Документация API Edutalks (регистрация, логин, токены, статьи, логи и т.д.).",

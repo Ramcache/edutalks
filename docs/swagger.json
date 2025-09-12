@@ -13,9 +13,51 @@
         },
         "version": "1.0"
     },
-    "host": "edutalks.ru",
-    "basePath": "/",
+    "host": "https://edutalks.ru",
+    "basePath": "/api",
     "paths": {
+        "/admin/logs/download": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "admin-logs"
+                ],
+                "summary": "Скачать лог за день",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Дата (YYYY-MM-DD)",
+                        "name": "day",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Лог-файл",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "file not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/articles": {
             "post": {
                 "security": [
@@ -583,49 +625,6 @@
                     },
                     "401": {
                         "description": "unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/admin/logs/download": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Отдаёт лог-файл за день (gzip если есть).",
-                "produces": [
-                    "text/plain"
-                ],
-                "tags": [
-                    "admin-logs"
-                ],
-                "summary": "Скачать лог-файл целиком",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Дата (YYYY-MM-DD)",
-                        "name": "day",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "gzip/text файл логов",
-                        "schema": {
-                            "type": "file"
-                        }
-                    },
-                    "404": {
-                        "description": "file not found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
