@@ -162,19 +162,17 @@ func (h *AdminLogsHandler) GetLogs(w http.ResponseWriter, r *http.Request) {
 			return true
 		}
 
-		// фильтр по уровню
-		lvl := strings.ToUpper(getString(obj, "level"))
+		// фильтр по уровню (с алиасами)
+		lvl := normalizeLevel(getString(obj, "level"), obj)
 		if len(levelSet) > 0 && !levelSet[lvl] {
 			return true
 		}
+
 		// фильтр по часу
 		if hourPtr != nil {
-			ts := getString(obj, "time") // RFC3339/RFC3339Nano
-			if ts != "" {
-				if t, err := time.Parse(time.RFC3339Nano, ts); err == nil {
-					if t.Hour() != *hourPtr {
-						return true
-					}
+			if t, ok := extractTimeLocal(obj, raw); ok {
+				if t.Hour() != *hourPtr {
+					return true
 				}
 			}
 		}
@@ -247,25 +245,47 @@ func (h *AdminLogsHandler) Stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Массив уровней фиксируем для стабильной структуры ответа.
+	allLvls := []string{"DEBUG", "INFO", "WARN", "ERROR", "PANIC", "FATAL"}
+
 	type Lvl map[string]int
 	stats := make(map[int]Lvl)
 	for hr := 0; hr < 24; hr++ {
 		stats[hr] = Lvl{}
+		// Инициализируем нулями, чтобы фронт видел стабильную структуру
+		for _, lv := range allLvls {
+			stats[hr][lv] = 0
+		}
 	}
 
+	linesScanned := 0
+
 	err := h.forEachDayLineCtx(r.Context(), day, func(raw []byte) bool {
+		linesScanned++
+
 		var obj map[string]any
 		if err := json.Unmarshal(raw, &obj); err != nil {
-			return true // пропускаем не-JSON
-		}
-		ts := getString(obj, "time")
-		lvl := strings.ToUpper(getString(obj, "level"))
-		if ts == "" || lvl == "" {
+			// не JSON — пробуем вытащить время из строки регуляркой
+			if t, ok := extractTimeFromRaw(raw); ok {
+				stats[t.Hour()]["INFO"]++ // если вообще не знаем уровень — считаем INFO
+			}
 			return true
 		}
-		if t, err := time.Parse(time.RFC3339Nano, ts); err == nil {
-			stats[t.Hour()][lvl]++
+
+		// время — максимально терпим к формату и ключам
+		t, ok := extractTimeLocal(obj, raw)
+		if !ok {
+			// если даже из сырой строки не получилось — пропустим
+			return true
 		}
+
+		// уровень с алиасами
+		lvl := normalizeLevel(getString(obj, "level"), obj)
+		if _, known := stats[t.Hour()][lvl]; !known {
+			// на всякий случай, если встретится новый уровень
+			stats[t.Hour()][lvl] = 0
+		}
+		stats[t.Hour()][lvl]++
 		return true
 	})
 	if err != nil {
@@ -273,7 +293,11 @@ func (h *AdminLogsHandler) Stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Info("admin logs: статистика по дням сформирована", zap.String("day", day))
+	log.Info("admin logs: статистика по дням сформирована",
+		zap.String("day", day),
+		zap.Int("scanned_lines", linesScanned),
+	)
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"day":   day,
 		"stats": stats,
@@ -349,33 +373,50 @@ func (h *AdminLogsHandler) StatsSummary(w http.ResponseWriter, r *http.Request) 
 	days := clampAtoi(r.URL.Query().Get("days"), 7, 1, h.Retention)
 
 	today := time.Now().Local()
+	allLvls := []string{"DEBUG", "INFO", "WARN", "ERROR", "PANIC", "FATAL"}
 	summary := map[string]any{
 		"total":  0,
 		"levels": map[string]int{},
 		"by_day": map[string]map[string]int{},
 	}
 	levelsTotal := summary["levels"].(map[string]int)
+	for _, lv := range allLvls {
+		levelsTotal[lv] = 0
+	}
 
 	for i := 0; i < days; i++ {
 		d := today.AddDate(0, 0, -i).Format("2006-01-02")
 		dayStats := map[string]int{}
+		for _, lv := range allLvls {
+			dayStats[lv] = 0
+		}
 
 		_ = h.forEachDayLineCtx(r.Context(), d, func(raw []byte) bool {
 			var obj map[string]any
 			if err := json.Unmarshal(raw, &obj); err != nil {
+				if _, ok := extractTimeFromRaw(raw); ok {
+					dayStats["INFO"]++
+					levelsTotal["INFO"]++
+					summary["total"] = summary["total"].(int) + 1
+				}
 				return true
 			}
-			lvl := strings.ToUpper(getString(obj, "level"))
-			if lvl == "" {
-				return true
-			}
+			lvl := normalizeLevel(getString(obj, "level"), obj)
 			dayStats[lvl]++
 			levelsTotal[lvl]++
 			summary["total"] = summary["total"].(int) + 1
 			return true
 		})
 
-		if len(dayStats) > 0 {
+		// Сохраняем день только если есть хоть какие-то логи
+		nonZero := false
+		for _, c := range dayStats {
+			if c > 0 {
+				nonZero = true
+				break
+			}
+		}
+		if nonZero {
 			summary["by_day"].(map[string]map[string]int)[d] = dayStats
 		}
 	}
@@ -426,6 +467,13 @@ func (h *AdminLogsHandler) listFilesForDay(day string) ([]string, error) {
 
 		// lumberjack: app-2025-09-11T12-34-56.123.log или .gz — проверяем, что имя содержит день.
 		if strings.HasPrefix(name, "app-") && strings.Contains(name, day) &&
+			(strings.HasSuffix(name, ".log") || strings.HasSuffix(name, ".gz")) {
+			files = append(files, filepath.Join(h.LogDir, name))
+			continue
+		}
+
+		// Перестраховка: иногда встречаются app_YYYY-MM-DD.log
+		if strings.Contains(name, strings.ReplaceAll(day, "-", "_")) &&
 			(strings.HasSuffix(name, ".log") || strings.HasSuffix(name, ".gz")) {
 			files = append(files, filepath.Join(h.LogDir, name))
 		}
@@ -531,7 +579,7 @@ func getString(m map[string]any, key string) string {
 			return s
 		}
 	}
-	// часто сообщение пишут как "message", поддержим
+	// популярный синоним
 	if key == "msg" {
 		if v, ok := m["message"]; ok {
 			if s, ok := v.(string); ok {
@@ -568,7 +616,7 @@ func writeJSON(w http.ResponseWriter, code int, data any) {
 func toLogItem(obj map[string]any) LogItem {
 	li := LogItem{
 		Time:    getString(obj, "time"),
-		Level:   strings.ToUpper(getString(obj, "level")),
+		Level:   normalizeLevel(getString(obj, "level"), obj),
 		Message: getString(obj, "msg"),
 		Fields:  map[string]any{},
 	}
@@ -576,7 +624,7 @@ func toLogItem(obj map[string]any) LogItem {
 	// популярные «колоночные» поля
 	keys := []string{
 		"method", "path", "status", "url",
-		"remote_ip", "ip", "user_id", "request_id",
+		"remote_ip", "ip", "user_id", "request_id", "req_id", "requestId", "rid",
 		"stack", "error",
 	}
 	for _, k := range keys {
@@ -596,4 +644,136 @@ func toLogItem(obj map[string]any) LogItem {
 		li.Fields[k] = v
 	}
 	return li
+}
+
+// ===== парсинг времени и уровней с запасом прочности =====
+
+var tsRE = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+\-]\d{2}:\d{2})`)
+
+func extractTimeLocal(obj map[string]any, raw []byte) (time.Time, bool) {
+	// 1) строковые ключи
+	for _, k := range []string{"time", "ts", "timestamp"} {
+		if s := getString(obj, k); s != "" {
+			if t, ok := parseTimestamp(s); ok {
+				return t.Local(), true
+			}
+		}
+	}
+	// 2) numeric unix(ts)
+	if v, ok := obj["ts"]; ok {
+		switch vv := v.(type) {
+		case float64:
+			// различаем секунды/миллисекунды по порядку величины
+			if vv > 1e12 {
+				sec := int64(vv) / 1000
+				nsec := (int64(vv) % 1000) * int64(time.Millisecond)
+				return time.Unix(sec, nsec).Local(), true
+			}
+			return time.Unix(int64(vv), 0).Local(), true
+		case json.Number:
+			if i, err := vv.Int64(); err == nil {
+				if i > 1e12 {
+					sec := i / 1000
+					nsec := (i % 1000) * int64(time.Millisecond)
+					return time.Unix(sec, nsec).Local(), true
+				}
+				return time.Unix(i, 0).Local(), true
+			}
+		}
+	}
+	// 3) из сырой строки регуляркой
+	if t, ok := extractTimeFromRaw(raw); ok {
+		return t.Local(), true
+	}
+	return time.Time{}, false
+}
+
+func extractTimeFromRaw(raw []byte) (time.Time, bool) {
+	m := tsRE.Find(raw)
+	if len(m) == 0 {
+		return time.Time{}, false
+	}
+	if t, ok := parseTimestamp(string(m)); ok {
+		return t, true
+	}
+	return time.Time{}, false
+}
+
+func parseTimestamp(s string) (time.Time, bool) {
+	layouts := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02 15:04:05Z07:00",
+		"2006-01-02 15:04:05.000000000Z07:00",
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
+	}
+	for _, l := range layouts {
+		if t, err := time.Parse(l, s); err == nil {
+			return t, true
+		}
+	}
+	// иногда встречаются запятые в долях секунды: 2025-09-12T11:12:38,354Z
+	if strings.Contains(s, ",") {
+		s2 := strings.ReplaceAll(s, ",", ".")
+		for _, l := range layouts {
+			if t, err := time.Parse(l, s2); err == nil {
+				return t, true
+			}
+		}
+	}
+	return time.Time{}, false
+}
+
+func normalizeLevel(lvl string, obj map[string]any) string {
+	l := strings.ToUpper(strings.TrimSpace(lvl))
+	if l != "" {
+		return levelAlias(l)
+	}
+	// пробуем альтернативные ключи
+	for _, k := range []string{"severity", "lvl"} {
+		if s, ok := obj[k]; ok {
+			if str, ok := s.(string); ok {
+				return levelAlias(strings.ToUpper(strings.TrimSpace(str)))
+			}
+			// числовые уровни — сведём к приблизительным
+			if num, ok := s.(float64); ok {
+				return numericLevel(num)
+			}
+		}
+	}
+	return "INFO"
+}
+
+func levelAlias(l string) string {
+	switch l {
+	case "TRACE":
+		return "DEBUG"
+	case "WARNING":
+		return "WARN"
+	case "ERR":
+		return "ERROR"
+	case "CRITICAL":
+		return "FATAL"
+	default:
+		return l
+	}
+}
+
+func numericLevel(n float64) string {
+	// очень условное соответствие
+	switch {
+	case n <= 10:
+		return "DEBUG"
+	case n <= 20:
+		return "INFO"
+	case n <= 30:
+		return "WARN"
+	case n <= 40:
+		return "ERROR"
+	case n <= 50:
+		return "PANIC"
+	default:
+		return "FATAL"
+	}
 }
