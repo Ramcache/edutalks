@@ -2,17 +2,20 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"strings"
+
 	"edutalks/internal/logger"
 	"edutalks/internal/middleware"
 	"edutalks/internal/models"
 	"edutalks/internal/services"
-	"encoding/json"
-	"net/http"
+	helpers "edutalks/internal/utils/helpers"
 
 	"go.uber.org/zap"
 )
 
-// рядом с PasswordHandler
+// userReader — рядом с PasswordHandler
 type userReader interface {
 	GetUserByID(ctx context.Context, id int) (*models.User, error)
 }
@@ -41,16 +44,24 @@ type forgotReq struct {
 // @Failure 400 {object} map[string]string
 // @Router /api/password/forgot [post]
 func (h *PasswordHandler) Forgot(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	var req forgotReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" {
-		http.Error(w, "invalid payload", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Email) == "" {
+		log.Warn("Невалидный payload в Forgot")
+		helpers.Error(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
+
+	// Не раскрываем, существует ли email — всегда возвращаем 200
 	if err := h.svc.RequestReset(r.Context(), req.Email); err != nil {
-		logger.Log.Error("password forgot failed", zap.Error(err))
+		// Ошибку логируем, но клиенту отвечаем одинаково
+		log.Error("Сбой при запросе восстановления пароля", zap.String("email_masked", maskEmail(req.Email)), zap.Error(err))
+	} else {
+		log.Info("Запрошено восстановление пароля", zap.String("email_masked", maskEmail(req.Email)))
 	}
-	// одинаковый ответ всегда
-	writeJSON(w, http.StatusOK, map[string]any{"message": "If the email exists, a reset link has been sent."})
+
+	helpers.JSON(w, http.StatusOK, map[string]any{"message": "If the email exists, a reset link has been sent."})
 }
 
 type resetReq struct {
@@ -69,16 +80,24 @@ type resetReq struct {
 // @Failure 400 {object} map[string]string
 // @Router /api/password/reset [post]
 func (h *PasswordHandler) Reset(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	var req resetReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Token == "" || req.NewPassword == "" {
-		http.Error(w, "invalid payload", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Token) == "" || strings.TrimSpace(req.NewPassword) == "" {
+		log.Warn("Невалидный payload в Reset")
+		helpers.Error(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
+
 	if err := h.svc.ResetPassword(r.Context(), req.Token, req.NewPassword); err != nil {
-		http.Error(w, "invalid token or password", http.StatusBadRequest)
+		// Ошибки токена/валидации — это 400
+		log.Warn("Не удалось сбросить пароль по токену", zap.Error(err))
+		helpers.Error(w, http.StatusBadRequest, "invalid token or password")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"message": "Password has been reset."})
+
+	log.Info("Пароль успешно сброшен")
+	helpers.JSON(w, http.StatusOK, map[string]string{"message": "Password has been reset."})
 }
 
 type changeReq struct {
@@ -99,37 +118,36 @@ type changeReq struct {
 // @Failure 401 {object} map[string]string
 // @Router /api/password/change [post]
 func (h *PasswordHandler) Change(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	if !ok || userID == 0 {
+		log.Warn("Нет доступа для Change: отсутствует user_id")
+		helpers.Error(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
 	var req changeReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.OldPassword == "" || req.NewPassword == "" {
-		http.Error(w, "invalid payload", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.OldPassword) == "" || strings.TrimSpace(req.NewPassword) == "" {
+		log.Warn("Невалидный payload в Change", zap.Int("user_id", userID))
+		helpers.Error(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
-	// достаём текущий hash пользователя
+
 	u, err := h.userRepo.GetUserByID(r.Context(), userID)
 	if err != nil {
-		http.Error(w, "user not found", http.StatusUnauthorized)
+		log.Warn("Пользователь не найден при смене пароля", zap.Int("user_id", userID))
+		helpers.Error(w, http.StatusUnauthorized, "user not found")
 		return
 	}
-	newHash, err := h.svc.ChangePassword(r.Context(), int64(userID), req.OldPassword, req.NewPassword, u.PasswordHash)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+
+	if _, err := h.svc.ChangePassword(r.Context(), int64(userID), req.OldPassword, req.NewPassword, u.PasswordHash); err != nil {
+		// Ошибки валидации/несовпадения старого пароля — 400
+		log.Warn("Не удалось сменить пароль", zap.Int("user_id", userID), zap.Error(err))
+		helpers.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	// (опционально) инвалидация refresh-токенов и т.д.
-	_ = newHash
 
-	writeJSON(w, http.StatusOK, map[string]string{"message": "Password changed."})
-}
-
-// локальный helper
-func writeJSON(w http.ResponseWriter, code int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(data)
+	log.Info("Пароль изменён", zap.Int("user_id", userID))
+	helpers.JSON(w, http.StatusOK, map[string]string{"message": "Password changed."})
 }

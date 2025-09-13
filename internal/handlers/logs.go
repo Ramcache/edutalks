@@ -1,8 +1,11 @@
+// internal/handlers/admin_logs.go
 package handlers
 
 import (
+	"archive/zip"
 	"bufio"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +17,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"edutalks/internal/logger"
+	"go.uber.org/zap"
 )
 
 // AdminLogsHandler — просмотр логов (14 дней), поддерживает:
@@ -44,6 +50,8 @@ func NewAdminLogsHandler() *AdminLogsHandler {
 // @Failure      401 {object} map[string]string "unauthorized"
 // @Router       /api/admin/logs/days [get]
 func (h *AdminLogsHandler) ListDays(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	today := time.Now().Local()
 	var days []string
 	for i := 0; i < h.Retention; i++ {
@@ -52,13 +60,28 @@ func (h *AdminLogsHandler) ListDays(w http.ResponseWriter, r *http.Request) {
 			days = append(days, d)
 		}
 	}
-	sort.Strings(days)
+	// свежие сверху
+	sort.Sort(sort.Reverse(sort.StringSlice(days)))
+
+	log.Info("admin logs: список доступных дней",
+		zap.Int("retention_days", h.Retention),
+		zap.Int("days_count", len(days)),
+	)
+
 	writeJSON(w, http.StatusOK, map[string]any{"days": days})
+}
+
+// LogItem — структурированная запись лога для UI
+type LogItem struct {
+	Time    string         `json:"time,omitempty"`
+	Level   string         `json:"level,omitempty"`
+	Message string         `json:"msg,omitempty"`
+	Fields  map[string]any `json:"fields,omitempty"`
 }
 
 // GetLogs
 // @Summary      Логи за день
-// @Description  Возвращает массив логов (JSON-строки) за указанный день. Поддерживает фильтрацию по уровню, часу и строке поиска.
+// @Description  Возвращает массив логов за указанный день. Поддерживает фильтрацию по уровню, часу и строке поиска.
 // @Tags         admin-logs
 // @Security     ApiKeyAuth
 // @Produce      json
@@ -67,14 +90,19 @@ func (h *AdminLogsHandler) ListDays(w http.ResponseWriter, r *http.Request) {
 // @Param        hour    query  int    false "Час (0-23)"
 // @Param        q       query  string false "Поиск по подстроке"
 // @Param        limit   query  int    false "Лимит (по умолч. 200, макс. 1000)"
-// @Param        cursor  query  int    false "Номер строки для пагинации (по умолч. 0)"
+// @Param        cursor  query  int    false "Номер строки для пагинации (по умолч. 0) — счётчик по файлу"
+// @Param        order   query  string false "Порядок в выдаче: asc|desc (по умолчанию asc)"
+// @Param        tail    query  int    false "Вернуть только последние N совпадений после сортировки (опц.)"
 // @Success      200 {object} map[string]interface{}
 // @Failure      401 {object} map[string]string "unauthorized"
 // @Failure      404 {object} map[string]string "day not found"
 // @Router       /api/admin/logs [get]
 func (h *AdminLogsHandler) GetLogs(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	day := r.URL.Query().Get("day")
 	if !reDay.MatchString(day) {
+		log.Warn("admin logs: некорректный параметр day", zap.String("day", day))
 		http.Error(w, "bad day", http.StatusBadRequest)
 		return
 	}
@@ -93,31 +121,47 @@ func (h *AdminLogsHandler) GetLogs(w http.ResponseWriter, r *http.Request) {
 	if hourStr != "" {
 		if hv, err := strconv.Atoi(hourStr); err == nil && hv >= 0 && hv <= 23 {
 			hourPtr = &hv
+		} else {
+			log.Warn("admin logs: некорректный час", zap.String("hour", hourStr))
 		}
 	}
 
 	limit := clampAtoi(r.URL.Query().Get("limit"), 200, 50, 1000)
 	cursor := clampAtoi(r.URL.Query().Get("cursor"), 0, 0, 10_000_000)
+	order := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("order"))) // asc|desc
+	tail := clampAtoi(r.URL.Query().Get("tail"), 0, 0, 1000)
+
+	log.Info("admin logs: запрос логов",
+		zap.String("day", day),
+		zap.Strings("levels", levels),
+		zap.Any("hour", hourPtr),
+		zap.String("q", q),
+		zap.Int("limit", limit),
+		zap.Int("cursor", cursor),
+		zap.String("order", order),
+		zap.Int("tail", tail),
+	)
 
 	lineNo := 0
 	matched := 0
-	var items []json.RawMessage
+	var items []LogItem
 
-	err := h.forEachDayLine(day, func(raw []byte) bool {
+	err := h.forEachDayLineCtx(r.Context(), day, func(raw []byte) bool {
 		lineNo++
 		if lineNo <= cursor {
 			return true // продолжаем читать
 		}
-		// быстрый фильтр по строке
+		// быстрый фильтр по подстроке
 		if qre != nil && !qre.Match(raw) {
 			return true
 		}
-		// JSON-объект
+		// парсим JSON
 		var obj map[string]any
 		if err := json.Unmarshal(raw, &obj); err != nil {
-			// пропускаем строки не в JSON (например, консольный формат)
+			// пропускаем не-JSON (например, консольный формат)
 			return true
 		}
+
 		// фильтр по уровню
 		lvl := strings.ToUpper(getString(obj, "level"))
 		if len(levelSet) > 0 && !levelSet[lvl] {
@@ -135,25 +179,50 @@ func (h *AdminLogsHandler) GetLogs(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		items = append(items, append([]byte{}, raw...))
+		items = append(items, toLogItem(obj))
 		matched++
 		// ограничение выборки
 		return matched < limit
 	})
 
 	if err != nil {
+		log.Warn("admin logs: файлы за день не найдены", zap.String("day", day), zap.Error(err))
 		http.Error(w, "day not found", http.StatusNotFound)
 		return
 	}
 
-	if items == nil {
-		items = make([]json.RawMessage, 0)
+	// сортировка
+	if order == "desc" {
+		for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
+			items[i], items[j] = items[j], items[i]
+		}
 	}
+	// «хвост»
+	if tail > 0 && len(items) > tail {
+		if order == "desc" {
+			items = items[:tail]
+		} else {
+			items = items[len(items)-tail:]
+		}
+	}
+
+	// курсор и флаг наличия ещё данных
 	next := cursor + matched
+	hasMore := matched >= limit // простая и честная эвристика
+
+	log.Info("admin logs: логи отданы",
+		zap.String("day", day),
+		zap.Int("returned", len(items)),
+		zap.Int("next_cursor", next),
+		zap.Int("scanned_lines", lineNo),
+		zap.Bool("has_more", hasMore),
+	)
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"day":        day,
 		"items":      items,
 		"nextCursor": next,
+		"hasMore":    hasMore,
 	})
 }
 
@@ -169,8 +238,11 @@ func (h *AdminLogsHandler) GetLogs(w http.ResponseWriter, r *http.Request) {
 // @Failure      404 {object} map[string]string "day not found"
 // @Router       /api/admin/logs/stats [get]
 func (h *AdminLogsHandler) Stats(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	day := r.URL.Query().Get("day")
 	if !reDay.MatchString(day) {
+		log.Warn("admin logs: некорректный параметр day (stats)", zap.String("day", day))
 		http.Error(w, "bad day", http.StatusBadRequest)
 		return
 	}
@@ -181,7 +253,7 @@ func (h *AdminLogsHandler) Stats(w http.ResponseWriter, r *http.Request) {
 		stats[hr] = Lvl{}
 	}
 
-	_ = h.forEachDayLine(day, func(raw []byte) bool {
+	err := h.forEachDayLineCtx(r.Context(), day, func(raw []byte) bool {
 		var obj map[string]any
 		if err := json.Unmarshal(raw, &obj); err != nil {
 			return true // пропускаем не-JSON
@@ -196,7 +268,12 @@ func (h *AdminLogsHandler) Stats(w http.ResponseWriter, r *http.Request) {
 		}
 		return true
 	})
+	if err != nil {
+		http.Error(w, "day not found", http.StatusNotFound)
+		return
+	}
 
+	log.Info("admin logs: статистика по дням сформирована", zap.String("day", day))
 	writeJSON(w, http.StatusOK, map[string]any{
 		"day":   day,
 		"stats": stats,
@@ -207,24 +284,52 @@ func (h *AdminLogsHandler) Stats(w http.ResponseWriter, r *http.Request) {
 // @Summary      Скачать лог за день
 // @Tags         admin-logs
 // @Security     ApiKeyAuth
-// @Produce      text/plain
+// @Produce      application/zip,text/plain
 // @Param        day query string true "Дата (YYYY-MM-DD)"
+// @Param        zip query int false "Если 1 — отдать ZIP со всеми файлами за день"
 // @Success      200 {file} file "Лог-файл"
 // @Failure      404 {object} map[string]string "file not found"
 // @Router       /api/admin/logs/download [get]
 func (h *AdminLogsHandler) DownloadLog(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	day := r.URL.Query().Get("day")
 	files, err := h.listFilesForDay(day)
 	if err != nil || len(files) == 0 {
+		log.Warn("admin logs: файл лога не найден для скачивания", zap.String("day", day))
 		http.Error(w, "file not found", http.StatusNotFound)
 		return
 	}
 
-	fpath := files[0] // если файлов несколько — можно выбрать последний или первый
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Content-Disposition",
-		"attachment; filename=\""+filepath.Base(fpath)+"\"")
+	// zip=1 — отдать все файлы дня одним архивом
+	if r.URL.Query().Get("zip") == "1" && len(files) > 1 {
+		filename := fmt.Sprintf("logs-%s.zip", day)
+		w.Header().Set("Content-Type", "application/zip")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+		zw := zip.NewWriter(w)
+		for _, p := range files {
+			fw, err := zw.Create(filepath.Base(p))
+			if err != nil {
+				continue
+			}
+			src, err := os.Open(p)
+			if err != nil {
+				continue
+			}
+			_, _ = io.Copy(fw, src)
+			_ = src.Close()
+		}
+		_ = zw.Close()
+		log.Info("admin logs: скачан ZIP набора файлов", zap.String("day", day), zap.Int("files", len(files)))
+		return
+	}
 
+	// иначе — первый (можно поменять стратегию на «самый новый»)
+	fpath := files[0]
+	log.Info("admin logs: скачивание файла лога", zap.String("day", day), zap.String("file", filepath.Base(fpath)))
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+filepath.Base(fpath)+"\"")
 	http.ServeFile(w, r, fpath)
 }
 
@@ -239,6 +344,8 @@ func (h *AdminLogsHandler) DownloadLog(w http.ResponseWriter, r *http.Request) {
 // @Failure      401 {object} map[string]string "unauthorized"
 // @Router       /api/admin/logs/summary [get]
 func (h *AdminLogsHandler) StatsSummary(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	days := clampAtoi(r.URL.Query().Get("days"), 7, 1, h.Retention)
 
 	today := time.Now().Local()
@@ -252,7 +359,8 @@ func (h *AdminLogsHandler) StatsSummary(w http.ResponseWriter, r *http.Request) 
 	for i := 0; i < days; i++ {
 		d := today.AddDate(0, 0, -i).Format("2006-01-02")
 		dayStats := map[string]int{}
-		_ = h.forEachDayLine(d, func(raw []byte) bool {
+
+		_ = h.forEachDayLineCtx(r.Context(), d, func(raw []byte) bool {
 			var obj map[string]any
 			if err := json.Unmarshal(raw, &obj); err != nil {
 				return true
@@ -266,11 +374,16 @@ func (h *AdminLogsHandler) StatsSummary(w http.ResponseWriter, r *http.Request) 
 			summary["total"] = summary["total"].(int) + 1
 			return true
 		})
+
 		if len(dayStats) > 0 {
 			summary["by_day"].(map[string]map[string]int)[d] = dayStats
 		}
 	}
 
+	log.Info("admin logs: краткая статистика сформирована",
+		zap.Int("days", days),
+		zap.Int("total", summary["total"].(int)),
+	)
 	writeJSON(w, http.StatusOK, summary)
 }
 
@@ -297,10 +410,7 @@ func (h *AdminLogsHandler) listFilesForDay(day string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	today := time.Now().Local().Format("2026-01-02") // intentionally wrong? Fix to 2006.
-	// correct pattern for Go reference time is 2006-01-02
-	_ = today
-	today = time.Now().Local().Format("2006-01-02")
+	today := time.Now().Local().Format("2006-01-02")
 
 	for _, e := range entries {
 		if e.IsDir() {
@@ -314,31 +424,38 @@ func (h *AdminLogsHandler) listFilesForDay(day string) ([]string, error) {
 			continue
 		}
 
-		// lumberjack: app-2025-09-11T12-34-56.123.log или .gz
-		// Просто проверяем, что имя содержит день.
+		// lumberjack: app-2025-09-11T12-34-56.123.log или .gz — проверяем, что имя содержит день.
 		if strings.HasPrefix(name, "app-") && strings.Contains(name, day) &&
 			(strings.HasSuffix(name, ".log") || strings.HasSuffix(name, ".gz")) {
 			files = append(files, filepath.Join(h.LogDir, name))
 		}
 	}
 
-	// Сортировка для стабильного порядка (примерно хронологически)
+	// Стабильный порядок (примерно хронологически)
 	sort.Strings(files)
 	return files, nil
 }
 
-// Итерируем все строки всех файлов дня
-func (h *AdminLogsHandler) forEachDayLine(day string, handle func([]byte) bool) error {
+// Итерируем все строки всех файлов дня, уважаем контекст запроса и не режем длинные строки
+func (h *AdminLogsHandler) forEachDayLineCtx(ctx context.Context, day string, handle func([]byte) bool) error {
 	files, err := h.listFilesForDay(day)
 	if err != nil || len(files) == 0 {
 		return os.ErrNotExist
 	}
 
 	for _, path := range files {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		f, err := os.Open(path)
 		if err != nil {
+			// файл мог быть удалён/перемещён; пропускаем
 			continue
 		}
+
 		var reader io.Reader = f
 		var gr *gzip.Reader
 
@@ -347,14 +464,26 @@ func (h *AdminLogsHandler) forEachDayLine(day string, handle func([]byte) bool) 
 				gr = gzr
 				reader = gr
 			} else {
-				f.Close()
+				_ = f.Close()
 				continue
 			}
 		}
 
 		sc := bufio.NewScanner(reader)
-		sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		// 4 МБ на строку — чтобы не обрезать длинные JSON-записи
+		buf := make([]byte, 0, 256*1024)
+		sc.Buffer(buf, 4*1024*1024)
+
 		for sc.Scan() {
+			select {
+			case <-ctx.Done():
+				if gr != nil {
+					_ = gr.Close()
+				}
+				_ = f.Close()
+				return ctx.Err()
+			default:
+			}
 			if keep := handle(sc.Bytes()); !keep {
 				break
 			}
@@ -402,6 +531,14 @@ func getString(m map[string]any, key string) string {
 			return s
 		}
 	}
+	// часто сообщение пишут как "message", поддержим
+	if key == "msg" {
+		if v, ok := m["message"]; ok {
+			if s, ok := v.(string); ok {
+				return s
+			}
+		}
+	}
 	return ""
 }
 
@@ -419,4 +556,44 @@ func clampAtoi(s string, def, min, max int) int {
 		return n
 	}
 	return def
+}
+
+func writeJSON(w http.ResponseWriter, code int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(data)
+}
+
+// маппинг «сырая запись -> структурированная»
+func toLogItem(obj map[string]any) LogItem {
+	li := LogItem{
+		Time:    getString(obj, "time"),
+		Level:   strings.ToUpper(getString(obj, "level")),
+		Message: getString(obj, "msg"),
+		Fields:  map[string]any{},
+	}
+
+	// популярные «колоночные» поля
+	keys := []string{
+		"method", "path", "status", "url",
+		"remote_ip", "ip", "user_id", "request_id",
+		"stack", "error",
+	}
+	for _, k := range keys {
+		if v, ok := obj[k]; ok {
+			li.Fields[k] = v
+		}
+	}
+
+	// прицепим остальное в details
+	for k, v := range obj {
+		if k == "time" || k == "level" || k == "msg" || k == "message" {
+			continue
+		}
+		if _, ok := li.Fields[k]; ok {
+			continue
+		}
+		li.Fields[k] = v
+	}
+	return li
 }

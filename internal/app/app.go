@@ -5,19 +5,25 @@ import (
 	"edutalks/internal/config"
 	"edutalks/internal/db"
 	"edutalks/internal/handlers"
+	"edutalks/internal/logger"
 	"edutalks/internal/repository"
 	"edutalks/internal/routes"
 	"edutalks/internal/services"
 	"time"
 
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
 )
 
-func InitApp(cfg *config.Config) (*mux.Router, error) {
+// InitApp возвращает router, cleanup-функцию и ошибку.
+func InitApp(cfg *config.Config) (*mux.Router, func(), error) {
+	// DB
 	conn, err := db.NewPostgresConnection(cfg)
 	if err != nil {
-		return nil, err
+		logger.Log.Error("Не удалось подключиться к Postgres", zap.Error(err))
+		return nil, nil, err
 	}
+	logger.Log.Info("Подключение к Postgres успешно")
 
 	// Репозитории
 	userRepo := repository.NewUserRepository(conn)
@@ -30,8 +36,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	pwdResetRepo := repository.NewPasswordResetRepository(conn)
 
 	// Сервисы
-	emailService := services.NewEmailService(cfg) // единый email-сервис
-
+	emailService := services.NewEmailService(cfg)
 	authService := services.NewAuthService(userRepo)
 	docService := services.NewDocumentService(docRepo)
 	newsService := services.NewNewsService(newsRepo, userRepo, emailService, cfg)
@@ -39,12 +44,7 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	articleSvc := services.NewArticleService(articleRepo)
 	taxonomySvc := services.NewTaxonomyService(taxonomyRepo)
 	notifier := services.NewNotifier(subsRepo, taxonomyRepo, cfg.SiteURLNews, "Edutalks")
-
-	// Password reset / change
 	passwordSvc := services.NewPasswordService(pwdResetRepo, emailService, cfg.FrontendURL)
-	// если добавлял TTL в конфиг, можно так:
-	// if cfg.PasswordResetTTLMin > 0 { passwordSvc.SetTTL(time.Duration(cfg.PasswordResetTTLMin) * time.Minute) }
-
 	yookassaService := services.NewYooKassaService(
 		cfg.YooKassaShopID,
 		cfg.YooKassaSecret,
@@ -64,12 +64,17 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 	passwordHandler := handlers.NewPasswordHandler(passwordSvc, userRepo)
 	logsAdminH := handlers.NewAdminLogsHandler()
 
-	_ = userRepo.ExpireSubscriptions(context.Background())
-	StartSubscriptionCleaner(userRepo)
+	// Чистка подписок при старте
+	if err := userRepo.ExpireSubscriptions(context.Background()); err != nil {
+		logger.Log.Warn("Не удалось выполнить ExpireSubscriptions при старте", zap.Error(err))
+	} else {
+		logger.Log.Info("ExpireSubscriptions при старте выполнен")
+	}
+	stopCleaner := startSubscriptionCleaner(userRepo)
 
-	// email worker(ы)
-	for i := 0; i < 3; i++ {
-		go services.StartEmailWorker(emailService)
+	// Почтовые воркеры (3 штуки) — с ID в логах
+	for i := 1; i <= 3; i++ {
+		services.StartEmailWorker(i, emailService)
 	}
 
 	// Маршруты
@@ -83,14 +88,38 @@ func InitApp(cfg *config.Config) (*mux.Router, error) {
 		logsAdminH,
 	)
 
-	return router, nil
+	logger.Log.Info("Приложение инициализировано")
+
+	// cleanup: закрываем email-очередь и останавливаем планировщик
+	cleanup := func() {
+		services.StopEmailWorkers() // закрывает канал и завершает горутины-воркеры
+		stopCleaner()
+	}
+
+	return router, cleanup, nil
 }
 
-func StartSubscriptionCleaner(repo *repository.UserRepository) {
-	t := time.NewTicker(1 * time.Hour)
+func startSubscriptionCleaner(repo *repository.UserRepository) func() {
+	ticker := time.NewTicker(1 * time.Hour)
+	done := make(chan struct{})
+
 	go func() {
-		for range t.C {
-			_ = repo.ExpireSubscriptions(context.Background())
+		logger.Log.Info("SubscriptionCleaner запущен")
+		for {
+			select {
+			case <-ticker.C:
+				if err := repo.ExpireSubscriptions(context.Background()); err != nil {
+					logger.Log.Error("Ошибка в ExpireSubscriptions", zap.Error(err))
+				} else {
+					logger.Log.Debug("ExpireSubscriptions выполнен по расписанию")
+				}
+			case <-done:
+				ticker.Stop()
+				logger.Log.Info("SubscriptionCleaner остановлен")
+				return
+			}
 		}
 	}()
+
+	return func() { close(done) }
 }

@@ -272,7 +272,6 @@ definitions:
   internal_handlers.SetPublishBody:
     properties:
       publish:
-        example: true
         type: boolean
     type: object
   internal_handlers.changeReq:
@@ -362,8 +361,7 @@ definitions:
         description: grant | extend | revoke
         type: string
       duration:
-        description: monthly | halfyear | yearly | "30d" | "72h" и т.п. (обязательно
-          для grant/extend)
+        description: monthly | halfyear | yearly | "30d" | "72h" | ...
         type: string
     type: object
   internal_handlers.updateNewsRequest:
@@ -379,7 +377,7 @@ definitions:
       title:
         type: string
     type: object
-host: https://edutalks.ru
+host: edutalks.ru
 info:
   contact:
     email: support@edutalks.ru
@@ -396,8 +394,6 @@ paths:
       - application/json
       - multipart/form-data
       - application/x-www-form-urlencoded
-      description: 'Поддерживает JSON и form-data. Поле публикации: `publish` (также
-        принимается `isPublished`).'
       parameters:
       - description: Данные статьи
         in: body
@@ -444,8 +440,6 @@ paths:
             additionalProperties:
               type: string
             type: object
-      security:
-      - BearerAuth: []
       summary: Удалить статью
       tags:
       - articles
@@ -454,8 +448,6 @@ paths:
       - application/json
       - multipart/form-data
       - application/x-www-form-urlencoded
-      description: 'Поддерживает JSON и form-data. Поле публикации: `publish` (также
-        принимается `isPublished`).'
       parameters:
       - description: ID статьи
         in: path
@@ -481,8 +473,6 @@ paths:
             additionalProperties:
               type: string
             type: object
-      security:
-      - BearerAuth: []
       summary: Обновить статью
       tags:
       - articles
@@ -490,7 +480,6 @@ paths:
     patch:
       consumes:
       - application/json
-      description: 'Лёгкий PATCH: принимает только флаг публикации.'
       parameters:
       - description: ID статьи
         in: path
@@ -522,8 +511,6 @@ paths:
             additionalProperties:
               type: string
             type: object
-      security:
-      - BearerAuth: []
       summary: Установить публикацию статьи
       tags:
       - articles
@@ -531,7 +518,6 @@ paths:
     post:
       consumes:
       - application/json
-      description: Возвращает очищенный HTML (без сохранения в БД)
       parameters:
       - description: Сырый HTML статьи
         in: body
@@ -684,8 +670,8 @@ paths:
       - documents
   /api/admin/logs:
     get:
-      description: Возвращает массив логов (JSON-строки) за указанный день. Поддерживает
-        фильтрацию по уровню, часу и строке поиска.
+      description: Возвращает массив логов за указанный день. Поддерживает фильтрацию
+        по уровню, часу и строке поиска.
       parameters:
       - description: Дата (YYYY-MM-DD)
         in: query
@@ -708,9 +694,17 @@ paths:
         in: query
         name: limit
         type: integer
-      - description: Номер строки для пагинации (по умолч. 0)
+      - description: Номер строки для пагинации (по умолч. 0) — счётчик по файлу
         in: query
         name: cursor
+        type: integer
+      - description: 'Порядок в выдаче: asc|desc (по умолчанию asc)'
+        in: query
+        name: order
+        type: string
+      - description: Вернуть только последние N совпадений после сортировки (опц.)
+        in: query
+        name: tail
         type: integer
       produces:
       - application/json
@@ -771,7 +765,12 @@ paths:
         name: day
         required: true
         type: string
+      - description: Если 1 — отдать ZIP со всеми файлами за день
+        in: query
+        name: zip
+        type: integer
       produces:
+      - application/zip
       - text/plain
       responses:
         "200":
@@ -1359,13 +1358,12 @@ paths:
       - admin-users
   /api/articles:
     get:
-      description: Возвращает список опубликованных статей (публичный доступ)
       parameters:
-      - description: Номер страницы (по умолчанию 1)
+      - description: Номер страницы
         in: query
         name: page
         type: integer
-      - description: Размер страницы (по умолчанию 10)
+      - description: Размер страницы
         in: query
         name: page_size
         type: integer
@@ -1389,8 +1387,6 @@ paths:
       - articles
   /api/articles/{id}:
     get:
-      description: Возвращает одну опубликованную статью по её идентификатору (публичный
-        доступ)
       parameters:
       - description: ID статьи
         in: path
@@ -1405,13 +1401,7 @@ paths:
           schema:
             $ref: '#/definitions/edutalks_internal_models.Article'
         "404":
-          description: Статья не найдена
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal Server Error
+          description: Not Found
           schema:
             additionalProperties:
               type: string
@@ -2038,7 +2028,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: Подтверждает email по токену из письма
+      description: Подверждает email по токену из письма
       parameters:
       - description: Токен подтверждения
         in: query

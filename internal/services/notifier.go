@@ -7,11 +7,12 @@ import (
 	"edutalks/internal/repository"
 	helpers "edutalks/internal/utils/helpers"
 	"fmt"
-	"go.uber.org/zap"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type Notifier struct {
@@ -20,7 +21,7 @@ type Notifier struct {
 	baseURL  string
 	fromName string
 
-	// === новые поля для батч-уведомлений ===
+	// — батч-уведомления —
 	mu     sync.Mutex
 	buffer []string
 	once   sync.Once
@@ -55,7 +56,7 @@ func chunkStrings(all []string, n int) [][]string {
 }
 
 func (n *Notifier) sendToAll(ctx context.Context, subject, htmlBody string) {
-	// важное: не завязываемся на HTTP-контекст
+	// не завязываемся на HTTP-контекст
 	ctx = context.WithoutCancel(ctx)
 
 	emails, err := n.subsRepo.GetAllSubscribedEmails(ctx)
@@ -63,7 +64,23 @@ func (n *Notifier) sendToAll(ctx context.Context, subject, htmlBody string) {
 		logger.Log.Error("Не удалось получить список подписчиков", zap.Error(err))
 		return
 	}
-	for _, batch := range chunkStrings(emails, 50) {
+	if len(emails) == 0 {
+		logger.Log.Debug("Список подписчиков пуст — рассылка пропущена")
+		return
+	}
+
+	batches := chunkStrings(emails, 50)
+	logger.Log.Info("Формирование рассылки",
+		zap.Int("total_recipients", len(emails)),
+		zap.Int("batches", len(batches)),
+		zap.String("subject", subject),
+	)
+
+	for i, batch := range batches {
+		logger.Log.Debug("Постановка батча писем в очередь",
+			zap.Int("batch_index", i),
+			zap.Int("batch_size", len(batch)),
+		)
 		EmailQueue <- EmailJob{
 			To:      batch,
 			Subject: subject,
@@ -71,6 +88,10 @@ func (n *Notifier) sendToAll(ctx context.Context, subject, htmlBody string) {
 			IsHTML:  true,
 		}
 	}
+	logger.Log.Info("Рассылка поставлена в очередь",
+		zap.Int("total_recipients", len(emails)),
+		zap.Int("batches", len(batches)),
+	)
 }
 
 // ==== ПИСЬМА ====
@@ -84,8 +105,15 @@ func (n *Notifier) NotifyNewDocument(ctx context.Context, title string, tabsID *
 	if tabsID != nil {
 		if slug, err := n.taxRepo.GetTabSlugByID(ctx, *tabsID); err == nil && slug != "" {
 			link = base + "/" + url.PathEscape(slug) // https://edutalks.ru/<slug>
+		} else if err != nil {
+			logger.Log.Warn("Не удалось получить slug вкладки для уведомления о документе", zap.Error(err), zap.Intp("tab_id", tabsID))
 		}
 	}
+
+	logger.Log.Info("Уведомление: новый документ",
+		zap.String("title", title),
+		zap.String("link", link),
+	)
 
 	subject := "Новый документ на Edutalks"
 	body := fmt.Sprintf(`
@@ -101,18 +129,28 @@ func (n *Notifier) NotifyNewDocument(ctx context.Context, title string, tabsID *
 // Новость опубликована
 func (n *Notifier) NotifyNewsPublished(ctx context.Context, newsID int, title string) {
 	link := fmt.Sprintf("%s/recomm/%d", n.baseURL, newsID)
+
+	logger.Log.Info("Уведомление: опубликована новость",
+		zap.Int("news_id", newsID),
+		zap.String("title", title),
+		zap.String("link", link),
+	)
+
 	subject := "Новая новость на Edutalks"
+	html := helpers.BuildNewsHTML(title, "", link) // сюда можно передать краткий контент
 
-	// Можно передать краткий контент вместо "" если он у тебя есть
-	html := helpers.BuildNewsHTML(title, "", link)
-
-	n.sendToAll(ctx, subject, html)
+	n.sendToAll(context.WithoutCancel(ctx), subject, html)
 }
 
 // Статья опубликована
 func (n *Notifier) NotifyArticlePublished(ctx context.Context, articleID int, title string) {
 	link := fmt.Sprintf("%s/zavuch/%d", n.baseURL, articleID)
-	subject := "Новая статья на Edutalks"
+
+	logger.Log.Info("Уведомление: опубликована статья",
+		zap.Int("article_id", articleID),
+		zap.String("title", title),
+		zap.String("link", link),
+	)
 
 	body := fmt.Sprintf(`
       <p style="font-size:16px;color:#222;margin:0 0 16px 0;"><strong>%s</strong></p>
@@ -121,16 +159,18 @@ func (n *Notifier) NotifyArticlePublished(ctx context.Context, articleID int, ti
     `, title, link, link)
 	html := helpers.BuildSimpleHTML("Новая статья", body)
 
-	n.sendToAll(ctx, subject, html)
+	n.sendToAll(context.WithoutCancel(ctx), "Новая статья на Edutalks", html)
 }
 
-// AddDocumentForBatch — складываем документы во временный буфер
+// AddDocumentForBatch — добавляем документ в временный буфер для групповой рассылки
 func (n *Notifier) AddDocumentForBatch(ctx context.Context, title string, tabsID *int) {
 	base := strings.TrimRight(n.baseURL, "/")
 	link := base + "/documents"
 	if tabsID != nil {
 		if slug, err := n.taxRepo.GetTabSlugByID(ctx, *tabsID); err == nil && slug != "" {
 			link = base + "/" + url.PathEscape(slug)
+		} else if err != nil {
+			logger.Log.Warn("Не удалось получить slug вкладки (batch)", zap.Error(err), zap.Intp("tab_id", tabsID))
 		}
 	}
 
@@ -138,32 +178,52 @@ func (n *Notifier) AddDocumentForBatch(ctx context.Context, title string, tabsID
 
 	n.mu.Lock()
 	n.buffer = append(n.buffer, item)
+	size := len(n.buffer)
 	n.mu.Unlock()
 
+	logger.Log.Info("Документ добавлен в батч-буфер",
+		zap.String("title", title),
+		zap.String("link", link),
+		zap.Int("buffer_size", size),
+	)
+
 	// запускаем воркер только один раз
-	n.once.Do(func() { go n.startBatchWorker() })
+	n.once.Do(func() {
+		logger.Log.Info("Старт батч-воркера уведомлений документов")
+		go n.startBatchWorker()
+	})
 }
 
 func (n *Notifier) startBatchWorker() {
 	ticker := time.NewTicker(10 * time.Minute) // период можно вынести в конфиг
 	defer ticker.Stop()
 
+	logger.Log.Info("Батч-воркер запущен", zap.String("period", "10m"))
+
 	for range ticker.C {
 		n.mu.Lock()
 		if len(n.buffer) == 0 {
 			n.mu.Unlock()
+			logger.Log.Debug("Батч-тик: буфер пуст — рассылка пропущена")
 			continue
 		}
 
+		items := make([]string, len(n.buffer))
+		copy(items, n.buffer)
+		n.buffer = nil
+		n.mu.Unlock()
+
 		body := "<p>За последние 10 минут добавлены документы:</p><ul>"
-		body += strings.Join(n.buffer, "")
+		body += strings.Join(items, "")
 		body += "</ul>"
+
+		logger.Log.Info("Флаш батча документов",
+			zap.Int("items_count", len(items)),
+		)
 
 		html := helpers.BuildSimpleHTML("Новые документы на сайте", body)
 		n.sendToAll(context.Background(), "Новые документы на Edutalks", html)
 
-		// очищаем буфер
-		n.buffer = nil
-		n.mu.Unlock()
+		logger.Log.Debug("Буфер батча очищен после отправки")
 	}
 }

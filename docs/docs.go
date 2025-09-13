@@ -26,7 +26,6 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Поддерживает JSON и form-data. Поле публикации: ` + "`" + `publish` + "`" + ` (также принимается ` + "`" + `isPublished` + "`" + `).",
                 "consumes": [
                     "application/json",
                     "multipart/form-data",
@@ -71,7 +70,6 @@ const docTemplate = `{
         },
         "/api/admin/articles/preview": {
             "post": {
-                "description": "Возвращает очищенный HTML (без сохранения в БД)",
                 "consumes": [
                     "application/json"
                 ],
@@ -120,11 +118,6 @@ const docTemplate = `{
         },
         "/api/admin/articles/{id}": {
             "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -160,12 +153,6 @@ const docTemplate = `{
                 }
             },
             "patch": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Поддерживает JSON и form-data. Поле публикации: ` + "`" + `publish` + "`" + ` (также принимается ` + "`" + `isPublished` + "`" + `).",
                 "consumes": [
                     "application/json",
                     "multipart/form-data",
@@ -217,12 +204,6 @@ const docTemplate = `{
         },
         "/api/admin/articles/{id}/publish": {
             "patch": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Лёгкий PATCH: принимает только флаг публикации.",
                 "consumes": [
                     "application/json"
                 ],
@@ -480,7 +461,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Возвращает массив логов (JSON-строки) за указанный день. Поддерживает фильтрацию по уровню, часу и строке поиска.",
+                "description": "Возвращает массив логов за указанный день. Поддерживает фильтрацию по уровню, часу и строке поиска.",
                 "produces": [
                     "application/json"
                 ],
@@ -522,8 +503,20 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Номер строки для пагинации (по умолч. 0)",
+                        "description": "Номер строки для пагинации (по умолч. 0) — счётчик по файлу",
                         "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Порядок в выдаче: asc|desc (по умолчанию asc)",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Вернуть только последние N совпадений после сортировки (опц.)",
+                        "name": "tail",
                         "in": "query"
                     }
                 ],
@@ -604,6 +597,7 @@ const docTemplate = `{
                     }
                 ],
                 "produces": [
+                    "application/zip",
                     "text/plain"
                 ],
                 "tags": [
@@ -617,6 +611,12 @@ const docTemplate = `{
                         "name": "day",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Если 1 — отдать ZIP со всеми файлами за день",
+                        "name": "zip",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1528,7 +1528,6 @@ const docTemplate = `{
         },
         "/api/articles": {
             "get": {
-                "description": "Возвращает список опубликованных статей (публичный доступ)",
                 "produces": [
                     "application/json"
                 ],
@@ -1539,13 +1538,13 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Номер страницы (по умолчанию 1)",
+                        "description": "Номер страницы",
                         "name": "page",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Размер страницы (по умолчанию 10)",
+                        "description": "Размер страницы",
                         "name": "page_size",
                         "in": "query"
                     }
@@ -1574,7 +1573,6 @@ const docTemplate = `{
         },
         "/api/articles/{id}": {
             "get": {
-                "description": "Возвращает одну опубликованную статью по её идентификатору (публичный доступ)",
                 "produces": [
                     "application/json"
                 ],
@@ -1599,16 +1597,7 @@ const docTemplate = `{
                         }
                     },
                     "404": {
-                        "description": "Статья не найдена",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
+                        "description": "Not Found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -2580,7 +2569,7 @@ const docTemplate = `{
         },
         "/api/verify-email": {
             "get": {
-                "description": "Подтверждает email по токену из письма",
+                "description": "Подверждает email по токену из письма",
                 "consumes": [
                     "application/json"
                 ],
@@ -3036,8 +3025,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "publish": {
-                    "type": "boolean",
-                    "example": true
+                    "type": "boolean"
                 }
             }
         },
@@ -3175,7 +3163,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "duration": {
-                    "description": "monthly | halfyear | yearly | \"30d\" | \"72h\" и т.п. (обязательно для grant/extend)",
+                    "description": "monthly | halfyear | yearly | \"30d\" | \"72h\" | ...",
                     "type": "string"
                 }
             }
@@ -3213,7 +3201,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "https://edutalks.ru",
+	Host:             "edutalks.ru",
 	BasePath:         "/api",
 	Schemes:          []string{"https"},
 	Title:            "Edutalks API",

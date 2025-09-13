@@ -4,17 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/gorilla/mux"
+	"go.uber.org/zap"
 
 	"edutalks/internal/logger"
 	"edutalks/internal/models"
 	"edutalks/internal/services"
 	"edutalks/internal/utils/helpers"
-
-	"go.uber.org/zap"
 )
 
 type ArticleHandler struct {
@@ -27,178 +27,247 @@ func NewArticleHandler(svc services.ArticleService, notifier *services.Notifier)
 }
 
 // Preview
-// @Summary      Предпросмотр статьи
-// @Description  Возвращает очищенный HTML (без сохранения в БД)
-// @Tags         articles
-// @Accept       json
-// @Produce      json
-// @Param        body  body   map[string]string  true  "Сырый HTML статьи"
-// @Success      200   {object}  map[string]string
-// @Failure      400   {object}  map[string]string
-// @Router       /api/admin/articles/preview [post]
+// @Summary     Предпросмотр статьи
+// @Tags        articles
+// @Accept      json
+// @Produce     json
+// @Param       body body map[string]string true "Сырый HTML статьи"
+// @Success     200 {object} map[string]string
+// @Failure     400 {object} map[string]string
+// @Router      /api/admin/articles/preview [post]
 func (h *ArticleHandler) Preview(w http.ResponseWriter, r *http.Request) {
-	type reqT struct {
+	log := logger.WithCtx(r.Context())
+
+	var req struct {
 		BodyHTML string `json:"bodyHtml"`
 	}
-	var req reqT
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.Log.Error("ошибка декодирования JSON при предпросмотре статьи", zap.Error(err))
+		log.Warn("Невалидный JSON при предпросмотре статьи", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "invalid json")
 		return
 	}
-	safe := h.svc.PreviewHTML(req.BodyHTML)
 
-	logger.Log.Info("предпросмотр статьи успешно создан")
+	safe := h.svc.PreviewHTML(req.BodyHTML)
+	log.Info("Предпросмотр статьи создан")
 
 	helpers.JSON(w, http.StatusOK, map[string]string{"bodyHtml": safe})
 }
 
 // Create
-// @Summary      Создать статью
-// @Description  Поддерживает JSON и form-data. Поле публикации: `publish` (также принимается `isPublished`).
-// @Tags         articles
-// @Accept       json
-// @Accept       mpfd
-// @Accept       x-www-form-urlencoded
-// @Produce      json
-// @Param        body  body   models.CreateArticleRequest  true  "Данные статьи"
-// @Success      201   {object}  models.Article
-// @Failure      400   {object}  map[string]string
-// @Security     BearerAuth
-// @Router       /api/admin/articles [post]
+// @Summary     Создать статью
+// @Tags        articles
+// @Accept      json,mpfd,x-www-form-urlencoded
+// @Produce     json
+// @Param       body body models.CreateArticleRequest true "Данные статьи"
+// @Success     201 {object} models.Article
+// @Failure     400 {object} map[string]string
+// @Security    BearerAuth
+// @Router      /api/admin/articles [post]
 func (h *ArticleHandler) Create(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	req, err := readCreateArticleRequest(r)
 	if err != nil {
-		logger.Log.Error("ошибка чтения тела при создании статьи", zap.Error(err))
+		log.Warn("Невалидный payload при создании статьи", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
 
 	authorID := authorIDFromCtx(r.Context())
+	log.Info("Запрос на создание статьи",
+		zap.String("title", req.Title),
+		zap.Bool("publish", req.Publish),
+	)
+
 	article, err := h.svc.Create(r.Context(), authorID, req)
 	if err != nil {
-		logger.Log.Error("ошибка создания статьи", zap.Error(err))
+		log.Error("Ошибка создания статьи", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	logger.Log.Info("статья успешно создана",
+	log.Info("Статья создана",
 		zap.Int64("id", article.ID),
-		zap.String("title", article.Title),
 		zap.Bool("published", article.IsPublished),
 	)
 
-	// Если уже опубликована — уведомляем
 	ctx := context.WithoutCancel(r.Context())
 	go h.notifier.NotifyArticlePublished(ctx, int(article.ID), article.Title)
 
 	helpers.JSON(w, http.StatusCreated, article)
 }
 
-// GetAll godoc
-// @Summary      Список статей
-// @Description  Возвращает список опубликованных статей (публичный доступ)
-// @Tags         articles
-// @Produce      json
-// @Param        page      query int    false "Номер страницы (по умолчанию 1)"
-// @Param        page_size query int    false "Размер страницы (по умолчанию 10)"
-// @Success      200 {array} models.Article
-// @Failure      500 {object} map[string]string
-// @Router       /api/articles [get]
+// GetAll
+// @Summary     Список статей
+// @Tags        articles
+// @Produce     json
+// @Param       page query int false "Номер страницы"
+// @Param       page_size query int false "Размер страницы"
+// @Success     200 {array} models.Article
+// @Failure     500 {object} map[string]string
+// @Router      /api/articles [get]
 func (h *ArticleHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	limit := parseIntQuery(r, "limit", 20)
 	offset := parseIntQuery(r, "offset", 0)
 	tag := r.URL.Query().Get("tag")
 	onlyPublished := r.URL.Query().Get("published") == "true"
 
+	log.Info("Запрос списка статей",
+		zap.Int("limit", limit),
+		zap.Int("offset", offset),
+		zap.String("tag", tag),
+		zap.Bool("only_published", onlyPublished),
+	)
+
 	list, err := h.svc.GetAll(r.Context(), limit, offset, tag, onlyPublished)
 	if err != nil {
-		logger.Log.Error("ошибка получения списка статей", zap.Error(err))
+		log.Error("Ошибка получения статей", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+
+	log.Info("Список статей получен", zap.Int("count", len(list)))
 	helpers.JSON(w, http.StatusOK, list)
 }
 
-// GetByID godoc
-// @Summary      Получить статью по ID
-// @Description  Возвращает одну опубликованную статью по её идентификатору (публичный доступ)
-// @Tags         articles
-// @Produce      json
-// @Param        id path int true "ID статьи"
-// @Success      200 {object} models.Article
-// @Failure      404 {object} map[string]string "Статья не найдена"
-// @Failure      500 {object} map[string]string
-// @Router       /api/articles/{id} [get]
+// GetByID
+// @Summary     Получить статью по ID
+// @Tags        articles
+// @Produce     json
+// @Param       id path int true "ID статьи"
+// @Success     200 {object} models.Article
+// @Failure     404 {object} map[string]string
+// @Router      /api/articles/{id} [get]
 func (h *ArticleHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	id := mux.Vars(r)["id"]
 	aid, _ := strconv.ParseInt(id, 10, 64)
 
+	log.Info("Запрос статьи по ID", zap.Int64("id", aid))
+
 	a, err := h.svc.GetByID(r.Context(), aid)
 	if err != nil {
-		logger.Log.Error("статья не найдена", zap.Error(err))
+		log.Warn("Статья не найдена", zap.Int64("id", aid))
 		helpers.Error(w, http.StatusNotFound, "not found")
 		return
 	}
+
+	log.Info("Статья получена", zap.Int64("id", aid))
 	helpers.JSON(w, http.StatusOK, a)
 }
 
 // Update
-// @Summary      Обновить статью
-// @Description  Поддерживает JSON и form-data. Поле публикации: `publish` (также принимается `isPublished`).
-// @Tags         articles
-// @Accept       json
-// @Accept       mpfd
-// @Accept       x-www-form-urlencoded
-// @Produce      json
-// @Param        id   path int true "ID статьи"
-// @Param        body body models.CreateArticleRequest true "Данные статьи"
-// @Success      200 {object} models.Article
-// @Failure      400 {object} map[string]string
-// @Security     BearerAuth
-// @Router       /api/admin/articles/{id} [patch]
+// @Summary     Обновить статью
+// @Tags        articles
+// @Accept      json,mpfd,x-www-form-urlencoded
+// @Produce     json
+// @Param       id path int true "ID статьи"
+// @Param       body body models.CreateArticleRequest true "Данные статьи"
+// @Success     200 {object} models.Article
+// @Failure     400 {object} map[string]string
+// @Router      /api/admin/articles/{id} [patch]
 func (h *ArticleHandler) Update(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	id := mux.Vars(r)["id"]
 	aid, _ := strconv.ParseInt(id, 10, 64)
 
 	req, err := readCreateArticleRequest(r)
 	if err != nil {
-		logger.Log.Error("ошибка чтения тела при обновлении статьи", zap.Error(err))
+		log.Warn("Невалидный payload при обновлении статьи", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
 
+	log.Info("Запрос на обновление статьи", zap.Int64("id", aid), zap.String("title", req.Title))
+
 	article, err := h.svc.Update(r.Context(), aid, req)
 	if err != nil {
-		logger.Log.Error("ошибка обновления статьи", zap.Error(err))
+		log.Error("Ошибка обновления статьи", zap.Int64("id", aid), zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "update failed")
 		return
 	}
+
+	log.Info("Статья обновлена", zap.Int64("id", aid))
 	helpers.JSON(w, http.StatusOK, article)
 }
 
 // Delete
-// @Summary      Удалить статью
-// @Tags         articles
-// @Produce      json
-// @Param        id   path int true "ID статьи"
-// @Success      204 {string} string "no content"
-// @Failure      404 {object} map[string]string
-// @Security     BearerAuth
-// @Router       /api/admin/articles/{id} [delete]
+// @Summary     Удалить статью
+// @Tags        articles
+// @Produce     json
+// @Param       id path int true "ID статьи"
+// @Success     204 {string} string "no content"
+// @Failure     404 {object} map[string]string
+// @Router      /api/admin/articles/{id} [delete]
 func (h *ArticleHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	id := mux.Vars(r)["id"]
 	aid, _ := strconv.ParseInt(id, 10, 64)
 
+	log.Info("Запрос на удаление статьи", zap.Int64("id", aid))
+
 	if err := h.svc.Delete(r.Context(), aid); err != nil {
-		logger.Log.Error("ошибка удаления статьи", zap.Error(err))
+		log.Error("Ошибка удаления статьи", zap.Int64("id", aid), zap.Error(err))
 		helpers.Error(w, http.StatusNotFound, "not found")
 		return
 	}
+
+	log.Info("Статья удалена", zap.Int64("id", aid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// SetPublish
+// @Summary     Установить публикацию статьи
+// @Tags        articles
+// @Accept      json
+// @Produce     json
+// @Param       id path int true "ID статьи"
+// @Param       body body SetPublishBody true "Флаг публикации"
+// @Success     200 {object} models.Article
+// @Failure     400 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /api/admin/articles/{id}/publish [patch]
+func (h *ArticleHandler) SetPublish(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
+	aid, err := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
+	if err != nil || aid <= 0 {
+		log.Warn("Невалидный ID при SetPublish", zap.String("raw", mux.Vars(r)["id"]))
+		helpers.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	var body SetPublishBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Publish == nil {
+		log.Warn("Невалидный payload при SetPublish", zap.Error(err))
+		helpers.Error(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+
+	log.Info("Запрос на изменение публикации", zap.Int64("id", aid), zap.Bool("publish", *body.Publish))
+
+	article, err := h.svc.SetPublish(r.Context(), aid, *body.Publish)
+	if err != nil {
+		log.Error("Ошибка при SetPublish", zap.Int64("id", aid), zap.Error(err))
+		helpers.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	log.Info("Публикация изменена", zap.Int64("id", aid), zap.Bool("publish", *body.Publish))
+	helpers.JSON(w, http.StatusOK, article)
+}
+
+type SetPublishBody struct {
+	Publish *bool `json:"publish"`
+}
+
 // --- helpers ---
+
 type ctxKey string
 
 const userIDKey ctxKey = "user_id"
@@ -216,7 +285,6 @@ func authorIDFromCtx(ctx interface{ Value(any) any }) *int64 {
 	return nil
 }
 
-// parseIntQuery — хелпер для limit/offset
 func parseIntQuery(r *http.Request, key string, def int) int {
 	val := r.URL.Query().Get(key)
 	if val == "" {
@@ -228,7 +296,6 @@ func parseIntQuery(r *http.Request, key string, def int) int {
 	return def
 }
 
-// readCreateArticleRequest читает JSON или form-data и принимает оба поля publish/isPublished.
 func readCreateArticleRequest(r *http.Request) (models.CreateArticleRequest, error) {
 	ct := r.Header.Get("Content-Type")
 	var req models.CreateArticleRequest
@@ -238,26 +305,22 @@ func readCreateArticleRequest(r *http.Request) (models.CreateArticleRequest, err
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			return req, fmt.Errorf("invalid json: %w", err)
 		}
-
 	case strings.HasPrefix(ct, "multipart/form-data"):
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			return req, fmt.Errorf("invalid multipart: %w", err)
 		}
 		fillFromForm(&req, r)
-
 	case strings.HasPrefix(ct, "application/x-www-form-urlencoded"):
 		if err := r.ParseForm(); err != nil {
 			return req, fmt.Errorf("invalid form: %w", err)
 		}
 		fillFromForm(&req, r)
-
 	default:
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			return req, fmt.Errorf("unsupported content-type: %s", ct)
 		}
 	}
 
-	// Алиас: если фронт прислал isPublished, используем его.
 	if req.IsPublished != nil {
 		req.Publish = *req.IsPublished
 	}
@@ -269,7 +332,6 @@ func fillFromForm(req *models.CreateArticleRequest, r *http.Request) {
 	req.Summary = r.FormValue("summary")
 	req.BodyHTML = r.FormValue("bodyHtml")
 
-	// Теги: tags[]=a&tags[]=b ИЛИ tags="a,b"
 	tags := r.Form["tags[]"]
 	if len(tags) == 0 {
 		if raw := r.FormValue("tags"); raw != "" {
@@ -283,11 +345,7 @@ func fillFromForm(req *models.CreateArticleRequest, r *http.Request) {
 	}
 	req.Tags = tags
 
-	// publish / isPublished
-	pub := firstNonEmpty(
-		r.FormValue("publish"),
-		r.FormValue("isPublished"),
-	)
+	pub := firstNonEmpty(r.FormValue("publish"), r.FormValue("isPublished"))
 	pub = strings.ToLower(strings.TrimSpace(pub))
 	req.Publish = pub == "true" || pub == "1" || pub == "on"
 }
@@ -299,46 +357,4 @@ func firstNonEmpty(vals ...string) string {
 		}
 	}
 	return ""
-}
-
-// SetPublish
-// @Summary      Установить публикацию статьи
-// @Description  Лёгкий PATCH: принимает только флаг публикации.
-// @Tags         articles
-// @Accept       json
-// @Produce      json
-// @Param        id    path   int             true  "ID статьи"
-// @Param        body  body   SetPublishBody  true  "Флаг публикации"
-// @Success      200   {object}  models.Article
-// @Failure      400   {object}  map[string]string
-// @Failure      404   {object}  map[string]string
-// @Security     BearerAuth
-// @Router       /api/admin/articles/{id}/publish [patch]
-func (h *ArticleHandler) SetPublish(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	aid, err := strconv.ParseInt(vars["id"], 10, 64)
-	if err != nil || aid <= 0 {
-		helpers.Error(w, http.StatusBadRequest, "invalid id")
-		return
-	}
-
-	var body SetPublishBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Publish == nil {
-		helpers.Error(w, http.StatusBadRequest, "invalid payload")
-		return
-	}
-
-	article, err := h.svc.SetPublish(r.Context(), aid, *body.Publish)
-	if err != nil {
-		logger.Log.Error("ошибка выставления публикации", zap.Int64("id", aid), zap.Error(err))
-		helpers.Error(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	helpers.JSON(w, http.StatusOK, article)
-}
-
-// SetPublishBody — модель тела запроса для Swagger
-type SetPublishBody struct {
-	Publish *bool `json:"publish" example:"true"`
 }
