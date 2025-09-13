@@ -201,3 +201,9 @@ func ChunkEmails(emails []string, size int) [][]string {
 	}
 	return res
 }
+
+// GetLastTokenByUserID — вернёт последний токен подтверждения e-mail для пользователя.
+// Используется для антиспама при повторной отправке письма.
+func (s *EmailTokenService) GetLastTokenByUserID(ctx context.Context, userID int) (*models.EmailVerificationToken, error) {
+	return s.repo.GetLastTokenByUserID(ctx, userID)
+}
