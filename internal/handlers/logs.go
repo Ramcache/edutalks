@@ -162,16 +162,21 @@ func (h *AdminLogsHandler) GetLogs(w http.ResponseWriter, r *http.Request) {
 			return true
 		}
 
-		// фильтр по уровню (с алиасами)
-		lvl := normalizeLevel(getString(obj, "level"), obj)
+		// фильтр по уровню
+		lvl := strings.ToUpper(getString(obj, "level"))
 		if len(levelSet) > 0 && !levelSet[lvl] {
 			return true
 		}
-
 		// фильтр по часу
 		if hourPtr != nil {
-			if t, ok := extractTimeLocal(obj, raw); ok {
-				if t.Hour() != *hourPtr {
+			ts := getString(obj, "time")
+			if hr, ok := extractHour(ts); ok {
+				if hr != *hourPtr {
+					return true
+				}
+			} else {
+				// пробуем fallback из сырой строки (если формат нестандартный)
+				if hr2, ok2 := extractHourFromRaw(raw); ok2 && hr2 != *hourPtr {
 					return true
 				}
 			}
@@ -245,47 +250,47 @@ func (h *AdminLogsHandler) Stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Массив уровней фиксируем для стабильной структуры ответа.
-	allLvls := []string{"DEBUG", "INFO", "WARN", "ERROR", "PANIC", "FATAL"}
+	levels := []string{"DEBUG", "INFO", "WARN", "ERROR", "PANIC", "FATAL"}
 
+	// заранее инициализируем карту по всем часам и уровням
 	type Lvl map[string]int
-	stats := make(map[int]Lvl)
+	stats := make(map[int]Lvl, 24)
 	for hr := 0; hr < 24; hr++ {
 		stats[hr] = Lvl{}
-		// Инициализируем нулями, чтобы фронт видел стабильную структуру
-		for _, lv := range allLvls {
+		for _, lv := range levels {
 			stats[hr][lv] = 0
 		}
 	}
 
-	linesScanned := 0
-
 	err := h.forEachDayLineCtx(r.Context(), day, func(raw []byte) bool {
-		linesScanned++
-
+		// парсим JSON
 		var obj map[string]any
 		if err := json.Unmarshal(raw, &obj); err != nil {
-			// не JSON — пробуем вытащить время из строки регуляркой
-			if t, ok := extractTimeFromRaw(raw); ok {
-				stats[t.Hour()]["INFO"]++ // если вообще не знаем уровень — считаем INFO
-			}
+			// не-JSON пропускаем
 			return true
 		}
 
-		// время — максимально терпим к формату и ключам
-		t, ok := extractTimeLocal(obj, raw)
-		if !ok {
-			// если даже из сырой строки не получилось — пропустим
+		lvl := strings.ToUpper(getString(obj, "level"))
+		if lvl == "" {
+			lvl = "INFO"
+		}
+
+		ts := getString(obj, "time")
+		if hr, ok := extractHour(ts); ok {
+			stats[hr][lvl]++
 			return true
 		}
 
-		// уровень с алиасами
-		lvl := normalizeLevel(getString(obj, "level"), obj)
-		if _, known := stats[t.Hour()][lvl]; !known {
-			// на всякий случай, если встретится новый уровень
-			stats[t.Hour()][lvl] = 0
+		// fallback: попытка распарсить через time.Parse с нормализацией
+		if t, ok := parseTimestamp(ts); ok {
+			stats[t.Hour()][lvl]++
+			return true
 		}
-		stats[t.Hour()][lvl]++
+
+		// ещё один fallback: вытащить по регэкспу из сырой строки
+		if hr2, ok2 := extractHourFromRaw(raw); ok2 {
+			stats[hr2][lvl]++
+		}
 		return true
 	})
 	if err != nil {
@@ -293,11 +298,7 @@ func (h *AdminLogsHandler) Stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Info("admin logs: статистика по дням сформирована",
-		zap.String("day", day),
-		zap.Int("scanned_lines", linesScanned),
-	)
-
+	log.Info("admin logs: статистика по дням сформирована", zap.String("day", day))
 	writeJSON(w, http.StatusOK, map[string]any{
 		"day":   day,
 		"stats": stats,
@@ -373,50 +374,33 @@ func (h *AdminLogsHandler) StatsSummary(w http.ResponseWriter, r *http.Request) 
 	days := clampAtoi(r.URL.Query().Get("days"), 7, 1, h.Retention)
 
 	today := time.Now().Local()
-	allLvls := []string{"DEBUG", "INFO", "WARN", "ERROR", "PANIC", "FATAL"}
 	summary := map[string]any{
 		"total":  0,
 		"levels": map[string]int{},
 		"by_day": map[string]map[string]int{},
 	}
 	levelsTotal := summary["levels"].(map[string]int)
-	for _, lv := range allLvls {
-		levelsTotal[lv] = 0
-	}
 
 	for i := 0; i < days; i++ {
 		d := today.AddDate(0, 0, -i).Format("2006-01-02")
 		dayStats := map[string]int{}
-		for _, lv := range allLvls {
-			dayStats[lv] = 0
-		}
 
 		_ = h.forEachDayLineCtx(r.Context(), d, func(raw []byte) bool {
 			var obj map[string]any
 			if err := json.Unmarshal(raw, &obj); err != nil {
-				if _, ok := extractTimeFromRaw(raw); ok {
-					dayStats["INFO"]++
-					levelsTotal["INFO"]++
-					summary["total"] = summary["total"].(int) + 1
-				}
 				return true
 			}
-			lvl := normalizeLevel(getString(obj, "level"), obj)
+			lvl := strings.ToUpper(getString(obj, "level"))
+			if lvl == "" {
+				lvl = "INFO"
+			}
 			dayStats[lvl]++
 			levelsTotal[lvl]++
 			summary["total"] = summary["total"].(int) + 1
 			return true
 		})
 
-		// Сохраняем день только если есть хоть какие-то логи
-		nonZero := false
-		for _, c := range dayStats {
-			if c > 0 {
-				nonZero = true
-				break
-			}
-		}
-		if nonZero {
+		if len(dayStats) > 0 {
 			summary["by_day"].(map[string]map[string]int)[d] = dayStats
 		}
 	}
@@ -431,6 +415,7 @@ func (h *AdminLogsHandler) StatsSummary(w http.ResponseWriter, r *http.Request) 
 // ====== CORE ======
 
 var reDay = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+var reDateTime = regexp.MustCompile(`(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2}):(\d{2})`)
 
 // Собирает список файлов для дня.
 // Поддерживаем дневные, lumberjack и текущий app.log.
@@ -467,13 +452,6 @@ func (h *AdminLogsHandler) listFilesForDay(day string) ([]string, error) {
 
 		// lumberjack: app-2025-09-11T12-34-56.123.log или .gz — проверяем, что имя содержит день.
 		if strings.HasPrefix(name, "app-") && strings.Contains(name, day) &&
-			(strings.HasSuffix(name, ".log") || strings.HasSuffix(name, ".gz")) {
-			files = append(files, filepath.Join(h.LogDir, name))
-			continue
-		}
-
-		// Перестраховка: иногда встречаются app_YYYY-MM-DD.log
-		if strings.Contains(name, strings.ReplaceAll(day, "-", "_")) &&
 			(strings.HasSuffix(name, ".log") || strings.HasSuffix(name, ".gz")) {
 			files = append(files, filepath.Join(h.LogDir, name))
 		}
@@ -579,7 +557,7 @@ func getString(m map[string]any, key string) string {
 			return s
 		}
 	}
-	// популярный синоним
+	// часто сообщение пишут как "message", поддержим
 	if key == "msg" {
 		if v, ok := m["message"]; ok {
 			if s, ok := v.(string); ok {
@@ -616,7 +594,7 @@ func writeJSON(w http.ResponseWriter, code int, data any) {
 func toLogItem(obj map[string]any) LogItem {
 	li := LogItem{
 		Time:    getString(obj, "time"),
-		Level:   normalizeLevel(getString(obj, "level"), obj),
+		Level:   strings.ToUpper(getString(obj, "level")),
 		Message: getString(obj, "msg"),
 		Fields:  map[string]any{},
 	}
@@ -624,7 +602,7 @@ func toLogItem(obj map[string]any) LogItem {
 	// популярные «колоночные» поля
 	keys := []string{
 		"method", "path", "status", "url",
-		"remote_ip", "ip", "user_id", "request_id", "req_id", "requestId", "rid",
+		"remote_ip", "ip", "user_id", "request_id",
 		"stack", "error",
 	}
 	for _, k := range keys {
@@ -646,121 +624,47 @@ func toLogItem(obj map[string]any) LogItem {
 	return li
 }
 
-// ===== парсинг времени и уровней с запасом прочности =====
+// ==== time helpers ====
 
-var tsRE = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+\-]\d{2}:\d{2})`)
-
-func extractTimeLocal(obj map[string]any, raw []byte) (time.Time, bool) {
-	// 1) строковые ключи
-	for _, k := range []string{"time", "ts", "timestamp"} {
-		if s := getString(obj, k); s != "" {
-			if t, ok := parseTimestamp(s); ok {
-				return t.Local(), true
-			}
+func extractHour(ts string) (int, bool) {
+	if ts == "" {
+		return 0, false
+	}
+	// ищем разделитель даты/времени
+	i := strings.IndexByte(ts, 'T')
+	if i == -1 {
+		i = strings.IndexByte(ts, ' ')
+		if i == -1 {
+			return 0, false
 		}
 	}
-	// 2) numeric unix(ts)
-	if v, ok := obj["ts"]; ok {
-		switch vv := v.(type) {
-		case float64:
-			// различаем секунды/миллисекунды по порядку величины
-			if vv > 1e12 {
-				sec := int64(vv) / 1000
-				nsec := (int64(vv) % 1000) * int64(time.Millisecond)
-				return time.Unix(sec, nsec).Local(), true
-			}
-			return time.Unix(int64(vv), 0).Local(), true
-		case json.Number:
-			if i, err := vv.Int64(); err == nil {
-				if i > 1e12 {
-					sec := i / 1000
-					nsec := (i % 1000) * int64(time.Millisecond)
-					return time.Unix(sec, nsec).Local(), true
-				}
-				return time.Unix(i, 0).Local(), true
-			}
+	if len(ts) < i+3 {
+		return 0, false
+	}
+	hs := ts[i+1 : i+3]
+	h, err := strconv.Atoi(hs)
+	if err != nil || h < 0 || h > 23 {
+		return 0, false
+	}
+	return h, true
+}
+
+func extractHourFromRaw(raw []byte) (int, bool) {
+	m := reDateTime.FindSubmatch(raw)
+	if len(m) >= 3 {
+		h, _ := strconv.Atoi(string(m[2]))
+		if h >= 0 && h <= 23 {
+			return h, true
 		}
 	}
-	// 3) из сырой строки регуляркой
-	if t, ok := extractTimeFromRaw(raw); ok {
-		return t.Local(), true
-	}
-	return time.Time{}, false
-}
-
-func extractTimeFromRaw(raw []byte) (time.Time, bool) {
-	m := tsRE.Find(raw)
-	if len(m) == 0 {
-		return time.Time{}, false
-	}
-	if t, ok := parseTimestamp(string(m)); ok {
-		return t, true
-	}
-	return time.Time{}, false
-}
-
-func normalizeLevel(lvl string, obj map[string]any) string {
-	l := strings.ToUpper(strings.TrimSpace(lvl))
-	if l != "" {
-		return levelAlias(l)
-	}
-	// пробуем альтернативные ключи
-	for _, k := range []string{"severity", "lvl"} {
-		if s, ok := obj[k]; ok {
-			if str, ok := s.(string); ok {
-				return levelAlias(strings.ToUpper(strings.TrimSpace(str)))
-			}
-			// числовые уровни — сведём к приблизительным
-			if num, ok := s.(float64); ok {
-				return numericLevel(num)
-			}
-		}
-	}
-	return "INFO"
-}
-
-func levelAlias(l string) string {
-	switch l {
-	case "TRACE":
-		return "DEBUG"
-	case "WARNING":
-		return "WARN"
-	case "ERR":
-		return "ERROR"
-	case "CRITICAL":
-		return "FATAL"
-	default:
-		return l
-	}
-}
-
-func numericLevel(n float64) string {
-	// очень условное соответствие
-	switch {
-	case n <= 10:
-		return "DEBUG"
-	case n <= 20:
-		return "INFO"
-	case n <= 30:
-		return "WARN"
-	case n <= 40:
-		return "ERROR"
-	case n <= 50:
-		return "PANIC"
-	default:
-		return "FATAL"
-	}
+	return 0, false
 }
 
 // normalizeRFC3339Frac приводит количество знаков после секунды к 9 (RFC3339Nano).
-// Работает и с 'Z', и с часовыми смещениями (+03:00 / -07:00), и с запятой в долях.
 func normalizeRFC3339Frac(s string) string {
-	// смена запятой на точку, если вдруг
 	if strings.Contains(s, ",") {
 		s = strings.ReplaceAll(s, ",", ".")
 	}
-	// ищем точку между секундами и таймзоной
-	// сначала находим позицию 'T' (или пробела), чтобы не зацепить дату
 	sep := strings.IndexByte(s, 'T')
 	if sep == -1 {
 		sep = strings.IndexByte(s, ' ')
@@ -770,12 +674,10 @@ func normalizeRFC3339Frac(s string) string {
 	}
 	dot := strings.IndexByte(s[sep:], '.')
 	if dot == -1 {
-		// нет долей секунд — оставляем как есть
 		return s
 	}
 	dot += sep
 
-	// ищем начало таймзоны после точки: 'Z' или '+' или '-'
 	zoneIdx := -1
 	for i := dot + 1; i < len(s); i++ {
 		switch s[i] {
@@ -786,33 +688,29 @@ func normalizeRFC3339Frac(s string) string {
 	}
 done:
 	if zoneIdx == -1 {
-		// сомнительная строка, не трогаем
 		return s
 	}
-
 	frac := s[dot+1 : zoneIdx]
-	if len(frac) == 9 {
-		return s
-	}
 	if len(frac) > 9 {
 		frac = frac[:9]
-	} else {
+	} else if len(frac) < 9 {
 		frac = frac + strings.Repeat("0", 9-len(frac))
 	}
 	return s[:dot+1] + frac + s[zoneIdx:]
 }
 
 func parseTimestamp(s string) (time.Time, bool) {
-	// Сначала пробуем нормализовать до RFC3339Nano (ровно 9 знаков в долях)
+	if s == "" {
+		return time.Time{}, false
+	}
 	sn := normalizeRFC3339Frac(s)
-	// Базовые варианты
 	layouts := []string{
-		time.RFC3339Nano,                      // 2006-01-02T15:04:05.999999999Z07:00
-		time.RFC3339,                          // 2006-01-02T15:04:05Z07:00 (без долей)
-		"2006-01-02 15:04:05Z07:00",           // с пробелом, без долей
-		"2006-01-02 15:04:05.000000000Z07:00", // с пробелом, с долями (ровно 9)
-		"2006-01-02 15:04:05",                 // вообще без таймзоны
-		"2006-01-02T15:04:05",                 // без таймзоны (ISO, без долей)
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02 15:04:05.000000000Z07:00",
+		"2006-01-02 15:04:05Z07:00",
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
 	}
 	for _, l := range layouts {
 		if t, err := time.Parse(l, sn); err == nil {
