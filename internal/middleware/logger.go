@@ -22,6 +22,9 @@ func Logging(next http.Handler) http.Handler {
 			zap.Duration("duration", time.Since(start)),
 		}
 
+		if rid, ok := r.Context().Value(ContextRequestID).(string); ok {
+			fields = append(fields, zap.String("request_id", rid))
+		}
 		if userID, ok := r.Context().Value(ContextUserID).(int); ok {
 			fields = append(fields, zap.Int("user_id", userID))
 		}

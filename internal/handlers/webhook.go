@@ -8,6 +8,8 @@ import (
 
 	"edutalks/internal/logger"
 	"edutalks/internal/services"
+	helpers "edutalks/internal/utils/helpers"
+
 	"go.uber.org/zap"
 )
 
@@ -43,55 +45,79 @@ type PaymentWebhook struct {
 // @Failure 500 {string} string "Ошибка обновления подписки"
 // @Router /api/payments/webhook [post]
 func (h *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+	start := time.Now()
+
+	// ограничим размер тела, чтобы не словить OOM
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MiB
+
 	var webhook PaymentWebhook
 	if err := json.NewDecoder(r.Body).Decode(&webhook); err != nil {
-		logger.Log.Error("Ошибка парсинга webhook", zap.Error(err))
-		http.Error(w, "invalid json", http.StatusBadRequest)
+		log.Warn("webhook: не удалось распарсить JSON", zap.Error(err))
+		helpers.Error(w, http.StatusBadRequest, "invalid json")
 		return
 	}
 
 	userIDStr := webhook.Object.Metadata.UserID
 	plan := webhook.Object.Metadata.Plan
-
-	userID, err := strconv.Atoi(userIDStr)
-	if err != nil {
-		logger.Log.Error("Некорректный user_id в webhook", zap.String("raw_user_id", userIDStr), zap.Error(err))
-		http.Error(w, "invalid user_id", http.StatusBadRequest)
+	if userIDStr == "" || plan == "" {
+		log.Warn("webhook: отсутствуют обязательные поля metadata",
+			zap.String("user_id", userIDStr), zap.String("plan", plan))
+		helpers.Error(w, http.StatusBadRequest, "missing metadata.user_id or metadata.plan")
 		return
 	}
 
-	logger.Log.Info("Webhook получен",
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil || userID <= 0 {
+		log.Warn("webhook: некорректный user_id", zap.String("raw_user_id", userIDStr), zap.Error(err))
+		helpers.Error(w, http.StatusBadRequest, "invalid user_id")
+		return
+	}
+
+	log.Info("webhook: получено событие",
 		zap.String("event", webhook.Event),
+		zap.String("payment_id", webhook.Object.ID),
+		zap.String("status", webhook.Object.Status),
 		zap.Int("user_id", userID),
 		zap.String("plan", plan),
 	)
 
-	if webhook.Event == "payment.succeeded" && webhook.Object.Status == "succeeded" {
-		var duration time.Duration
-		switch plan {
-		case "monthly":
-			duration = 30 * 24 * time.Hour
-		case "halfyear":
-			duration = 180 * 24 * time.Hour
-		case "yearly":
-			duration = 365 * 24 * time.Hour
-		default:
-			logger.Log.Warn("Неизвестный тип подписки", zap.String("plan", plan))
-			http.Error(w, "invalid plan", http.StatusBadRequest)
-			return
-		}
-
-		err := h.UserService.SetSubscriptionWithExpiry(r.Context(), userID, duration)
-		if err != nil {
-			logger.Log.Error("Не удалось установить подписку с истечением", zap.Int("user_id", userID), zap.Error(err))
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-
-		logger.Log.Info("Подписка успешно активирована", zap.Int("user_id", userID), zap.String("plan", plan))
+	// Нормируем длительности как в остальном коде (halfyear = 182d)
+	planDurations := map[string]time.Duration{
+		"monthly":  30 * 24 * time.Hour,
+		"halfyear": 182 * 24 * time.Hour,
+		"yearly":   365 * 24 * time.Hour,
+	}
+	duration, ok := planDurations[plan]
+	if !ok {
+		log.Warn("webhook: неизвестный план", zap.String("plan", plan))
+		helpers.Error(w, http.StatusBadRequest, "invalid plan")
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"ok"}`))
+	if webhook.Event == "payment.succeeded" && webhook.Object.Status == "succeeded" {
+		if err := h.UserService.SetSubscriptionWithExpiry(r.Context(), userID, duration); err != nil {
+			log.Error("webhook: не удалось активировать подписку",
+				zap.Int("user_id", userID),
+				zap.String("plan", plan),
+				zap.Duration("duration", duration),
+				zap.Error(err),
+			)
+			helpers.Error(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		log.Info("webhook: подписка активирована",
+			zap.Int("user_id", userID),
+			zap.String("plan", plan),
+			zap.Duration("duration", duration),
+		)
+	} else {
+		// Идемпотентно подтверждаем другие события
+		log.Info("webhook: событие проигнорировано (не succeeded)",
+			zap.String("event", webhook.Event),
+			zap.String("status", webhook.Object.Status))
+	}
+
+	log.Info("webhook: обработано", zap.Duration("elapsed", time.Since(start)))
+	helpers.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

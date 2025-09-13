@@ -5,12 +5,10 @@ import "context"
 type ctxKey string
 
 const (
-	// ЭТОТ ФЛАГ будем ставить админам, чтобы пропускать все проверки
 	ContextSkipGuards ctxKey = "skip_guards"
-
-	// Предполагается, что эти ключи уже есть в jwt.go — ничего не меняй:
-	// ContextUserID ctxKey = "user_id"
-	// ContextRole   ctxKey = "role"
+	ContextUserID     ctxKey = "user_id"
+	ContextRole       ctxKey = "role"
+	ContextRequestID  ctxKey = "request_id"
 )
 
 func WithSkipGuards(ctx context.Context) context.Context {
@@ -22,8 +20,6 @@ func SkipGuards(ctx context.Context) bool {
 	b, _ := v.(bool)
 	return b
 }
-
-const userIDKey ctxKey = "user_id"
 
 func UserIDFromContext(ctx context.Context) (int, bool) {
 	v := ctx.Value(ContextUserID)
@@ -41,4 +37,13 @@ func RoleFromContext(ctx context.Context) (string, bool) {
 	}
 	role, ok := v.(string)
 	return role, ok
+}
+
+func RequestIDFromContext(ctx context.Context) (string, bool) {
+	v := ctx.Value(ContextRequestID)
+	if v == nil {
+		return "", false
+	}
+	rid, ok := v.(string)
+	return rid, ok
 }

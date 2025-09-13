@@ -2,12 +2,6 @@ package handlers
 
 import (
 	"context"
-	"edutalks/internal/logger"
-	"edutalks/internal/middleware"
-	"edutalks/internal/models"
-	"edutalks/internal/repository"
-	"edutalks/internal/services"
-	helpers "edutalks/internal/utils/helpers"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,6 +13,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"edutalks/internal/logger"
+	"edutalks/internal/middleware"
+	"edutalks/internal/models"
+	"edutalks/internal/repository"
+	"edutalks/internal/services"
+	helpers "edutalks/internal/utils/helpers"
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
@@ -52,22 +53,24 @@ func NewDocumentHandler(docService *services.DocumentService, userService *servi
 // @Param        is_public   formData  bool    true   "Публичный документ?"
 // @Param        category    formData  string  false  "Категория"
 // @Param        section_id  formData  int     false  "ID раздела"
-// @Param allow_free_download formData bool false "Можно скачивать без подписки?"
+// @Param        allow_free_download formData bool false "Можно скачивать без подписки?"
 // @Success      201 {object} map[string]int
 // @Failure      400 {object} map[string]string
 // @Failure      500 {object} map[string]string
 // @Router       /api/admin/files/upload [post]
 func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request) {
-	logger.Log.Info("Запрос на загрузку документа")
+	log := logger.WithCtx(r.Context())
+	log.Info("Запрос на загрузку документа")
+
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		logger.Log.Warn("Ошибка разбора формы при загрузке документа", zap.Error(err))
+		log.Warn("Ошибка разбора формы при загрузке документа", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "Ошибка разбора формы")
 		return
 	}
 
 	file, handler, err := r.FormFile("file")
 	if err != nil {
-		logger.Log.Warn("Файл не найден при загрузке", zap.Error(err))
+		log.Warn("Файл не найден в форме", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "Файл не найден")
 		return
 	}
@@ -77,19 +80,38 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 	isPublic := strings.ToLower(r.FormValue("is_public")) == "true"
 	category := r.FormValue("category")
 	title := r.FormValue("title")
+	allowFreeDownload := strings.ToLower(r.FormValue("allow_free_download")) == "true"
 
 	var sectionIDPtr *int
 	if s := r.FormValue("section_id"); s != "" {
-		if sid, err := strconv.Atoi(s); err == nil {
+		if sid, convErr := strconv.Atoi(s); convErr == nil {
 			sectionIDPtr = &sid
+		} else {
+			log.Warn("Невалидный section_id", zap.String("raw", s))
 		}
 	}
 
-	userID := r.Context().Value(middleware.ContextUserID).(int)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || userID == 0 {
+		log.Warn("Нет user_id в контексте при загрузке документа")
+		helpers.Error(w, http.StatusUnauthorized, "Нет доступа")
+		return
+	}
+
+	log.Info("Параметры загрузки документа",
+		zap.String("original_filename", handler.Filename),
+		zap.Int64("upload_size_hint", handler.Size),
+		zap.String("title", title),
+		zap.String("category", category),
+		zap.Bool("is_public", isPublic),
+		zap.Bool("allow_free_download", allowFreeDownload),
+		zap.Any("section_id", sectionIDPtr),
+		zap.Int("user_id", userID),
+	)
 
 	uploadDir := "uploaded"
 	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
-		logger.Log.Error("Ошибка создания директории загрузки", zap.Error(err))
+		log.Error("Не удалось создать директорию загрузки", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка сохранения файла")
 		return
 	}
@@ -99,19 +121,17 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 
 	dst, err := os.Create(fullPath)
 	if err != nil {
-		logger.Log.Error("Ошибка при сохранении файла", zap.Error(err))
+		log.Error("Не удалось создать файл на диске", zap.String("path", fullPath), zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при сохранении файла")
 		return
 	}
 	defer dst.Close()
 
 	if _, err := io.Copy(dst, file); err != nil {
-		logger.Log.Error("Ошибка записи файла", zap.Error(err))
+		log.Error("Ошибка записи файла на диск", zap.String("path", fullPath), zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при сохранении файла")
 		return
 	}
-
-	allowFreeDownload := strings.ToLower(r.FormValue("allow_free_download")) == "true"
 
 	doc := &models.Document{
 		UserID:            userID,
@@ -126,24 +146,30 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 		AllowFreeDownload: allowFreeDownload,
 	}
 
-	logger.Log.Info("Сохраняем информацию о документе", zap.String("filename", handler.Filename), zap.Int("user_id", userID))
+	log.Info("Сохраняем метаданные документа в БД",
+		zap.String("stored_filename", filename),
+		zap.String("original_filename", handler.Filename),
+		zap.Int("user_id", userID),
+	)
+
 	id, err := h.service.Upload(r.Context(), doc)
 	if err != nil {
-		logger.Log.Error("Ошибка при сохранении документа в базе", zap.Error(err))
+		log.Error("Ошибка сохранения документа в БД", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при сохранении документа")
 		return
 	}
 
-	// --- Вместо мгновенной рассылки кладём в батч-уведомитель ---
 	ctx := context.WithoutCancel(r.Context())
 	var tabsID *int
 	if doc.SectionID != nil {
-		if tid, err := h.taxonomyRepo.GetTabIDBySectionID(ctx, *doc.SectionID); err == nil {
+		if tid, e := h.taxonomyRepo.GetTabIDBySectionID(ctx, *doc.SectionID); e == nil {
 			tabsID = &tid
+		} else {
+			log.Warn("Не удалось получить tab_id по section_id", zap.Any("section_id", *doc.SectionID), zap.Error(e))
 		}
 	}
-	// теперь вызываем batchedNotifier, который сам раз в 10 минут отправляет одно письмо
 	h.notifier.AddDocumentForBatch(ctx, doc.Title, tabsID)
+	log.Info("Документ добавлен в batched-уведомления", zap.Int("doc_id", id), zap.Any("tab_id", tabsID))
 
 	helpers.JSON(w, http.StatusCreated, map[string]any{
 		"id": id,
@@ -172,22 +198,29 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 // @Failure      500 {object} map[string]string
 // @Router       /api/files [get]
 func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	category := r.URL.Query().Get("category")
 
 	var sectionIDPtr *int
 	if s := r.URL.Query().Get("section_id"); s != "" {
 		if sid, err := strconv.Atoi(s); err == nil {
 			sectionIDPtr = &sid
+		} else {
+			log.Warn("Невалидный section_id", zap.String("raw", s))
 		}
 	}
 
+	log.Info("Запрос публичных документов", zap.Any("section_id", sectionIDPtr), zap.String("category", category))
+
 	docs, err := h.service.GetPublicDocuments(r.Context(), sectionIDPtr, category)
 	if err != nil {
-		logger.Log.Error("Ошибка при получении документов", zap.Error(err))
+		log.Error("Ошибка получения публичных документов", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при получении документов")
 		return
 	}
 
+	log.Info("Публичные документы получены", zap.Int("count", len(docs)))
 	helpers.JSON(w, http.StatusOK, map[string]any{
 		"data":       docs,
 		"total":      len(docs),
@@ -207,12 +240,11 @@ func (h *DocumentHandler) ListPublicDocuments(w http.ResponseWriter, r *http.Req
 // @Failure 404 {string} string "Документ не найден"
 // @Router /api/files/{id} [get]
 func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value(middleware.ContextUserID).(int)
-	logger.Log.Info("Запрос на скачивание документа", zap.Int("user_id", userID))
+	log := logger.WithCtx(r.Context())
 
-	user, err := h.userService.GetUserByID(r.Context(), userID)
-	if err != nil {
-		logger.Log.Warn("Пользователь не найден при скачивании документа", zap.Int("user_id", userID))
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || userID == 0 {
+		log.Warn("Нет доступа при скачивании документа: отсутствует user_id")
 		helpers.Error(w, http.StatusUnauthorized, "Пользователь не найден")
 		return
 	}
@@ -220,47 +252,48 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 	idStr := mux.Vars(r)["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
+		log.Warn("Невалидный идентификатор документа", zap.String("raw", idStr))
 		helpers.Error(w, http.StatusBadRequest, "Некорректный идентификатор документа")
+		return
+	}
+
+	log.Info("Запрос на скачивание документа", zap.Int("user_id", userID), zap.Int("doc_id", id))
+
+	user, err := h.userService.GetUserByID(r.Context(), userID)
+	if err != nil {
+		log.Warn("Пользователь не найден при скачивании документа", zap.Int("user_id", userID))
+		helpers.Error(w, http.StatusUnauthorized, "Пользователь не найден")
 		return
 	}
 
 	doc, err := h.service.GetDocumentByID(r.Context(), id)
 	if err != nil {
-		logger.Log.Warn("Документ не найден", zap.Int("doc_id", id))
+		log.Warn("Документ не найден", zap.Int("doc_id", id))
 		helpers.Error(w, http.StatusNotFound, "Документ не найден")
 		return
 	}
 
-	// --- доступ ---
 	if user.Role != "admin" {
-		// закрытые документы недоступны
 		if !doc.IsPublic {
-			logger.Log.Warn("Попытка доступа к закрытому документу",
-				zap.Int("user_id", userID), zap.Int("doc_id", id))
+			log.Warn("Попытка доступа к закрытому документу", zap.Int("user_id", userID), zap.Int("doc_id", id))
 			helpers.Error(w, http.StatusForbidden, "Этот документ закрыт")
 			return
 		}
-
-		// нужна активная подписка или free
 		if !isActiveSub(user) && !doc.AllowFreeDownload {
-			logger.Log.Warn("Нет подписки и документ не free",
-				zap.Int("user_id", userID), zap.Int("doc_id", id))
+			log.Warn("Нет подписки и документ не free", zap.Int("user_id", userID), zap.Int("doc_id", id))
 			helpers.Error(w, http.StatusForbidden, "Нет доступа — купите подписку")
 			return
 		}
 	}
-	// --- конец доступа ---
 
-	// Открываем файл и определяем корректный Content-Type
 	f, err := os.Open(doc.Filepath)
 	if err != nil {
-		logger.Log.Error("Файл не найден на диске", zap.String("filepath", doc.Filepath), zap.Error(err))
+		log.Error("Файл не найден на диске", zap.String("filepath", doc.Filepath), zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Файл не найден")
 		return
 	}
 	defer f.Close()
 
-	// Определяем тип
 	ctype := mime.TypeByExtension(strings.ToLower(filepath.Ext(doc.Filename)))
 	if ctype == "" {
 		buf := make([]byte, 512)
@@ -272,22 +305,21 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 		ctype = "application/octet-stream"
 	}
 
-	// Заголовки
 	encoded := url.PathEscape(doc.Filename)
 	w.Header().Set("Content-Type", ctype)
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename*=UTF-8''%s", encoded))
+	// Добавляем и filename и filename*, чтобы охватить больше клиентов
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q; filename*=UTF-8''%s", doc.Filename, encoded))
+
 	if fi, err := f.Stat(); err == nil {
 		w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
-		// необязательно, но полезно: публичные free можно кэшировать браузером
 		if doc.IsPublic && (doc.AllowFreeDownload || user.Role == "admin") {
 			w.Header().Set("Cache-Control", "private, max-age=3600")
 		}
 	}
 
-	// Отдача с поддержкой Range/кэша
 	http.ServeContent(w, r, doc.Filename, doc.UploadedAt, f)
 
-	logger.Log.Info("Документ успешно скачан",
+	log.Info("Документ успешно скачан",
 		zap.Int("user_id", userID),
 		zap.Int("doc_id", id),
 		zap.String("role", user.Role),
@@ -306,31 +338,38 @@ func (h *DocumentHandler) DownloadDocument(w http.ResponseWriter, r *http.Reques
 // @Failure 404 {string} string "Документ не найден"
 // @Router /api/admin/files/{id} [delete]
 func (h *DocumentHandler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id, _ := strconv.Atoi(vars["id"])
-	logger.Log.Info("Запрос на удаление документа", zap.Int("doc_id", id))
+	log := logger.WithCtx(r.Context())
+
+	idStr := mux.Vars(r)["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		log.Warn("Невалидный doc_id в DeleteDocument", zap.String("raw", idStr))
+		helpers.Error(w, http.StatusBadRequest, "Некорректный id документа")
+		return
+	}
+
+	log.Info("Запрос на удаление документа", zap.Int("doc_id", id))
 
 	doc, err := h.service.GetDocumentByID(r.Context(), id)
 	if err != nil {
-		logger.Log.Warn("Документ не найден для удаления", zap.Int("doc_id", id))
+		log.Warn("Документ не найден для удаления", zap.Int("doc_id", id))
 		helpers.Error(w, http.StatusNotFound, "Документ не найден")
 		return
 	}
 
-	err = h.service.Delete(r.Context(), id)
-	if err != nil {
-		logger.Log.Error("Ошибка при удалении документа из базы", zap.Error(err), zap.Int("doc_id", id))
+	if err := h.service.Delete(r.Context(), id); err != nil {
+		log.Error("Ошибка при удалении документа из базы", zap.Error(err), zap.Int("doc_id", id))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при удалении")
 		return
 	}
 
 	if err := os.Remove(doc.Filepath); err != nil && !os.IsNotExist(err) {
-		logger.Log.Error("Ошибка при удалении файла с диска", zap.String("filepath", doc.Filepath), zap.Error(err))
+		log.Error("Ошибка при удалении файла с диска", zap.String("filepath", doc.Filepath), zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Файл не удалось удалить")
 		return
 	}
 
-	logger.Log.Info("Документ успешно удалён", zap.Int("doc_id", id))
+	log.Info("Документ успешно удалён", zap.Int("doc_id", id))
 	helpers.JSON(w, http.StatusOK, "Документ удалён")
 }
 
@@ -344,26 +383,29 @@ func (h *DocumentHandler) DeleteDocument(w http.ResponseWriter, r *http.Request)
 // @Failure 500 {string} string "Ошибка сервера"
 // @Router /api/admin/files [get]
 func (h *DocumentHandler) GetAllDocuments(w http.ResponseWriter, r *http.Request) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit < 0 {
-		limit = 10
-	}
-	if limit == 0 {
-		// 0 = все
-	} else if limit == 0 || limit == 1 {
-		limit = 10 // дефолт
+	log := logger.WithCtx(r.Context())
+
+	limit := 10
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil {
+			if v >= 0 {
+				limit = v // 0 = все
+			}
+		} else {
+			log.Warn("Невалидный limit, используется значение по умолчанию", zap.String("raw", raw))
+		}
 	}
 
-	if limit == 0 {
-		// особый случай: вернуть все
-		logger.Log.Info("Админ: вернуть все документы")
-	}
+	log.Info("Запрос списка всех документов (admin)", zap.Int("limit", limit))
 
 	docs, err := h.service.GetAllDocuments(r.Context(), limit)
 	if err != nil {
+		log.Error("Ошибка получения всех документов", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка получения документов")
 		return
 	}
+
+	log.Info("Список документов получен", zap.Int("count", len(docs)))
 	helpers.JSON(w, http.StatusOK, map[string]any{"data": docs})
 }
 
@@ -378,29 +420,40 @@ func (h *DocumentHandler) GetAllDocuments(w http.ResponseWriter, r *http.Request
 // @Failure 403 {object} string "Документ не публичный"
 // @Router /api/documents/{id}/preview [get]
 func (h *DocumentHandler) PreviewDocument(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	idStr := mux.Vars(r)["id"]
-	id, _ := strconv.Atoi(idStr)
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		log.Warn("Невалидный id в PreviewDocument", zap.String("raw", idStr))
+		helpers.Error(w, http.StatusBadRequest, "Невалидный id")
+		return
+	}
 
 	doc, err := h.service.GetDocumentByID(r.Context(), id)
 	if err != nil {
+		log.Warn("Документ не найден (preview)", zap.Int("doc_id", id))
 		helpers.Error(w, http.StatusNotFound, "Документ не найден")
 		return
 	}
 
 	if !doc.IsPublic {
+		log.Warn("Документ не публичный (preview запрещён)", zap.Int("doc_id", id))
 		helpers.Error(w, http.StatusForbidden, "Документ недоступен для просмотра")
 		return
 	}
 
 	resp := models.DocumentPreviewResponse{
 		ID:          doc.ID,
-		Title:       doc.Title, // теперь title, не filename
+		Title:       doc.Title,
 		Description: doc.Description,
 		Category:    doc.Category,
 		SectionID:   doc.SectionID,
 		UploadedAt:  doc.UploadedAt.Format("2006-01-02"),
 		Message:     "Документ доступен только по подписке",
 	}
+
+	log.Info("Превью документа сформировано", zap.Int("doc_id", id))
 	helpers.JSON(w, http.StatusOK, map[string]any{"item": resp})
 }
 
@@ -415,6 +468,8 @@ func (h *DocumentHandler) PreviewDocument(w http.ResponseWriter, r *http.Request
 // @Failure 500 {object} map[string]string
 // @Router /api/documents/preview [get]
 func (h *DocumentHandler) PreviewDocuments(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
 		page = 1
@@ -426,8 +481,14 @@ func (h *DocumentHandler) PreviewDocuments(w http.ResponseWriter, r *http.Reques
 	offset := (page - 1) * pageSize
 	category := r.URL.Query().Get("category")
 
+	log.Info("Запрос превью документов",
+		zap.Int("page", page), zap.Int("page_size", pageSize),
+		zap.Int("offset", offset), zap.String("category", category),
+	)
+
 	docs, total, err := h.service.GetPublicDocumentsPaginated(r.Context(), pageSize, offset, category)
 	if err != nil {
+		log.Error("Ошибка получения превью документов", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка получения документов")
 		return
 	}
@@ -439,7 +500,7 @@ func (h *DocumentHandler) PreviewDocuments(w http.ResponseWriter, r *http.Reques
 		}
 		previews = append(previews, models.DocumentPreviewResponse{
 			ID:          d.ID,
-			Title:       d.Title, // теперь title, не filename
+			Title:       d.Title,
 			Description: d.Description,
 			Category:    d.Category,
 			SectionID:   d.SectionID,
@@ -448,6 +509,7 @@ func (h *DocumentHandler) PreviewDocuments(w http.ResponseWriter, r *http.Reques
 		})
 	}
 
+	log.Info("Превью документов сформировано", zap.Int("count", len(previews)), zap.Int("total", total))
 	helpers.JSON(w, http.StatusOK, map[string]any{
 		"data":      previews,
 		"total":     total,
@@ -469,28 +531,31 @@ func (h *DocumentHandler) PreviewDocuments(w http.ResponseWriter, r *http.Reques
 // @Failure 401 {string} string "Нет доступа"
 // @Router /api/profile [patch]
 func (h *AuthHandler) UpdateMyProfile(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(middleware.ContextUserID).(int)
+	log := logger.WithCtx(r.Context())
+
+	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == 0 {
+		log.Warn("Нет доступа при обновлении профиля: отсутствует user_id")
 		helpers.Error(w, http.StatusUnauthorized, "Нет доступа")
 		return
 	}
 
 	var input models.UpdateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		logger.Log.Warn("Невалидный JSON при обновлении профиля", zap.Error(err))
+		log.Warn("Невалидный JSON при обновлении профиля", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "Невалидный JSON")
 		return
 	}
 
-	// защита: обычный пользователь не может менять роль
-	input.Role = nil
+	input.Role = nil // обычный пользователь не меняет роль
 
 	if err := h.authService.UpdateUser(r.Context(), userID, &input); err != nil {
-		logger.Log.Error("Ошибка обновления профиля", zap.Error(err), zap.Int("user_id", userID))
+		log.Error("Ошибка обновления профиля", zap.Error(err), zap.Int("user_id", userID))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка обновления профиля")
 		return
 	}
 
+	log.Info("Профиль обновлён", zap.Int("user_id", userID))
 	helpers.JSON(w, http.StatusOK, map[string]string{"message": "Профиль обновлён"})
 }
 
@@ -498,6 +563,5 @@ func isActiveSub(u *models.User) bool {
 	if u == nil || !u.HasSubscription || u.SubscriptionExpiresAt == nil {
 		return false
 	}
-	// предполагаем, что SubscriptionExpiresAt в UTC
 	return u.SubscriptionExpiresAt.After(time.Now().UTC())
 }

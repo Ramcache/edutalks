@@ -82,13 +82,20 @@ type emailSubscriptionRequest struct {
 // @Failure 400 {string} string "Ошибка валидации"
 // @Router /api/register [post]
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.Log.Warn("Ошибка декодирования JSON в Register", zap.Error(err))
+		log.Warn("Невалидный JSON в Register", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "Невалидный JSON")
 		return
 	}
-	logger.Log.Info("Регистрация пользователя", zap.String("username", req.Username), zap.String("email", req.Email))
+
+	log.Info("Регистрация пользователя",
+		zap.String("username", strings.TrimSpace(req.Username)),
+		zap.String("email_masked", maskEmail(req.Email)),
+		zap.String("phone_masked", maskPhone(req.Phone)),
+	)
 
 	user := &models.User{
 		Username: req.Username,
@@ -99,14 +106,17 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.authService.RegisterUser(r.Context(), user, req.Password); err != nil {
-		logger.Log.Error("Ошибка регистрации пользователя", zap.Error(err))
+		log.Error("Ошибка регистрации пользователя", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	// Проверка лимита перед генерацией токена
-	lastToken, err := h.emailTokenService.GetLastTokenByUserID(r.Context(), user.ID)
-	if err == nil && time.Since(lastToken.CreatedAt) < 5*time.Minute {
+	// Антиспам по письмам с подтверждением
+	if lastToken, err := h.emailTokenService.GetLastTokenByUserID(r.Context(), user.ID); err == nil && time.Since(lastToken.CreatedAt) < 5*time.Minute {
+		log.Warn("Слишком частая отправка письма подтверждения",
+			zap.Int("user_id", user.ID),
+			zap.Duration("remaining", 5*time.Minute-time.Since(lastToken.CreatedAt)),
+		)
 		helpers.Error(w, http.StatusTooManyRequests, "Повторная отправка письма возможна через 5 минут")
 		return
 	}
@@ -114,18 +124,19 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	// Генерация токена
 	emailToken, err := h.emailTokenService.GenerateToken(r.Context(), user.ID)
 	if err != nil {
-		logger.Log.Error("Ошибка генерации токена", zap.Error(err))
+		log.Error("Ошибка генерации email-токена", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка генерации токена")
 		return
 	}
 
 	// Отправка письма с токеном
 	if err := h.SendVerificationEmail(r.Context(), user, emailToken.Token); err != nil {
-		logger.Log.Error("Ошибка отправки письма", zap.Error(err))
+		log.Error("Ошибка отправки письма подтверждения", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при отправке письма")
 		return
 	}
 
+	log.Info("Пользователь зарегистрирован, письмо подтверждения отправлено", zap.Int("user_id", user.ID))
 	helpers.JSON(w, http.StatusCreated, "Пользователь успешно зарегистрирован. Проверьте вашу почту для подтверждения.")
 }
 
@@ -139,21 +150,26 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {string} string "Неверный логин или пароль"
 // @Router /api/login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Warn("Невалидный JSON в Login", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "Невалидный JSON")
 		return
 	}
 
-	// обратная совместимость
 	identifier := strings.TrimSpace(req.Login)
 	if identifier == "" {
 		identifier = strings.TrimSpace(req.Username)
 	}
 	if identifier == "" || req.Password == "" {
+		log.Warn("Отсутствуют обязательные поля в Login")
 		helpers.Error(w, http.StatusBadRequest, "Требуются поля login/username и password")
 		return
 	}
+
+	log.Info("Попытка входа", zap.String("identifier_masked", maskLogin(identifier)))
 
 	cfg, _ := config.LoadConfig()
 	accessTTL, _ := time.ParseDuration(cfg.AccessTokenTTL)
@@ -168,6 +184,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		refreshTTL,
 	)
 	if err != nil {
+		log.Warn("Неуспешная попытка входа", zap.String("identifier_masked", maskLogin(identifier)))
 		helpers.Error(w, http.StatusUnauthorized, err.Error())
 		return
 	}
@@ -179,6 +196,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		FullName:     user.FullName,
 		Role:         user.Role,
 	}
+	log.Info("Успешный вход", zap.Int("user_id", user.ID), zap.String("role", user.Role))
 	helpers.JSON(w, http.StatusOK, resp)
 }
 
@@ -191,17 +209,18 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {string} string "Пользователь не найден"
 // @Router /api/profile [get]
 func (h *AuthHandler) Protected(w http.ResponseWriter, r *http.Request) {
-	// Получаем userID из контекста
+	log := logger.WithCtx(r.Context())
+
 	userID, ok := r.Context().Value(middleware.ContextUserID).(int)
 	if !ok || userID == 0 {
+		log.Warn("Нет доступа в /profile: user_id отсутствует")
 		helpers.Error(w, http.StatusUnauthorized, "Нет доступа")
 		return
 	}
 
-	// Получаем профиль пользователя
 	user, err := h.authService.GetUserByID(r.Context(), userID)
 	if err != nil {
-		logger.Log.Warn("Пользователь не найден", zap.Int("user_id", userID))
+		log.Warn("Пользователь не найден (profile)", zap.Int("user_id", userID))
 		helpers.Error(w, http.StatusNotFound, "Пользователь не найден")
 		return
 	}
@@ -226,6 +245,7 @@ func (h *AuthHandler) Protected(w http.ResponseWriter, r *http.Request) {
 		EmailVerified:         user.EmailVerified,
 	}
 
+	log.Info("Профиль отдан", zap.Int("user_id", userID))
 	helpers.JSON(w, http.StatusOK, resp)
 }
 
@@ -238,23 +258,24 @@ func (h *AuthHandler) Protected(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {string} string "Недействительный refresh токен"
 // @Router /api/refresh [post]
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		logger.Log.Warn("Отсутствует refresh token в Refresh")
+		log.Warn("Отсутствует refresh token в Refresh")
 		helpers.Error(w, http.StatusUnauthorized, "Отсутствует refresh token")
 		return
 	}
 
-	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-	logger.Log.Debug("Попытка обновления токена", zap.String("token", tokenString))
-
 	cfg, _ := config.LoadConfig()
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+
 	claims := jwt.MapClaims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(cfg.JWTSecret), nil
 	})
 	if err != nil || !token.Valid {
-		logger.Log.Warn("Неверный или просроченный refresh token", zap.Error(err))
+		log.Warn("Неверный или просроченный refresh token", zap.Error(err))
 		helpers.Error(w, http.StatusUnauthorized, "Неверный или просроченный refresh token")
 		return
 	}
@@ -262,14 +283,14 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	userID, ok1 := claims["user_id"].(float64)
 	role, ok2 := claims["role"].(string)
 	if !ok1 || !ok2 {
-		logger.Log.Error("Неверный payload токена", zap.Any("claims", claims))
+		log.Warn("Неверный payload refresh токена", zap.Any("claims_keys", keys(claims)))
 		helpers.Error(w, http.StatusUnauthorized, "Неверный payload токена")
 		return
 	}
 
 	isValid, err := h.authService.ValidateRefreshToken(r.Context(), int(userID), tokenString)
 	if err != nil || !isValid {
-		logger.Log.Warn("Недействительный refresh token", zap.Error(err))
+		log.Warn("Недействительный refresh token (storage)", zap.Error(err))
 		helpers.Error(w, http.StatusUnauthorized, "Недействительный refresh token")
 		return
 	}
@@ -277,12 +298,12 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	accessTTL, _ := time.ParseDuration(cfg.AccessTokenTTL)
 	accessToken, err := utils.GenerateToken(cfg.JWTSecret, int(userID), role, accessTTL, "access")
 	if err != nil {
-		logger.Log.Error("Ошибка генерации токена", zap.Error(err))
+		log.Error("Ошибка генерации access токена", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка генерации токена")
 		return
 	}
 
-	logger.Log.Info("Токен обновлён", zap.Float64("user_id", userID))
+	log.Info("Токен обновлён", zap.Int("user_id", int(userID)))
 	helpers.JSON(w, http.StatusOK, map[string]string{"access_token": accessToken})
 }
 
@@ -294,41 +315,42 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {string} string "Невалидный токен"
 // @Router /api/logout [post]
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		logger.Log.Warn("Отсутствует refresh token в Logout")
+		log.Warn("Отсутствует refresh token в Logout")
 		helpers.Error(w, http.StatusUnauthorized, "Отсутствует refresh token")
 		return
 	}
 
+	cfg, _ := config.LoadConfig()
 	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
-	cfg, _ := config.LoadConfig()
 	claims := jwt.MapClaims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(cfg.JWTSecret), nil
 	})
 	if err != nil || !token.Valid {
-		logger.Log.Warn("Невалидный refresh token при выходе", zap.Error(err))
+		log.Warn("Невалидный refresh token при Logout", zap.Error(err))
 		helpers.Error(w, http.StatusUnauthorized, "Невалидный refresh token")
 		return
 	}
 
 	userID, ok := claims["user_id"].(float64)
 	if !ok {
-		logger.Log.Error("Неверный payload при выходе", zap.Any("claims", claims))
+		log.Warn("Неверный payload при Logout", zap.Any("claims_keys", keys(claims)))
 		helpers.Error(w, http.StatusUnauthorized, "Неверный payload")
 		return
 	}
 
-	err = h.authService.Logout(r.Context(), int(userID), tokenString)
-	if err != nil {
-		logger.Log.Error("Ошибка при удалении токена", zap.Error(err))
+	if err := h.authService.Logout(r.Context(), int(userID), tokenString); err != nil {
+		log.Error("Ошибка при удалении refresh токена", zap.Error(err), zap.Int("user_id", int(userID)))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при удалении токена")
 		return
 	}
 
-	logger.Log.Info("Пользователь вышел", zap.Float64("user_id", userID))
+	log.Info("Пользователь вышел", zap.Int("user_id", int(userID)))
 	helpers.JSON(w, http.StatusOK, "Выход выполнен")
 }
 
@@ -340,6 +362,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 // @Failure 403 {string} string "Доступ запрещён"
 // @Router /api/admin/dashboard [get]
 func (h *AuthHandler) AdminOnly(w http.ResponseWriter, r *http.Request) {
+	logger.WithCtx(r.Context()).Info("AdminOnly доступ")
 	helpers.JSON(w, http.StatusOK, "Доступно только администратору")
 }
 
@@ -356,7 +379,8 @@ func (h *AuthHandler) AdminOnly(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} map[string]interface{}
 // @Router /api/admin/users [get]
 func (h *AuthHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
-	// пагинация
+	log := logger.WithCtx(r.Context())
+
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
 		page = 1
@@ -367,7 +391,6 @@ func (h *AuthHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	offset := (page - 1) * pageSize
 
-	// фильтры
 	q := r.URL.Query().Get("q")
 
 	var rolePtr *string
@@ -385,28 +408,34 @@ func (h *AuthHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 			v := false
 			hasSubPtr = &v
 		default:
+			log.Warn("Невалидное значение has_subscription", zap.String("value", hs))
 			helpers.Error(w, http.StatusBadRequest, "has_subscription должен быть true|false")
 			return
 		}
 	}
 
+	log.Info("Запрос списка пользователей",
+		zap.Int("page", page), zap.Int("page_size", pageSize),
+		zap.Int("offset", offset), zap.String("q", q),
+		zap.Any("role", rolePtr), zap.Any("has_subscription", hasSubPtr),
+	)
+
 	users, total, err := h.authService.GetUsersFiltered(r.Context(), pageSize, offset, q, rolePtr, hasSubPtr)
 	if err != nil {
-		logger.Log.Error("Ошибка получения пользователей (handler)", zap.Error(err))
+		log.Error("Ошибка получения пользователей (handler)", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка получения пользователей")
 		return
 	}
 
+	log.Info("Список пользователей получен", zap.Int("count", len(users)), zap.Int("total", total))
 	helpers.JSON(w, http.StatusOK, map[string]interface{}{
-		"data":      users,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
-		"q":         q,
-		"role":      rolePtr,
-		"has_subscription": func() *bool {
-			return hasSubPtr
-		}(),
+		"data":             users,
+		"total":            total,
+		"page":             page,
+		"page_size":        pageSize,
+		"q":                q,
+		"role":             rolePtr,
+		"has_subscription": func() *bool { return hasSubPtr }(),
 	})
 }
 
@@ -421,22 +450,25 @@ func (h *AuthHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {string} string "Пользователь не найден"
 // @Router /api/admin/users/{id} [get]
 func (h *AuthHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	vars := mux.Vars(r)
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		logger.Log.Warn("Невалидный ID при получении пользователя", zap.String("id", idStr))
+		log.Warn("Невалидный ID при получении пользователя", zap.String("id", idStr))
 		helpers.Error(w, http.StatusBadRequest, "Невалидный ID")
 		return
 	}
 
 	user, err := h.authService.GetUserByID(r.Context(), id)
 	if err != nil {
-		logger.Log.Warn("Пользователь не найден", zap.Int("user_id", id))
+		log.Warn("Пользователь не найден", zap.Int("user_id", id))
 		helpers.Error(w, http.StatusNotFound, "Пользователь не найден")
 		return
 	}
-	logger.Log.Info("Получен пользователь по ID", zap.Int("user_id", id))
+
+	log.Info("Получен пользователь по ID", zap.Int("user_id", id))
 	helpers.JSON(w, http.StatusOK, user)
 }
 
@@ -453,29 +485,30 @@ func (h *AuthHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {string} string "Пользователь не найден"
 // @Router /api/admin/users/{id} [patch]
 func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		logger.Log.Warn("Невалидный ID при обновлении пользователя", zap.Any("vars", vars))
+		log.Warn("Невалидный ID при обновлении пользователя", zap.Any("vars", vars))
 		helpers.Error(w, http.StatusBadRequest, "Невалидный ID")
 		return
 	}
 
 	var input models.UpdateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		logger.Log.Warn("Невалидный JSON при обновлении пользователя", zap.Error(err))
+		log.Warn("Невалидный JSON при обновлении пользователя", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "Невалидный JSON")
 		return
 	}
 
-	err = h.authService.UpdateUser(r.Context(), id, &input)
-	if err != nil {
-		logger.Log.Error("Ошибка при обновлении пользователя", zap.Error(err), zap.Int("user_id", id))
+	if err := h.authService.UpdateUser(r.Context(), id, &input); err != nil {
+		log.Error("Ошибка при обновлении пользователя", zap.Error(err), zap.Int("user_id", id))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при обновлении")
 		return
 	}
 
-	logger.Log.Info("Пользователь обновлён", zap.Int("user_id", id))
+	log.Info("Пользователь обновлён", zap.Int("user_id", id))
 	helpers.JSON(w, http.StatusOK, "Пользователь обновлён")
 }
 
@@ -491,17 +524,19 @@ func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 // @Failure 400 {string} string "Ошибка запроса"
 // @Router /api/admin/users/{id}/subscription [patch]
 func (h *AuthHandler) SetSubscription(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	idStr := mux.Vars(r)["id"]
 	userID, err := strconv.Atoi(idStr)
 	if err != nil {
-		logger.Log.Warn("Неверный ID при обновлении подписки", zap.String("id", idStr))
+		log.Warn("Неверный ID при обновлении подписки", zap.String("id", idStr))
 		helpers.Error(w, http.StatusBadRequest, "Неверный ID")
 		return
 	}
 
 	var req setSubscriptionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.Log.Warn("Невалидный JSON при обновлении подписки", zap.Error(err))
+		log.Warn("Невалидный JSON при обновлении подписки", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "Невалидный JSON")
 		return
 	}
@@ -513,44 +548,50 @@ func (h *AuthHandler) SetSubscription(w http.ResponseWriter, r *http.Request) {
 
 	switch action {
 	case "revoke":
+		log.Info("Отключение подписки", zap.Int("user_id", userID))
 		if err := h.authService.SetSubscription(r.Context(), userID, false); err != nil {
-			logger.Log.Error("Ошибка отключения подписки", zap.Error(err), zap.Int("user_id", userID))
+			log.Error("Ошибка отключения подписки", zap.Error(err), zap.Int("user_id", userID))
 			helpers.Error(w, http.StatusInternalServerError, "Ошибка отключения подписки")
 			return
 		}
 	case "grant", "extend":
 		dur, err := parseHumanDuration(req.Duration)
 		if err != nil {
+			log.Warn("Невалидный duration при подписке", zap.String("duration", req.Duration))
 			helpers.Error(w, http.StatusBadRequest, "Неверный формат duration")
 			return
 		}
 		if action == "grant" {
+			log.Info("Выдача подписки", zap.Int("user_id", userID), zap.String("duration", req.Duration), zap.Duration("parsed", dur))
 			if err := h.authService.SetSubscriptionWithExpiry(r.Context(), userID, dur); err != nil {
-				logger.Log.Error("Ошибка выдачи подписки", zap.Error(err), zap.Int("user_id", userID))
+				log.Error("Ошибка выдачи подписки", zap.Error(err), zap.Int("user_id", userID))
 				helpers.Error(w, http.StatusInternalServerError, "Ошибка выдачи подписки")
 				return
 			}
 		} else {
+			log.Info("Продление подписки", zap.Int("user_id", userID), zap.String("duration", req.Duration), zap.Duration("parsed", dur))
 			if err := h.authService.ExtendSubscription(r.Context(), userID, dur); err != nil {
-				logger.Log.Error("Ошибка продления подписки", zap.Error(err), zap.Int("user_id", userID))
+				log.Error("Ошибка продления подписки", zap.Error(err), zap.Int("user_id", userID))
 				helpers.Error(w, http.StatusInternalServerError, "Ошибка продления подписки")
 				return
 			}
 		}
 	default:
+		log.Warn("Невалидное действие для подписки", zap.String("action", action))
 		helpers.Error(w, http.StatusBadRequest, "action должен быть grant|extend|revoke")
 		return
 	}
 
-	// Вернём текущее состояние пользователя
 	u, err := h.authService.GetUserByID(r.Context(), userID)
 	if err != nil {
+		log.Error("Не удалось получить пользователя после изменения подписки", zap.Error(err), zap.Int("user_id", userID))
 		helpers.Error(w, http.StatusInternalServerError, "Не удалось получить пользователя")
 		return
 	}
 	now := time.Now().UTC()
 	isActive := u.HasSubscription && u.SubscriptionExpiresAt != nil && u.SubscriptionExpiresAt.After(now)
 
+	log.Info("Подписка обновлена", zap.Int("user_id", userID), zap.Bool("has_subscription", u.HasSubscription))
 	helpers.JSON(w, http.StatusOK, map[string]interface{}{
 		"user_id":                 u.ID,
 		"has_subscription":        u.HasSubscription,
@@ -560,35 +601,8 @@ func (h *AuthHandler) SetSubscription(w http.ResponseWriter, r *http.Request) {
 }
 
 type setSubscriptionRequest struct {
-	// grant | extend | revoke
-	Action string `json:"action"`
-	// monthly | halfyear | yearly | "30d" | "72h" и т.п. (обязательно для grant/extend)
-	Duration string `json:"duration,omitempty"`
-}
-
-// "monthly"=30d, "halfyear"=182d, "yearly"=365d, "Nd" поддерживается.
-// Для "h/m/s" используем time.ParseDuration.
-func parseHumanDuration(s string) (time.Duration, error) {
-	s = strings.TrimSpace(strings.ToLower(s))
-	switch s {
-	case "monthly":
-		return 30 * 24 * time.Hour, nil
-	case "halfyear":
-		return 182 * 24 * time.Hour, nil
-	case "yearly":
-		return 365 * 24 * time.Hour, nil
-	}
-	// Nd -> часы
-	if strings.HasSuffix(s, "d") {
-		num := strings.TrimSuffix(s, "d")
-		n, err := strconv.Atoi(num)
-		if err != nil || n <= 0 {
-			return 0, fmt.Errorf("bad days")
-		}
-		return time.Duration(n) * 24 * time.Hour, nil
-	}
-	// попробуем стандартный формат (72h, 90m, 3600s)
-	return time.ParseDuration(s)
+	Action   string `json:"action"`             // grant | extend | revoke
+	Duration string `json:"duration,omitempty"` // monthly | halfyear | yearly | "30d" | "72h" | ...
 }
 
 // NotifySubscribers godoc
@@ -602,30 +616,29 @@ func parseHumanDuration(s string) (time.Duration, error) {
 // @Failure 500 {string} string "Ошибка отправки"
 // @Router /api/admin/notify [post]
 func (h *AuthHandler) NotifySubscribers(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	var req notifyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Warn("Невалидный JSON в NotifySubscribers", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "Невалидный JSON")
 		return
 	}
 
 	emails, err := h.authService.GetSubscribedEmails(r.Context())
 	if err != nil {
+		log.Error("Не удалось получить список подписчиков", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Не удалось получить список подписчиков")
 		return
 	}
 
 	if len(emails) == 0 {
+		log.Info("Нет подписчиков для рассылки")
 		helpers.JSON(w, http.StatusOK, map[string]string{"message": "Нет подписчиков"})
 		return
 	}
 
-	type result struct {
-		Email string `json:"email"`
-		Error string `json:"error,omitempty"`
-	}
-	results := make([]result, len(emails))
-
-	for i, email := range emails {
+	for _, email := range emails {
 		html := helpers.BuildSimpleHTML(req.Subject, req.Message)
 		services.EmailQueue <- services.EmailJob{
 			To:      []string{email},
@@ -633,14 +646,9 @@ func (h *AuthHandler) NotifySubscribers(w http.ResponseWriter, r *http.Request) 
 			Body:    html,
 			IsHTML:  true,
 		}
-		results[i] = result{Email: email}
 	}
-
-	helpers.JSON(w, http.StatusOK, map[string]interface{}{
-		"sent":    len(emails),
-		"failed":  0,
-		"results": results,
-	})
+	log.Info("Письма поставлены в очередь", zap.Int("count", len(emails)))
+	helpers.JSON(w, http.StatusOK, "Письма отправлены")
 }
 
 // EmailSubscribe godoc
@@ -654,20 +662,29 @@ func (h *AuthHandler) NotifySubscribers(w http.ResponseWriter, r *http.Request) 
 // @Failure 400 {string} string "Невалидный запрос"
 // @Router /api/email-subscription [patch]
 func (h *AuthHandler) EmailSubscribe(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	var req emailSubscriptionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Warn("Невалидный JSON в EmailSubscribe", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "Невалидный JSON")
 		return
 	}
 
-	userID := r.Context().Value(middleware.ContextUserID).(int)
+	userID, ok := r.Context().Value(middleware.ContextUserID).(int)
+	if !ok || userID == 0 {
+		log.Warn("Нет доступа для EmailSubscribe: user_id отсутствует")
+		helpers.Error(w, http.StatusUnauthorized, "Нет доступа")
+		return
+	}
 
-	err := h.authService.UpdateEmailSubscription(r.Context(), userID, req.Subscribe)
-	if err != nil {
+	if err := h.authService.UpdateEmailSubscription(r.Context(), userID, req.Subscribe); err != nil {
+		log.Error("Не удалось обновить статус email-подписки", zap.Error(err), zap.Int("user_id", userID))
 		helpers.Error(w, http.StatusInternalServerError, "Не удалось обновить статус подписки")
 		return
 	}
 
+	log.Info("Статус email-подписки обновлён", zap.Int("user_id", userID), zap.Bool("subscribe", req.Subscribe))
 	helpers.JSON(w, http.StatusOK, map[string]string{"message": "Статус подписки обновлён"})
 }
 
@@ -682,7 +699,7 @@ func (h *AuthHandler) SendVerificationEmail(ctx context.Context, user *models.Us
 		Body:    htmlBody,
 		IsHTML:  true,
 	}
-	logger.Log.Info("Добавление письма в очередь", zap.String("email", user.Email))
+	logger.WithCtx(ctx).Info("Письмо подтверждения поставлено в очередь", zap.String("email_masked", maskEmail(user.Email)))
 
 	return nil
 }
@@ -699,31 +716,32 @@ func (h *AuthHandler) SendVerificationEmail(ctx context.Context, user *models.Us
 // @Security ApiKeyAuth
 // @Router /api/admin/users/{id} [delete]
 func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	vars := mux.Vars(r)
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
+		log.Warn("Некорректный id пользователя в DeleteUser", zap.String("id", idStr))
 		helpers.Error(w, http.StatusBadRequest, "Некорректный id пользователя")
 		return
 	}
-	//
-	logger.Log.Info("Запрос на удаление пользователя", zap.Int("user_id", id))
 
-	_, err = h.authService.GetUserByID(r.Context(), id)
-	if err != nil {
-		logger.Log.Warn("Пользователь не найден для удаления", zap.Int("user_id", id))
+	log.Info("Запрос на удаление пользователя", zap.Int("user_id", id))
+
+	if _, err := h.authService.GetUserByID(r.Context(), id); err != nil {
+		log.Warn("Пользователь не найден для удаления", zap.Int("user_id", id))
 		helpers.Error(w, http.StatusNotFound, "Пользователь не найден")
 		return
 	}
 
-	err = h.authService.DeleteUserByID(r.Context(), id)
-	if err != nil {
-		logger.Log.Error("Ошибка при удалении пользователя из базы", zap.Error(err), zap.Int("user_id", id))
+	if err := h.authService.DeleteUserByID(r.Context(), id); err != nil {
+		log.Error("Ошибка при удалении пользователя из БД", zap.Error(err), zap.Int("user_id", id))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при удалении пользователя")
 		return
 	}
 
-	logger.Log.Info("Пользователь успешно удалён", zap.Int("user_id", id))
+	log.Info("Пользователь успешно удалён", zap.Int("user_id", id))
 	helpers.JSON(w, http.StatusOK, map[string]string{"message": "Пользователь удалён"})
 }
 
@@ -735,11 +753,99 @@ func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} models.SystemStats
 // @Router /api/admin/stats [get]
 func (h *AuthHandler) GetSystemStats(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	stats, err := h.authService.GetSystemStats(r.Context())
 	if err != nil {
-		logger.Log.Error("Ошибка получения статистики (handler)", zap.Error(err))
+		log.Error("Ошибка получения системной статистики (handler)", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "Не удалось получить статистику")
 		return
 	}
+
+	log.Info("Системная статистика отдана")
 	helpers.JSON(w, http.StatusOK, stats)
+}
+
+// --- helpers ---
+
+// parseHumanDuration:
+// "monthly"=30d, "halfyear"=182d, "yearly"=365d, "Nd" — дни, также поддерживаются "72h", "90m", "3600s".
+func parseHumanDuration(s string) (time.Duration, error) {
+	s = strings.TrimSpace(strings.ToLower(s))
+	switch s {
+	case "monthly":
+		return 30 * 24 * time.Hour, nil
+	case "halfyear":
+		return 182 * 24 * time.Hour, nil
+	case "yearly":
+		return 365 * 24 * time.Hour, nil
+	}
+	if strings.HasSuffix(s, "d") {
+		num := strings.TrimSuffix(s, "d")
+		n, err := strconv.Atoi(num)
+		if err != nil || n <= 0 {
+			return 0, fmt.Errorf("bad days")
+		}
+		return time.Duration(n) * 24 * time.Hour, nil
+	}
+	return time.ParseDuration(s)
+}
+
+func keys(m map[string]interface{}) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
+func maskEmail(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	at := strings.IndexByte(s, '@')
+	if at <= 1 {
+		return "***"
+	}
+	name := s[:at]
+	domain := s[at:]
+	if len(name) <= 2 {
+		return name[:1] + "*" + domain
+	}
+	return name[:1] + strings.Repeat("*", len(name)-2) + name[len(name)-1:] + domain
+}
+
+func maskPhone(s string) string {
+	digits := []rune{}
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			digits = append(digits, r)
+		}
+	}
+	if len(digits) < 4 {
+		return "***"
+	}
+	return "***" + string(digits[len(digits)-4:])
+}
+
+func maskLogin(s string) string {
+	s = strings.TrimSpace(s)
+	if strings.Contains(s, "@") {
+		return maskEmail(s)
+	}
+	onlyDigits := true
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			onlyDigits = false
+			break
+		}
+	}
+	if onlyDigits {
+		return maskPhone(s)
+	}
+	if len(s) <= 2 {
+		return s[:1] + "*"
+	}
+	return s[:1] + strings.Repeat("*", len(s)-2) + s[len(s)-1:]
 }

@@ -3,7 +3,9 @@ package repository
 import (
 	"context"
 
+	"edutalks/internal/logger"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.uber.org/zap"
 )
 
 type SubscriptionTopic string
@@ -23,23 +25,36 @@ func NewSubscriptionRepository(db *pgxpool.Pool) *SubscriptionRepository {
 	return &SubscriptionRepository{db: db}
 }
 
-// Вариант 1 (простой): один флаг "email_subscribed" в таблице users
+// GetAllSubscribedEmails — простой вариант: один флаг в users.email_subscription (+ email_verified)
+// выдержан в общем стиле логирования с ReqID/UserID из контекста.
 func (r *SubscriptionRepository) GetAllSubscribedEmails(ctx context.Context) ([]string, error) {
-	rows, err := r.db.Query(ctx, `SELECT email FROM users WHERE email_verified = TRUE AND email_subscription = TRUE`)
+	log := logger.WithCtx(ctx)
+
+	const q = `SELECT email FROM users WHERE email_verified = TRUE AND email_subscription = TRUE`
+
+	rows, err := r.db.Query(ctx, q)
 	if err != nil {
+		log.Error("subscription repo: query subscribed emails failed", zap.Error(err))
 		return nil, err
 	}
 	defer rows.Close()
 
-	var emails []string
+	emails := make([]string, 0, 128)
 	for rows.Next() {
 		var e string
 		if err := rows.Scan(&e); err != nil {
+			log.Error("subscription repo: scan email failed", zap.Error(err))
 			return nil, err
 		}
 		emails = append(emails, e)
 	}
-	return emails, rows.Err()
+	if err := rows.Err(); err != nil {
+		log.Error("subscription repo: rows error subscribed emails", zap.Error(err))
+		return nil, err
+	}
+
+	log.Debug("subscription repo: got subscribed emails", zap.Int("count", len(emails)))
+	return emails, nil
 }
 
 /*

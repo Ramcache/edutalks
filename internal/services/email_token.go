@@ -6,6 +6,7 @@ import (
 	"edutalks/internal/models"
 	"edutalks/internal/repository"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,14 +30,17 @@ var (
 func (s *EmailTokenService) GenerateToken(ctx context.Context, userID int) (*models.EmailVerificationToken, error) {
 	token := uuid.New().String()
 	expires := time.Now().Add(24 * time.Hour)
+
 	t := &models.EmailVerificationToken{
 		UserID:    userID,
 		Token:     token,
 		ExpiresAt: expires,
 		CreatedAt: time.Now(),
 	}
-	err := s.repo.SaveToken(ctx, t)
-	return t, err
+	if err := s.repo.SaveToken(ctx, t); err != nil {
+		return nil, err
+	}
+	return t, nil
 }
 
 func (s *EmailTokenService) ConfirmToken(ctx context.Context, token string) error {
@@ -66,10 +70,15 @@ type EmailJob struct {
 	IsHTML  bool
 }
 
-var EmailQueue = make(chan EmailJob, 100) // глобальная очередь на 100 писем
+var (
+	EmailQueue = make(chan EmailJob, 100)
+	closeOnce  sync.Once
+)
 
-func StartEmailWorker(emailService *EmailService) {
-	go func() {
+// StartEmailWorker — неблокирующий почтовый воркер с ID для логов.
+func StartEmailWorker(id int, emailService *EmailService) {
+	go func(workerID int) {
+		logger.Log.Info("Сервис: email-воркер запущен", zap.Int("worker_id", workerID))
 		for job := range EmailQueue {
 			var err error
 			if job.IsHTML {
@@ -79,20 +88,33 @@ func StartEmailWorker(emailService *EmailService) {
 			}
 			if err != nil {
 				logger.Log.Error("Не удалось отправить письмо",
+					zap.Int("worker_id", workerID),
 					zap.Strings("to", job.To),
 					zap.String("subject", job.Subject),
 					zap.Error(err),
 				)
-			} else {
-				logger.Log.Info("Письмо отправлено (SMTP accepted)",
-					zap.Strings("to", job.To),
-					zap.String("subject", job.Subject),
-				)
+				continue
 			}
+			logger.Log.Info("Письмо отправлено (SMTP accepted)",
+				zap.Int("worker_id", workerID),
+				zap.Strings("to", job.To),
+				zap.String("subject", job.Subject),
+			)
 		}
-	}()
+		logger.Log.Info("Email-воркер остановлен", zap.Int("worker_id", workerID))
+	}(id)
 }
 
+// StopEmailWorkers — корректно закрывает очередь (воркеры завершатся сами).
+func StopEmailWorkers() {
+	closeOnce.Do(func() {
+		close(EmailQueue)
+		logger.Log.Info("Email-очередь закрыта")
+	})
+}
+
+// GetLastTokenByUserID — вернёт последний токен подтверждения e-mail для пользователя.
+// Используется для антиспама при повторной отправке письма.
 func (s *EmailTokenService) GetLastTokenByUserID(ctx context.Context, userID int) (*models.EmailVerificationToken, error) {
 	return s.repo.GetLastTokenByUserID(ctx, userID)
 }

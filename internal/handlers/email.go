@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"edutalks/internal/config"
 	"edutalks/internal/logger"
 	"edutalks/internal/services"
 	helpers "edutalks/internal/utils/helpers"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -22,7 +24,7 @@ func NewEmailHandler(emailTokenService *services.EmailTokenService) *EmailHandle
 
 // VerifyEmail godoc
 // @Summary Подтвердить email
-// @Description Подтверждает email по токену из письма
+// @Description Подверждает email по токену из письма
 // @Tags email
 // @Accept json
 // @Produce json
@@ -31,17 +33,18 @@ func NewEmailHandler(emailTokenService *services.EmailTokenService) *EmailHandle
 // @Failure 400 {object} map[string]string
 // @Router /api/verify-email [get]
 func (h *EmailHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	token := r.URL.Query().Get("token")
-	if token == "" {
-		helpers.JSON(w, http.StatusBadRequest, map[string]string{
-			"message": "Токен отсутствует",
-		})
+	if strings.TrimSpace(token) == "" {
+		log.Warn("VerifyEmail: отсутствует токен")
+		helpers.Error(w, http.StatusBadRequest, "Токен отсутствует")
 		return
 	}
 
-	err := h.emailTokenService.ConfirmToken(r.Context(), token)
-	if err != nil {
-		logger.Log.Warn("Ошибка подтверждения email", zap.Error(err))
+	if err := h.emailTokenService.ConfirmToken(r.Context(), token); err != nil {
+		log.Warn("VerifyEmail: ошибка подтверждения email", zap.Error(err))
+
 		var msg string
 		switch err {
 		case services.ErrTokenInvalid:
@@ -51,14 +54,19 @@ func (h *EmailHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 		default:
 			msg = "Внутренняя ошибка сервиса."
 		}
-		helpers.JSON(w, http.StatusBadRequest, map[string]string{
-			"message": msg,
-		})
+		helpers.Error(w, http.StatusBadRequest, msg)
 		return
 	}
 
-	http.Redirect(w, r, "https://edutalks.ru/verify-email?status=success", http.StatusFound)
+	cfg, _ := config.LoadConfig()
+	base := strings.TrimRight(strings.TrimSpace(cfg.FrontendURL), "/")
+	if base == "" {
+		base = "https://edutalks.ru"
+	}
+	redirectURL := base + "/verify-email?status=success"
 
+	log.Info("VerifyEmail: email подтверждён, редирект на фронт", zap.String("redirect_to", redirectURL))
+	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 
 // ResendVerificationEmail godoc
@@ -74,33 +82,35 @@ func (h *EmailHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} map[string]string
 // @Router /api/resend-verification [post]
 func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	type request struct {
 		Email string `json:"email"`
 	}
-
 	var req request
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Email) == "" {
+		log.Warn("ResendVerificationEmail: невалидный payload")
 		helpers.Error(w, http.StatusBadRequest, "Неверный формат запроса или пустой email")
 		return
 	}
 
 	user, err := h.authService.GetUserByEmail(r.Context(), req.Email)
 	if err != nil {
-		logger.Log.Warn("Пользователь не найден при ResendVerificationEmail", zap.String("email", req.Email))
+		log.Warn("ResendVerificationEmail: пользователь не найден", zap.String("email_masked", maskEmail(req.Email)))
 		helpers.Error(w, http.StatusNotFound, "Пользователь не найден")
 		return
 	}
 
-	// Проверяем лимит по последнему токену
-	lastToken, err := h.emailTokenService.GetLastTokenByUserID(r.Context(), user.ID)
-	if err == nil {
+	// Лимит повторной отправки
+	if lastToken, err := h.emailTokenService.GetLastTokenByUserID(r.Context(), user.ID); err == nil {
 		nextAllowed := lastToken.CreatedAt.Add(5 * time.Minute)
 		if nextAllowed.After(time.Now()) {
 			remaining := int(time.Until(nextAllowed).Seconds())
-			logger.Log.Info("DEBUG resend-verification limit",
+			log.Info("ResendVerificationEmail: превышен лимит, слишком рано",
 				zap.Time("created_at", lastToken.CreatedAt),
 				zap.Time("next_allowed", nextAllowed),
 				zap.Int("remaining_sec", remaining),
+				zap.Int("user_id", user.ID),
 			)
 			helpers.Error(w, http.StatusTooManyRequests,
 				fmt.Sprintf("Вы можете повторно запросить письмо через %d секунд", remaining))
@@ -108,21 +118,22 @@ func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	// Создаём новый токен
+	// Создание нового токена
 	emailToken, err := h.emailTokenService.GenerateToken(r.Context(), user.ID)
 	if err != nil {
-		logger.Log.Error("Ошибка генерации токена при ResendVerificationEmail", zap.Error(err))
+		log.Error("ResendVerificationEmail: ошибка генерации токена", zap.Error(err), zap.Int("user_id", user.ID))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка генерации токена")
 		return
 	}
 
-	// Отправляем письмо
+	// Отправка письма
 	if err := h.SendVerificationEmail(r.Context(), user, emailToken.Token); err != nil {
-		logger.Log.Error("Ошибка при отправке письма в ResendVerificationEmail", zap.Error(err))
+		log.Error("ResendVerificationEmail: ошибка при отправке письма", zap.Error(err), zap.Int("user_id", user.ID))
 		helpers.Error(w, http.StatusInternalServerError, "Ошибка при отправке письма")
 		return
 	}
 
+	log.Info("ResendVerificationEmail: письмо отправлено повторно", zap.Int("user_id", user.ID))
 	helpers.JSON(w, http.StatusOK, map[string]string{
 		"message": "Письмо с подтверждением отправлено повторно",
 	})

@@ -3,10 +3,13 @@ package services
 import (
 	"context"
 	"edutalks/internal/config"
+	"edutalks/internal/logger"
 	"edutalks/internal/utils/helpers"
 	"fmt"
 	"net/smtp"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type EmailService struct {
@@ -18,16 +21,33 @@ type EmailService struct {
 
 func NewEmailService(cfg *config.Config) *EmailService {
 	auth := smtp.PlainAuth("", cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPHost)
-	return &EmailService{
+	s := &EmailService{
 		auth: auth,
 		from: cfg.SMTPUser,
 		host: cfg.SMTPHost,
 		port: cfg.SMTPPort,
 	}
+	logger.Log.Info("Сервис: инициализация EmailService",
+		zap.String("smtp_host", s.host),
+		zap.String("smtp_port", s.port),
+		zap.String("from", s.from),
+	)
+	return s
+}
+
+func (s *EmailService) smtpAddr() string {
+	return fmt.Sprintf("%s:%s", s.host, s.port)
 }
 
 func (s *EmailService) Send(to []string, subject, body string) error {
+	addr := s.smtpAddr()
+
 	for _, recipient := range to {
+		logger.Log.Info("Сервис: отправка письма (plain)",
+			zap.String("to", recipient),
+			zap.String("subject", subject),
+		)
+
 		msg := []byte(
 			"From: Edutalks <" + s.from + ">\r\n" +
 				"To: " + recipient + "\r\n" +
@@ -35,17 +55,33 @@ func (s *EmailService) Send(to []string, subject, body string) error {
 				"Content-Type: text/plain; charset=\"utf-8\"\r\n\r\n" +
 				body,
 		)
-		addr := fmt.Sprintf("%s:%s", s.host, s.port)
-		err := smtp.SendMail(addr, s.auth, s.from, []string{recipient}, msg)
-		if err != nil {
+
+		if err := smtp.SendMail(addr, s.auth, s.from, []string{recipient}, msg); err != nil {
+			logger.Log.Error("Сервис: ошибка отправки письма (plain)",
+				zap.String("to", recipient),
+				zap.String("subject", subject),
+				zap.Error(err),
+			)
 			return err
 		}
+
+		logger.Log.Info("Сервис: письмо отправлено (plain)",
+			zap.String("to", recipient),
+			zap.String("subject", subject),
+		)
 	}
 	return nil
 }
 
 func (s *EmailService) SendHTML(to []string, subject, htmlBody string) error {
+	addr := s.smtpAddr()
+
 	for _, recipient := range to {
+		logger.Log.Info("Сервис: отправка письма (html)",
+			zap.String("to", recipient),
+			zap.String("subject", subject),
+		)
+
 		msg := []byte(
 			"From: Edutalks <" + s.from + ">\r\n" +
 				"To: " + recipient + "\r\n" +
@@ -54,11 +90,20 @@ func (s *EmailService) SendHTML(to []string, subject, htmlBody string) error {
 				"Content-Type: text/html; charset=\"utf-8\"\r\n\r\n" +
 				htmlBody,
 		)
-		addr := fmt.Sprintf("%s:%s", s.host, s.port)
-		err := smtp.SendMail(addr, s.auth, s.from, []string{recipient}, msg)
-		if err != nil {
+
+		if err := smtp.SendMail(addr, s.auth, s.from, []string{recipient}, msg); err != nil {
+			logger.Log.Error("Сервис: ошибка отправки письма (html)",
+				zap.String("to", recipient),
+				zap.String("subject", subject),
+				zap.Error(err),
+			)
 			return err
 		}
+
+		logger.Log.Info("Сервис: письмо отправлено (html)",
+			zap.String("to", recipient),
+			zap.String("subject", subject),
+		)
 	}
 	return nil
 }
@@ -66,18 +111,67 @@ func (s *EmailService) SendHTML(to []string, subject, htmlBody string) error {
 func (s *EmailService) SendPasswordReset(ctx context.Context, to, resetLink string) error {
 	subject := "Восстановление пароля"
 	htmlBody := helpers.BuildPasswordResetHTML(resetLink)
-	// отправляем как HTML
-	return s.SendHTML([]string{to}, subject, htmlBody)
+
+	logger.Log.Info("Сервис: формирование письма для восстановления пароля",
+		zap.String("to", to),
+		// ссылку/токен намеренно не логируем
+	)
+
+	if err := s.SendHTML([]string{to}, subject, htmlBody); err != nil {
+		logger.Log.Error("Сервис: ошибка отправки письма восстановления",
+			zap.String("to", to),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	logger.Log.Info("Сервис: письмо восстановления отправлено", zap.String("to", to))
+	return nil
 }
 
 func (s *EmailService) SendSubscriptionGranted(ctx context.Context, to, name, planLabel string, expiresAt time.Time) error {
 	subject := "Подписка активирована"
 	body := helpers.BuildSubscriptionGrantedHTML(name, planLabel, expiresAt.Format("02.01.2006 15:04"))
-	return s.SendHTML([]string{to}, subject, body)
+
+	logger.Log.Info("Сервис: формирование письма об активации подписки",
+		zap.String("to", to),
+		zap.String("plan", planLabel),
+		zap.Time("expires_at", expiresAt),
+	)
+
+	if err := s.SendHTML([]string{to}, subject, body); err != nil {
+		logger.Log.Error("Сервис: ошибка отправки письма об активации подписки",
+			zap.String("to", to),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	logger.Log.Info("Сервис: письмо об активации подписки отправлено",
+		zap.String("to", to),
+		zap.String("plan", planLabel),
+	)
+	return nil
 }
 
 func (s *EmailService) SendSubscriptionRevoked(ctx context.Context, to, name string, revokedAt time.Time, prevExpiresAt *time.Time) error {
 	subject := "Подписка отключена"
 	body := helpers.BuildSubscriptionRevokedHTML(name, revokedAt, prevExpiresAt)
-	return s.SendHTML([]string{to}, subject, body)
+
+	logger.Log.Info("Сервис: формирование письма об отключении подписки",
+		zap.String("to", to),
+		zap.Time("revoked_at", revokedAt),
+		zap.Bool("had_prev_expiry", prevExpiresAt != nil),
+	)
+
+	if err := s.SendHTML([]string{to}, subject, body); err != nil {
+		logger.Log.Error("Сервис: ошибка отправки письма об отключении подписки",
+			zap.String("to", to),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	logger.Log.Info("Сервис: письмо об отключении подписки отправлено", zap.String("to", to))
+	return nil
 }

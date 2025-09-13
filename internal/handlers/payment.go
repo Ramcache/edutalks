@@ -1,10 +1,14 @@
 package handlers
 
 import (
+	"net/http"
+
+	"edutalks/internal/logger"
 	"edutalks/internal/middleware"
 	"edutalks/internal/services"
 	"edutalks/internal/utils/helpers"
-	"net/http"
+
+	"go.uber.org/zap"
 )
 
 type PaymentHandler struct {
@@ -31,15 +35,18 @@ type PaymentResult struct {
 // @Failure 401 {object} helpers.Response
 // @Router /api/pay [get]
 func (h *PaymentHandler) CreatePayment(w http.ResponseWriter, r *http.Request) {
+	log := logger.WithCtx(r.Context())
+
 	plan := r.URL.Query().Get("plan")
 	if plan == "" {
+		log.Warn("create payment: отсутствует параметр plan")
 		helpers.Error(w, http.StatusBadRequest, "missing plan")
 		return
 	}
 
-	// userID берём из JWT
 	userID, ok := r.Context().Value(middleware.ContextUserID).(int)
 	if !ok || userID == 0 {
+		log.Warn("create payment: отсутствует user_id в контексте")
 		helpers.Error(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
@@ -60,17 +67,25 @@ func (h *PaymentHandler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 		amount = 15000
 		description = "Годовая подписка"
 	default:
+		log.Warn("create payment: неверный план", zap.String("plan", plan))
 		helpers.Error(w, http.StatusBadRequest, "invalid plan")
 		return
 	}
 
-	// !! ВАЖНО: передаём plan дальше в сервис
-	paymentURL, err := h.YooKassaService.CreatePayment(amount, description, userID, plan)
+	log.Info("create payment: параметры",
+		zap.Int("user_id", userID),
+		zap.String("plan", plan),
+		zap.Float64("amount", amount),
+		zap.String("description", description),
+	)
+
+	paymentURL, err := h.YooKassaService.CreatePayment(r.Context(), amount, description, userID, plan)
 	if err != nil {
+		log.Error("create payment: ошибка сервиса YooKassa", zap.Error(err))
 		helpers.Error(w, http.StatusInternalServerError, "failed to create payment: "+err.Error())
 		return
 	}
 
-	// Отдаём JSON с ссылкой (фронт делает window.location.href = paymentURL)
+	log.Info("create payment: ссылка получена", zap.String("confirmation_url", paymentURL))
 	helpers.JSON(w, http.StatusOK, PaymentResult{ConfirmationURL: paymentURL})
 }
