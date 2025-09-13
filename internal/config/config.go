@@ -38,10 +38,16 @@ type Config struct {
 
 	FrontendURL         string
 	PasswordResetTTLMin string
+
+	// --- Новые настройки для рассылок через .env ---
+	EmailSendInterval      string // пример: "10s"
+	EmailPerRecipientDelay string // пример: "2s"
+	EmailMaxRetries        string // пример: "6"
+	EmailBaseBackoff       string // пример: "30s"
+	EmailBatchSize         string // пример: "25"
 }
 
 // LoadConfig загружает .env, читает переменные окружения и выставляет дефолты.
-// Ничего не логирует — чтобы не создавать зависимость от logger.
 func LoadConfig() (*Config, error) {
 	_ = godotenv.Load(".env")
 
@@ -82,6 +88,13 @@ func LoadConfig() (*Config, error) {
 		YooKassaShopID:      os.Getenv("YOOKASSA_SHOP_ID"),
 		FrontendURL:         os.Getenv("FRONTEND_URL"),
 		PasswordResetTTLMin: def(os.Getenv("PASSWORD_RESET_TTL_MIN"), "30"),
+
+		// Новые поля: читаем как строки, парсим в сервисах
+		EmailSendInterval:      def(os.Getenv("EMAIL_SEND_INTERVAL"), "10s"),
+		EmailPerRecipientDelay: def(os.Getenv("EMAIL_PER_RECIPIENT_DELAY"), "2s"),
+		EmailMaxRetries:        def(os.Getenv("EMAIL_MAX_RETRIES"), "6"),
+		EmailBaseBackoff:       def(os.Getenv("EMAIL_BASE_BACKOFF"), "30s"),
+		EmailBatchSize:         def(os.Getenv("EMAIL_BATCH_SIZE"), "25"),
 	}
 
 	return cfg, nil
@@ -94,12 +107,12 @@ func (c *Config) Validate() (warnings []string, err error) {
 		return nil, fmt.Errorf("incomplete DB config (DB_HOST/DB_USER/DB_NAME)")
 	}
 
-	// JWT — предупреждение (можешь сделать ошибкой, если нужно)
+	// JWT — предупреждение
 	if strings.TrimSpace(c.JWTSecret) == "" {
 		warnings = append(warnings, "JWT_SECRET is empty")
 	}
 
-	// YooKassa — предупреждение, если проект может работать и без оплат
+	// YooKassa — предупреждение
 	if c.YooKassaShopID == "" || c.YooKassaSecret == "" {
 		warnings = append(warnings, "YooKassa credentials are not set")
 	}
