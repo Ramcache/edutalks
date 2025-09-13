@@ -36,7 +36,7 @@ func InitApp(cfg *config.Config) (*mux.Router, func(), error) {
 	pwdResetRepo := repository.NewPasswordResetRepository(conn)
 
 	// Сервисы
-	emailService := services.NewEmailService(cfg)
+	emailService := services.NewEmailService(cfg) // <-- единственный экземпляр
 	authService := services.NewAuthService(userRepo)
 	docService := services.NewDocumentService(docRepo)
 	newsService := services.NewNewsService(newsRepo, userRepo, emailService, cfg)
@@ -64,6 +64,12 @@ func InitApp(cfg *config.Config) (*mux.Router, func(), error) {
 	passwordHandler := handlers.NewPasswordHandler(passwordSvc, userRepo)
 	logsAdminH := handlers.NewAdminLogsHandler()
 
+	// Применяем параметры воркера из .env (интервалы, ретраи, размер батча)
+	services.ConfigureEmailWorkerFromEnv(cfg)
+
+	// Запуск почтовых воркеров — начни с одного (дозированная отправка)
+	services.StartEmailWorker(1, emailService)
+
 	// Чистка подписок при старте
 	if err := userRepo.ExpireSubscriptions(context.Background()); err != nil {
 		logger.Log.Warn("Не удалось выполнить ExpireSubscriptions при старте", zap.Error(err))
@@ -71,11 +77,6 @@ func InitApp(cfg *config.Config) (*mux.Router, func(), error) {
 		logger.Log.Info("ExpireSubscriptions при старте выполнен")
 	}
 	stopCleaner := startSubscriptionCleaner(userRepo)
-
-	// Почтовые воркеры (3 штуки) — с ID в логах
-	for i := 1; i <= 3; i++ {
-		services.StartEmailWorker(i, emailService)
-	}
 
 	// Маршруты
 	router := mux.NewRouter()

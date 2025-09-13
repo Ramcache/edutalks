@@ -12,6 +12,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// Пауза между адресатами; настраивается из .env через NewEmailService.
+var emailPerRecipientDelay = 2 * time.Second
+
 type EmailService struct {
 	auth smtp.Auth
 	from string
@@ -20,6 +23,11 @@ type EmailService struct {
 }
 
 func NewEmailService(cfg *config.Config) *EmailService {
+	// Применяем настройку задержки между адресатами из .env
+	if d, err := time.ParseDuration(cfg.EmailPerRecipientDelay); err == nil && d >= 0 {
+		emailPerRecipientDelay = d
+	}
+
 	auth := smtp.PlainAuth("", cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPHost)
 	s := &EmailService{
 		auth: auth,
@@ -31,6 +39,7 @@ func NewEmailService(cfg *config.Config) *EmailService {
 		zap.String("smtp_host", s.host),
 		zap.String("smtp_port", s.port),
 		zap.String("from", s.from),
+		zap.Duration("per_recipient_delay", emailPerRecipientDelay),
 	)
 	return s
 }
@@ -39,10 +48,11 @@ func (s *EmailService) smtpAddr() string {
 	return fmt.Sprintf("%s:%s", s.host, s.port)
 }
 
+// Send — текстовое письмо; отправляем по одному получателю с небольшой паузой
 func (s *EmailService) Send(to []string, subject, body string) error {
 	addr := s.smtpAddr()
 
-	for _, recipient := range to {
+	for i, recipient := range to {
 		logger.Log.Info("Сервис: отправка письма (plain)",
 			zap.String("to", recipient),
 			zap.String("subject", subject),
@@ -52,6 +62,9 @@ func (s *EmailService) Send(to []string, subject, body string) error {
 			"From: Edutalks <" + s.from + ">\r\n" +
 				"To: " + recipient + "\r\n" +
 				"Subject: " + subject + "\r\n" +
+				"List-Unsubscribe: <mailto:unsubscribe@edutalks.ru?subject=unsubscribe>, <https://edutalks.ru/unsubscribe>\r\n" +
+				"List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n" +
+				"Precedence: bulk\r\n" +
 				"Content-Type: text/plain; charset=\"utf-8\"\r\n\r\n" +
 				body,
 		)
@@ -69,14 +82,20 @@ func (s *EmailService) Send(to []string, subject, body string) error {
 			zap.String("to", recipient),
 			zap.String("subject", subject),
 		)
+
+		// Пауза между адресатами, чтобы сгладить спайки
+		if i < len(to)-1 && emailPerRecipientDelay > 0 {
+			time.Sleep(emailPerRecipientDelay)
+		}
 	}
 	return nil
 }
 
+// SendHTML — HTML-письмо; отправляем по одному получателю с небольшой паузой
 func (s *EmailService) SendHTML(to []string, subject, htmlBody string) error {
 	addr := s.smtpAddr()
 
-	for _, recipient := range to {
+	for i, recipient := range to {
 		logger.Log.Info("Сервис: отправка письма (html)",
 			zap.String("to", recipient),
 			zap.String("subject", subject),
@@ -87,6 +106,9 @@ func (s *EmailService) SendHTML(to []string, subject, htmlBody string) error {
 				"To: " + recipient + "\r\n" +
 				"Subject: " + subject + "\r\n" +
 				"MIME-Version: 1.0\r\n" +
+				"List-Unsubscribe: <mailto:unsubscribe@edutalks.ru?subject=unsubscribe>, <https://edutalks.ru/unsubscribe>\r\n" +
+				"List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n" +
+				"Precedence: bulk\r\n" +
 				"Content-Type: text/html; charset=\"utf-8\"\r\n\r\n" +
 				htmlBody,
 		)
@@ -104,6 +126,11 @@ func (s *EmailService) SendHTML(to []string, subject, htmlBody string) error {
 			zap.String("to", recipient),
 			zap.String("subject", subject),
 		)
+
+		// Пауза между адресатами, чтобы сгладить спайки
+		if i < len(to)-1 && emailPerRecipientDelay > 0 {
+			time.Sleep(emailPerRecipientDelay)
+		}
 	}
 	return nil
 }
@@ -114,7 +141,6 @@ func (s *EmailService) SendPasswordReset(ctx context.Context, to, resetLink stri
 
 	logger.Log.Info("Сервис: формирование письма для восстановления пароля",
 		zap.String("to", to),
-		// ссылку/токен намеренно не логируем
 	)
 
 	if err := s.SendHTML([]string{to}, subject, htmlBody); err != nil {
