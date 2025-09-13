@@ -699,32 +699,6 @@ func extractTimeFromRaw(raw []byte) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-func parseTimestamp(s string) (time.Time, bool) {
-	layouts := []string{
-		time.RFC3339Nano,
-		time.RFC3339,
-		"2006-01-02 15:04:05Z07:00",
-		"2006-01-02 15:04:05.000000000Z07:00",
-		"2006-01-02 15:04:05",
-		"2006-01-02T15:04:05",
-	}
-	for _, l := range layouts {
-		if t, err := time.Parse(l, s); err == nil {
-			return t, true
-		}
-	}
-	// иногда встречаются запятые в долях секунды: 2025-09-12T11:12:38,354Z
-	if strings.Contains(s, ",") {
-		s2 := strings.ReplaceAll(s, ",", ".")
-		for _, l := range layouts {
-			if t, err := time.Parse(l, s2); err == nil {
-				return t, true
-			}
-		}
-	}
-	return time.Time{}, false
-}
-
 func normalizeLevel(lvl string, obj map[string]any) string {
 	l := strings.ToUpper(strings.TrimSpace(lvl))
 	if l != "" {
@@ -776,4 +750,74 @@ func numericLevel(n float64) string {
 	default:
 		return "FATAL"
 	}
+}
+
+// normalizeRFC3339Frac приводит количество знаков после секунды к 9 (RFC3339Nano).
+// Работает и с 'Z', и с часовыми смещениями (+03:00 / -07:00), и с запятой в долях.
+func normalizeRFC3339Frac(s string) string {
+	// смена запятой на точку, если вдруг
+	if strings.Contains(s, ",") {
+		s = strings.ReplaceAll(s, ",", ".")
+	}
+	// ищем точку между секундами и таймзоной
+	// сначала находим позицию 'T' (или пробела), чтобы не зацепить дату
+	sep := strings.IndexByte(s, 'T')
+	if sep == -1 {
+		sep = strings.IndexByte(s, ' ')
+		if sep == -1 {
+			return s
+		}
+	}
+	dot := strings.IndexByte(s[sep:], '.')
+	if dot == -1 {
+		// нет долей секунд — оставляем как есть
+		return s
+	}
+	dot += sep
+
+	// ищем начало таймзоны после точки: 'Z' или '+' или '-'
+	zoneIdx := -1
+	for i := dot + 1; i < len(s); i++ {
+		switch s[i] {
+		case 'Z', '+', '-':
+			zoneIdx = i
+			goto done
+		}
+	}
+done:
+	if zoneIdx == -1 {
+		// сомнительная строка, не трогаем
+		return s
+	}
+
+	frac := s[dot+1 : zoneIdx]
+	if len(frac) == 9 {
+		return s
+	}
+	if len(frac) > 9 {
+		frac = frac[:9]
+	} else {
+		frac = frac + strings.Repeat("0", 9-len(frac))
+	}
+	return s[:dot+1] + frac + s[zoneIdx:]
+}
+
+func parseTimestamp(s string) (time.Time, bool) {
+	// Сначала пробуем нормализовать до RFC3339Nano (ровно 9 знаков в долях)
+	sn := normalizeRFC3339Frac(s)
+	// Базовые варианты
+	layouts := []string{
+		time.RFC3339Nano,                      // 2006-01-02T15:04:05.999999999Z07:00
+		time.RFC3339,                          // 2006-01-02T15:04:05Z07:00 (без долей)
+		"2006-01-02 15:04:05Z07:00",           // с пробелом, без долей
+		"2006-01-02 15:04:05.000000000Z07:00", // с пробелом, с долями (ровно 9)
+		"2006-01-02 15:04:05",                 // вообще без таймзоны
+		"2006-01-02T15:04:05",                 // без таймзоны (ISO, без долей)
+	}
+	for _, l := range layouts {
+		if t, err := time.Parse(l, sn); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
