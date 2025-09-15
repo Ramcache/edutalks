@@ -3,12 +3,21 @@ package routes
 import (
 	"edutalks/internal/handlers"
 	"edutalks/internal/middleware"
+	"edutalks/internal/repository"
 	"github.com/gorilla/mux"
 	"net/http"
 )
 
+// helper-обёртка для передачи repo в middleware.JWTAuth
+func jwtMiddleware(repo repository.UserRepo) mux.MiddlewareFunc {
+	return func(next http.Handler) http.Handler {
+		return middleware.JWTAuth(repo, next)
+	}
+}
+
 func InitRoutes(
 	router *mux.Router,
+	userRepo repository.UserRepo, // ✅ новый аргумент
 	authHandler *handlers.AuthHandler,
 	documentHandler *handlers.DocumentHandler,
 	newsHandler *handlers.NewsHandler,
@@ -29,7 +38,6 @@ func InitRoutes(
 	// ---------- ПУБЛИЧНЫЕ ----------
 	api.HandleFunc("/register", authHandler.Register).Methods(http.MethodPost)
 	api.HandleFunc("/login", authHandler.Login).Methods(http.MethodPost)
-	api.HandleFunc("/refresh", authHandler.Refresh).Methods(http.MethodPost)
 	api.HandleFunc("/logout", authHandler.Logout).Methods(http.MethodPost)
 
 	// платежный вебхук (публичная точка приёмки от ЮKassa)
@@ -39,14 +47,14 @@ func InitRoutes(
 	api.HandleFunc("/news", newsHandler.ListNews).Methods(http.MethodGet)
 	api.HandleFunc("/news/{id:[0-9]+}", newsHandler.GetNews).Methods(http.MethodGet)
 
-	// --- ДОБАВЛЕНО: публичные статьи ---
+	// публичные статьи
 	api.HandleFunc("/articles", articleH.GetAll).Methods(http.MethodGet)
 	api.HandleFunc("/articles/{id:[0-9]+}", articleH.GetByID).Methods(http.MethodGet)
 
 	api.HandleFunc("/verify-email", emailHandler.VerifyEmail).Methods(http.MethodGet)
 	api.HandleFunc("/resend-verification", authHandler.ResendVerificationEmail).Methods(http.MethodPost)
 
-	// превью документов (метаданные)
+	// превью документов
 	api.HandleFunc("/documents/{id:[0-9]+}/preview", documentHandler.PreviewDocument).Methods(http.MethodGet)
 	api.HandleFunc("/documents/preview", documentHandler.PreviewDocuments).Methods(http.MethodGet)
 
@@ -54,19 +62,19 @@ func InitRoutes(
 	api.HandleFunc("/taxonomy/tree", taxonomyH.PublicTree).Methods(http.MethodGet)
 	api.HandleFunc("/taxonomy/tree/{tab}", taxonomyH.PublicTreeByTab).Methods(http.MethodGet)
 
-	// публичный список файлов (без скачивания)
+	// публичный список файлов
 	api.HandleFunc("/files", documentHandler.ListPublicDocuments).Methods(http.MethodGet)
 
 	// глобальный поиск
 	api.HandleFunc("/search", searchHandler.GlobalSearch).Methods(http.MethodGet)
 
-	// восстановление пароля (публичные)
+	// восстановление пароля
 	api.HandleFunc("/password/forgot", passwordH.Forgot).Methods(http.MethodPost)
 	api.HandleFunc("/password/reset", passwordH.Reset).Methods(http.MethodPost)
 
 	// ---------- ПРОТЕКТИРОВАННЫЕ (JWT) ----------
 	protected := api.PathPrefix("").Subrouter()
-	protected.Use(middleware.JWTAuth)
+	protected.Use(jwtMiddleware(userRepo)) // ✅ теперь проверка токена идёт с блоклистом
 
 	// профиль, платеж и пр.
 	protected.HandleFunc("/pay", paymentHandler.CreatePayment).Methods(http.MethodGet)
@@ -74,10 +82,10 @@ func InitRoutes(
 	protected.HandleFunc("/email-subscription", authHandler.EmailSubscribe).Methods(http.MethodPatch)
 	protected.HandleFunc("/profile", authHandler.UpdateMyProfile).Methods(http.MethodPatch)
 
-	// скачивание файла (нужен user из контекста и проверка подписки)
+	// скачивание файла
 	protected.HandleFunc("/files/{id:[0-9]+}", documentHandler.DownloadDocument).Methods(http.MethodGet)
 
-	// смена пароля (нужен JWT)
+	// смена пароля
 	protected.HandleFunc("/password/change", passwordH.Change).Methods(http.MethodPost)
 
 	// ---------- АДМИН ----------
@@ -91,7 +99,7 @@ func InitRoutes(
 	admin.HandleFunc("/files/upload", documentHandler.UploadDocument).Methods(http.MethodPost)
 	admin.HandleFunc("/files/{id:[0-9]+}", documentHandler.DeleteDocument).Methods(http.MethodDelete)
 
-	// админ-панель / пользователи
+	// пользователи
 	admin.HandleFunc("/dashboard", authHandler.AdminOnly).Methods(http.MethodGet)
 	admin.HandleFunc("/users", authHandler.GetUsers).Methods(http.MethodGet)
 	admin.HandleFunc("/users/{id}", authHandler.GetUserByID).Methods(http.MethodGet)
@@ -123,11 +131,10 @@ func InitRoutes(
 	admin.HandleFunc("/sections/{id:[0-9]+}", taxonomyH.UpdateSection).Methods(http.MethodPatch)
 	admin.HandleFunc("/sections/{id:[0-9]+}", taxonomyH.DeleteSection).Methods(http.MethodDelete)
 
-	// --- ЛОГИ (админ) ---
+	// --- ЛОГИ ---
 	admin.HandleFunc("/logs/days", logsAdminH.ListDays).Methods(http.MethodGet)
 	admin.HandleFunc("/logs", logsAdminH.GetLogs).Methods(http.MethodGet)
 	admin.HandleFunc("/logs/stats", logsAdminH.Stats).Methods(http.MethodGet)
 	admin.HandleFunc("/logs/download", logsAdminH.DownloadLog).Methods(http.MethodGet)
 	admin.HandleFunc("/logs/summary", logsAdminH.StatsSummary).Methods(http.MethodGet)
-
 }

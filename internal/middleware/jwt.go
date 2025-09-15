@@ -4,6 +4,7 @@ import (
 	"context"
 	"edutalks/internal/config"
 	"edutalks/internal/logger"
+	"edutalks/internal/repository"
 	"net/http"
 	"strings"
 
@@ -13,7 +14,7 @@ import (
 
 type ContextKey string
 
-func JWTAuth(next http.Handler) http.Handler {
+func JWTAuth(repo repository.UserRepo, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
@@ -39,6 +40,13 @@ func JWTAuth(next http.Handler) http.Handler {
 		if err != nil || !token.Valid {
 			logger.WithCtx(r.Context()).Warn("JWTAuth: неверный или просроченный токен",
 				zap.Error(err))
+			http.Error(w, "Неверный или просроченный токен", http.StatusUnauthorized)
+			return
+		}
+
+		// 🔹 Проверка блоклиста
+		if blacklisted, _ := repo.IsAccessTokenBlacklisted(r.Context(), tokenString); blacklisted {
+			logger.WithCtx(r.Context()).Warn("JWTAuth: токен найден в блоклисте")
 			http.Error(w, "Неверный или просроченный токен", http.StatusUnauthorized)
 			return
 		}

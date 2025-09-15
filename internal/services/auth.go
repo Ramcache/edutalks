@@ -25,136 +25,28 @@ func NewAuthService(repo repository.UserRepo) *AuthService {
 }
 
 func (s *AuthService) RegisterUser(ctx context.Context, input *models.User, plainPassword string) error {
-	log := logger.WithCtx(ctx)
-	log.Info("Регистрация пользователя",
-		zap.String("username", input.Username),
-		zap.String("email", strings.ToLower(strings.TrimSpace(input.Email))),
-	)
+	//log := logger.WithCtx(ctx)
 
-	if exists, err := s.repo.IsUsernameTaken(ctx, input.Username); exists || err != nil {
-		if err != nil {
-			log.Error("Ошибка проверки уникальности username", zap.Error(err))
-		}
+	if exists, _ := s.repo.IsUsernameTaken(ctx, input.Username); exists {
 		return errors.New("имя пользователя уже занято")
 	}
-	if exists, err := s.repo.IsEmailTaken(ctx, input.Email); exists || err != nil {
-		if err != nil {
-			log.Error("Ошибка проверки уникальности email", zap.Error(err))
-		}
+	if exists, _ := s.repo.IsEmailTaken(ctx, input.Email); exists {
 		return errors.New("адрес электронной почты уже зарегистрирован")
 	}
 
 	hashed, err := utils.HashPassword(plainPassword)
 	if err != nil {
-		log.Error("Ошибка хеширования пароля", zap.Error(err))
 		return err
 	}
 
 	input.PasswordHash = hashed
 	input.Role = "user"
 
-	if err := s.repo.CreateUser(ctx, input); err != nil {
-		log.Error("Ошибка создания пользователя", zap.Error(err))
-		return err
-	}
-
-	log.Info("Пользователь зарегистрирован",
-		zap.String("username", input.Username),
-		zap.Int("user_id", input.ID),
-	)
-	return nil
+	return s.repo.CreateUser(ctx, input)
 }
 
-func (s *AuthService) LoginUser(
-	ctx context.Context,
-	username, password, jwtSecret string,
-	accessTTL, refreshTTL time.Duration,
-) (string, string, error) {
-	log := logger.WithCtx(ctx)
-	log.Info("Попытка входа", zap.String("username", username))
-
-	user, err := s.repo.GetByUsername(ctx, username)
-	if err != nil {
-		log.Warn("Пользователь не найден", zap.String("username", username), zap.Error(err))
-		return "", "", errors.New("пользователь не найден")
-	}
-
-	if !utils.CheckPasswordHash(password, user.PasswordHash) {
-		log.Warn("Неверный пароль", zap.Int("user_id", user.ID))
-		return "", "", errors.New("неверный пароль")
-	}
-
-	accessToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, accessTTL, "access")
-	if err != nil {
-		log.Error("Ошибка генерации access-токена", zap.Error(err))
-		return "", "", err
-	}
-
-	refreshToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, refreshTTL, "refresh")
-	if err != nil {
-		log.Error("Ошибка генерации refresh-токена", zap.Error(err))
-		return "", "", err
-	}
-
-	if err := s.repo.SaveRefreshToken(ctx, user.ID, refreshToken); err != nil {
-		log.Error("Ошибка сохранения refresh-токена", zap.Error(err))
-		return "", "", err
-	}
-
-	log.Info("Вход выполнен", zap.Int("user_id", user.ID), zap.String("role", user.Role))
-	return accessToken, refreshToken, nil
-}
-
-func (s *AuthService) ValidateRefreshToken(ctx context.Context, userID int, token string) (bool, error) {
-	log := logger.WithCtx(ctx)
-	log.Debug("Проверка refresh-токена", zap.Int("user_id", userID))
-	return s.repo.IsRefreshTokenValid(ctx, userID, token)
-}
-
-func (s *AuthService) Logout(ctx context.Context, userID int, token string) error {
-	log := logger.WithCtx(ctx)
-	log.Info("Выход пользователя", zap.Int("user_id", userID))
-	return s.repo.DeleteRefreshToken(ctx, userID, token)
-}
-
-func (s *AuthService) LoginUserWithUser(
-	ctx context.Context,
-	username, password, jwtSecret string,
-	accessTTL, refreshTTL time.Duration,
-) (string, string, *models.User, error) {
-	log := logger.WithCtx(ctx)
-	log.Info("Попытка входа (с возвратом пользователя)", zap.String("username", username))
-
-	user, err := s.repo.GetByUsername(ctx, username)
-	if err != nil {
-		log.Warn("Пользователь не найден", zap.String("username", username), zap.Error(err))
-		return "", "", nil, errors.New("пользователь не найден")
-	}
-
-	if !utils.CheckPasswordHash(password, user.PasswordHash) {
-		log.Warn("Неверный пароль", zap.Int("user_id", user.ID))
-		return "", "", nil, errors.New("неверный пароль")
-	}
-
-	accessToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, accessTTL, "access")
-	if err != nil {
-		log.Error("Ошибка генерации access-токена", zap.Error(err))
-		return "", "", nil, err
-	}
-
-	refreshToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, refreshTTL, "refresh")
-	if err != nil {
-		log.Error("Ошибка генерации refresh-токена", zap.Error(err))
-		return "", "", nil, err
-	}
-
-	if err := s.repo.SaveRefreshToken(ctx, user.ID, refreshToken); err != nil {
-		log.Error("Ошибка сохранения refresh-токена", zap.Error(err))
-		return "", "", nil, err
-	}
-
-	log.Info("Вход выполнен", zap.Int("user_id", user.ID))
-	return accessToken, refreshToken, user, nil
+func (s *AuthService) Logout(ctx context.Context, token string, exp time.Time) error {
+	return s.repo.AddAccessTokenToBlacklist(ctx, token, exp)
 }
 
 func (s *AuthService) GetUsersPaginated(ctx context.Context, limit, offset int) ([]*models.User, int, error) {
@@ -321,69 +213,46 @@ func (s *AuthService) ExtendSubscription(ctx context.Context, userID int, durati
 }
 
 func (s *AuthService) findUserByIdentifier(ctx context.Context, identifier string) (*models.User, error) {
-	log := logger.WithCtx(ctx)
 	id := strings.TrimSpace(identifier)
 	if id == "" {
 		return nil, errors.New("пустой логин")
 	}
-
-	// email
 	if strings.Contains(id, "@") {
-		log.Debug("Поиск пользователя по email")
 		return s.repo.GetUserByEmail(ctx, id)
 	}
-
-	// телефон — по последним 10 цифрам
 	digits := normalizePhoneDigits(id)
 	if len(digits) >= 10 {
-		log.Debug("Поиск пользователя по телефону")
 		return s.repo.GetUserByPhone(ctx, digits)
 	}
-
-	// username
-	log.Debug("Поиск пользователя по username")
 	return s.repo.GetByUsername(ctx, id)
 }
 
 func (s *AuthService) LoginUserByIdentifier(
 	ctx context.Context,
 	identifier, password, jwtSecret string,
-	accessTTL, refreshTTL time.Duration,
-) (string, string, *models.User, error) {
+	accessTTL time.Duration,
+) (string, *models.User, error) {
 	log := logger.WithCtx(ctx)
-	log.Info("Попытка входа (универсальный идентификатор)")
+	log.Info("Попытка входа (только access)")
 
 	user, err := s.findUserByIdentifier(ctx, identifier)
 	if err != nil {
-		log.Warn("Пользователь не найден по идентификатору", zap.String("identifier", identifier), zap.Error(err))
-		return "", "", nil, errors.New("пользователь не найден")
+		return "", nil, errors.New("пользователь не найден")
 	}
 
 	if !utils.CheckPasswordHash(password, user.PasswordHash) {
-		log.Warn("Неверный пароль", zap.Int("user_id", user.ID))
-		return "", "", nil, errors.New("неверный пароль")
+		return "", nil, errors.New("неверный пароль")
 	}
 
 	accessToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, accessTTL, "access")
 	if err != nil {
 		log.Error("Ошибка генерации access-токена", zap.Error(err))
-		return "", "", nil, err
-	}
-	refreshToken, err := utils.GenerateToken(jwtSecret, user.ID, user.Role, refreshTTL, "refresh")
-	if err != nil {
-		log.Error("Ошибка генерации refresh-токена", zap.Error(err))
-		return "", "", nil, err
+		return "", nil, err
 	}
 
-	if err := s.repo.SaveRefreshToken(ctx, user.ID, refreshToken); err != nil {
-		log.Error("Ошибка сохранения refresh-токена", zap.Error(err))
-		return "", "", nil, err
-	}
-
-	log.Info("Вход выполнен", zap.Int("user_id", user.ID), zap.String("role", user.Role))
-	return accessToken, refreshToken, user, nil
+	log.Info("Вход выполнен", zap.Int("user_id", user.ID))
+	return accessToken, user, nil
 }
-
 func humanizeDuration(d time.Duration) string {
 	days := int(d.Hours() / 24)
 	switch {
