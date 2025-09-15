@@ -81,7 +81,7 @@ func InitApp(cfg *config.Config) (*mux.Router, func(), error) {
 	// Маршруты
 	router := mux.NewRouter()
 	routes.InitRoutes(
-		router,
+		router, userRepo,
 		authHandler, docHandler, newsHandler, emailHandler,
 		searchHandler, paymentHandler, webhookHandler,
 		articleH, taxonomyH,

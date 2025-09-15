@@ -2291,39 +2291,6 @@
                 }
             }
         },
-        "/api/refresh": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Обновление access-токена",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Недействительный refresh токен",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
         "/api/register": {
             "post": {
                 "consumes": [
@@ -3094,9 +3061,6 @@
                     "type": "string"
                 },
                 "full_name": {
-                    "type": "string"
-                },
-                "refresh_token": {
                     "type": "string"
                 },
                 "role": {

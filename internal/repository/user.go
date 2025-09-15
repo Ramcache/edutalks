@@ -25,9 +25,6 @@ type UserRepo interface {
 	IsEmailTaken(ctx context.Context, email string) (bool, error)
 	CreateUser(ctx context.Context, user *models.User) error
 	GetByUsername(ctx context.Context, username string) (*models.User, error)
-	SaveRefreshToken(ctx context.Context, userID int, token string) error
-	IsRefreshTokenValid(ctx context.Context, userID int, token string) (bool, error)
-	DeleteRefreshToken(ctx context.Context, userID int, token string) error
 	GetAllUsersPaginated(ctx context.Context, limit, offset int) ([]*models.User, int, error)
 	GetUserByID(ctx context.Context, id int) (*models.User, error)
 	UpdateUserFields(ctx context.Context, id int, input *models.UpdateUserRequest) error
@@ -49,6 +46,8 @@ type UserRepo interface {
 		role *string,
 		hasSubscription *bool,
 	) ([]*models.User, int, error)
+	AddAccessTokenToBlacklist(ctx context.Context, token string, exp time.Time) error
+	IsAccessTokenBlacklisted(ctx context.Context, token string) (bool, error)
 }
 
 func (r *UserRepository) CreateUser(ctx context.Context, user *models.User) error {
@@ -68,11 +67,11 @@ func (r *UserRepository) CreateUser(ctx context.Context, user *models.User) erro
 		user.PasswordHash,
 		user.Role,
 	).Scan(&user.ID); err != nil {
-		log.Error("user repo: create user failed", zap.Error(err), zap.String("username", user.Username), zap.String("email", user.Email))
+		log.Error("user repo: create user failed", zap.Error(err))
 		return err
 	}
 
-	log.Info("user repo: user created", zap.Int("id", user.ID), zap.String("username", user.Username))
+	log.Info("user repo: user created", zap.Int("id", user.ID))
 	return nil
 }
 
@@ -611,4 +610,26 @@ func (r *UserRepository) GetUsersFiltered(
 		zap.Any("has_subscription", hasSubscription),
 	)
 	return users, total, nil
+}
+
+func (r *UserRepository) AddAccessTokenToBlacklist(ctx context.Context, token string, exp time.Time) error {
+	log := logger.WithCtx(ctx)
+	const q = `INSERT INTO access_token_blacklist (token, expires_at) VALUES ($1, $2)`
+	if _, err := r.db.Exec(ctx, q, token, exp); err != nil {
+		log.Error("repo: add access token to blacklist failed", zap.Error(err))
+		return err
+	}
+	log.Info("repo: access token added to blacklist", zap.Time("exp", exp))
+	return nil
+}
+
+func (r *UserRepository) IsAccessTokenBlacklisted(ctx context.Context, token string) (bool, error) {
+	log := logger.WithCtx(ctx)
+	const q = `SELECT EXISTS(SELECT 1 FROM access_token_blacklist WHERE token = $1 AND expires_at > NOW())`
+	var exists bool
+	if err := r.db.QueryRow(ctx, q, token).Scan(&exists); err != nil {
+		log.Error("repo: check access token blacklist failed", zap.Error(err))
+		return false, err
+	}
+	return exists, nil
 }

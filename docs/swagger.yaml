@@ -319,8 +319,6 @@ definitions:
         type: string
       full_name:
         type: string
-      refresh_token:
-        type: string
       role:
         type: string
       username:
@@ -1845,26 +1843,6 @@ paths:
       summary: Обновить свои данные
       tags:
       - profile
-  /api/refresh:
-    post:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "401":
-          description: Недействительный refresh токен
-          schema:
-            type: string
-      security:
-      - ApiKeyAuth: []
-      summary: Обновление access-токена
-      tags:
-      - auth
   /api/register:
     post:
       consumes:

@@ -7,7 +7,6 @@ import (
 	"edutalks/internal/middleware"
 	"edutalks/internal/models"
 	"edutalks/internal/services"
-	"edutalks/internal/utils"
 	helpers "edutalks/internal/utils/helpers"
 	"encoding/json"
 	"fmt"
@@ -52,11 +51,10 @@ type loginRequest struct {
 }
 
 type loginResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	Username     string `json:"username"`
-	FullName     string `json:"full_name"`
-	Role         string `json:"role"`
+	AccessToken string `json:"access_token"`
+	Username    string `json:"username"`
+	FullName    string `json:"full_name"`
+	Role        string `json:"role"`
 }
 
 type subscriptionRequest struct {
@@ -150,11 +148,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {string} string "Неверный логин или пароль"
 // @Router /api/login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	log := logger.WithCtx(r.Context())
+	//log := logger.WithCtx(r.Context())
 
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Warn("Невалидный JSON в Login", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "Невалидный JSON")
 		return
 	}
@@ -164,39 +161,27 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		identifier = strings.TrimSpace(req.Username)
 	}
 	if identifier == "" || req.Password == "" {
-		log.Warn("Отсутствуют обязательные поля в Login")
-		helpers.Error(w, http.StatusBadRequest, "Требуются поля login/username и password")
+		helpers.Error(w, http.StatusBadRequest, "Требуются login/username и password")
 		return
 	}
 
-	log.Info("Попытка входа", zap.String("identifier_masked", maskLogin(identifier)))
-
 	cfg, _ := config.LoadConfig()
 	accessTTL, _ := time.ParseDuration(cfg.AccessTokenTTL)
-	refreshTTL, _ := time.ParseDuration(cfg.RefreshTokenTTL)
 
-	access, refresh, user, err := h.authService.LoginUserByIdentifier(
-		r.Context(),
-		identifier,
-		req.Password,
-		cfg.JWTSecret,
-		accessTTL,
-		refreshTTL,
+	access, user, err := h.authService.LoginUserByIdentifier(
+		r.Context(), identifier, req.Password, cfg.JWTSecret, accessTTL,
 	)
 	if err != nil {
-		log.Warn("Неуспешная попытка входа", zap.String("identifier_masked", maskLogin(identifier)))
 		helpers.Error(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 
 	resp := loginResponse{
-		AccessToken:  access,
-		RefreshToken: refresh,
-		Username:     user.Username,
-		FullName:     user.FullName,
-		Role:         user.Role,
+		AccessToken: access,
+		Username:    user.Username,
+		FullName:    user.FullName,
+		Role:        user.Role,
 	}
-	log.Info("Успешный вход", zap.Int("user_id", user.ID), zap.String("role", user.Role))
 	helpers.JSON(w, http.StatusOK, resp)
 }
 
@@ -249,64 +234,6 @@ func (h *AuthHandler) Protected(w http.ResponseWriter, r *http.Request) {
 	helpers.JSON(w, http.StatusOK, resp)
 }
 
-// Refresh godoc
-// @Summary Обновление access-токена
-// @Tags auth
-// @Produce json
-// @Security ApiKeyAuth
-// @Success 200 {object} map[string]string
-// @Failure 401 {string} string "Недействительный refresh токен"
-// @Router /api/refresh [post]
-func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
-	log := logger.WithCtx(r.Context())
-
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		log.Warn("Отсутствует refresh token в Refresh")
-		helpers.Error(w, http.StatusUnauthorized, "Отсутствует refresh token")
-		return
-	}
-
-	cfg, _ := config.LoadConfig()
-	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-
-	claims := jwt.MapClaims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		return []byte(cfg.JWTSecret), nil
-	})
-	if err != nil || !token.Valid {
-		log.Warn("Неверный или просроченный refresh token", zap.Error(err))
-		helpers.Error(w, http.StatusUnauthorized, "Неверный или просроченный refresh token")
-		return
-	}
-
-	userID, ok1 := claims["user_id"].(float64)
-	role, ok2 := claims["role"].(string)
-	if !ok1 || !ok2 {
-		log.Warn("Неверный payload refresh токена", zap.Any("claims_keys", keys(claims)))
-		helpers.Error(w, http.StatusUnauthorized, "Неверный payload токена")
-		return
-	}
-
-	isValid, err := h.authService.ValidateRefreshToken(r.Context(), int(userID), tokenString)
-	if err != nil || !isValid {
-		log.Warn("Недействительный refresh token (storage)", zap.Error(err))
-		helpers.Error(w, http.StatusUnauthorized, "Недействительный refresh token")
-		return
-	}
-
-	accessTTL, _ := time.ParseDuration(cfg.AccessTokenTTL)
-	accessToken, err := utils.GenerateToken(cfg.JWTSecret, int(userID), role, accessTTL, "access")
-	if err != nil {
-		log.Error("Ошибка генерации access токена", zap.Error(err))
-		helpers.Error(w, http.StatusInternalServerError, "Ошибка генерации токена")
-		return
-	}
-
-	log.Info("Токен обновлён", zap.Int("user_id", int(userID)))
-	helpers.JSON(w, http.StatusOK, map[string]string{"access_token": accessToken})
-}
-
 // Logout godoc
 // @Summary Выход (удаление refresh токена)
 // @Tags auth
@@ -316,11 +243,9 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 // @Router /api/logout [post]
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	log := logger.WithCtx(r.Context())
-
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		log.Warn("Отсутствует refresh token в Logout")
-		helpers.Error(w, http.StatusUnauthorized, "Отсутствует refresh token")
+		helpers.Error(w, http.StatusUnauthorized, "Отсутствует токен")
 		return
 	}
 
@@ -332,25 +257,20 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		return []byte(cfg.JWTSecret), nil
 	})
 	if err != nil || !token.Valid {
-		log.Warn("Невалидный refresh token при Logout", zap.Error(err))
-		helpers.Error(w, http.StatusUnauthorized, "Невалидный refresh token")
+		helpers.Error(w, http.StatusUnauthorized, "Невалидный токен")
 		return
 	}
 
-	userID, ok := claims["user_id"].(float64)
-	if !ok {
-		log.Warn("Неверный payload при Logout", zap.Any("claims_keys", keys(claims)))
-		helpers.Error(w, http.StatusUnauthorized, "Неверный payload")
+	expUnix, _ := claims["exp"].(float64)
+	exp := time.Unix(int64(expUnix), 0)
+
+	if err := h.authService.Logout(r.Context(), tokenString, exp); err != nil {
+		log.Error("Ошибка при logout", zap.Error(err))
+		helpers.Error(w, http.StatusInternalServerError, "Ошибка при выходе")
 		return
 	}
 
-	if err := h.authService.Logout(r.Context(), int(userID), tokenString); err != nil {
-		log.Error("Ошибка при удалении refresh токена", zap.Error(err), zap.Int("user_id", int(userID)))
-		helpers.Error(w, http.StatusInternalServerError, "Ошибка при удалении токена")
-		return
-	}
-
-	log.Info("Пользователь вышел", zap.Int("user_id", int(userID)))
+	log.Info("Пользователь вышел, токен в блоклисте")
 	helpers.JSON(w, http.StatusOK, "Выход выполнен")
 }
 
