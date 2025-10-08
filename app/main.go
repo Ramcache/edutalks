@@ -31,6 +31,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// main
 func main() {
 	// 1) Загружаем конфиг
 	cfg, err := config.LoadConfig()
