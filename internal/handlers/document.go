@@ -62,7 +62,7 @@ func (h *DocumentHandler) UploadDocument(w http.ResponseWriter, r *http.Request)
 	log := logger.WithCtx(r.Context())
 	log.Info("Запрос на загрузку документа")
 
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
+	if err := r.ParseMultipartForm(2000 << 20); err != nil {
 		log.Warn("Ошибка разбора формы при загрузке документа", zap.Error(err))
 		helpers.Error(w, http.StatusBadRequest, "Ошибка разбора формы")
 		return
